@@ -277,13 +277,6 @@ func (m Model) handleConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renders the model to a string
-func (m Model) View() string {
-	// Simple placeholder view for now
-	// Full implementation will be in view.go
-	return "wui - Warrior UI (TUI not yet implemented)\n"
-}
-
 // loadTasksCmd creates a command to load tasks asynchronously
 func loadTasksCmd(service core.TaskService, filter string) tea.Cmd {
 	return func() tea.Msg {
