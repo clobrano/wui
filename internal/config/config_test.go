@@ -50,8 +50,11 @@ func TestConfigStruct(t *testing.T) {
 }
 
 func TestLoadConfig_FileNotExist(t *testing.T) {
-	// Try to load from non-existent file
-	cfg, err := LoadConfig("/nonexistent/config.yaml")
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Load config from non-existent file - should create default
+	cfg, err := LoadConfig(configPath)
 	if err != nil {
 		t.Errorf("Expected no error for missing config, got %v", err)
 	}
@@ -61,6 +64,20 @@ func TestLoadConfig_FileNotExist(t *testing.T) {
 	// Should return default config
 	if cfg.TaskBin == "" {
 		t.Error("Expected default TaskBin")
+	}
+
+	// Verify file was created
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		t.Error("Expected default config file to be created")
+	}
+
+	// Verify file contains valid YAML
+	loadedCfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("Failed to load created config: %v", err)
+	}
+	if loadedCfg.TaskBin != cfg.TaskBin {
+		t.Errorf("Expected TaskBin %s, got %s", cfg.TaskBin, loadedCfg.TaskBin)
 	}
 }
 

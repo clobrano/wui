@@ -17,7 +17,7 @@ type Config struct {
 }
 
 // LoadConfig loads configuration from a YAML file
-// If the file doesn't exist, returns default configuration
+// If the file doesn't exist, creates a default config file and returns default configuration
 // Merges loaded config with defaults to ensure all fields are set
 func LoadConfig(path string) (*Config, error) {
 	// Get defaults first
@@ -26,8 +26,14 @@ func LoadConfig(path string) (*Config, error) {
 	// Try to read the file
 	data, err := os.ReadFile(path)
 	if err != nil {
-		// If file doesn't exist, return defaults
+		// If file doesn't exist, create default config file and return defaults
 		if os.IsNotExist(err) {
+			// Create default config file
+			if err := SaveConfig(cfg, path); err != nil {
+				// If we can't save, just return defaults (don't fail)
+				// This allows the app to work even if config dir isn't writable
+				return cfg, nil
+			}
 			return cfg, nil
 		}
 		return nil, fmt.Errorf("failed to read config file: %w", err)
