@@ -176,19 +176,3 @@ func (c *Client) runCommand(args ...string) ([]byte, error) {
 	}
 	return output, nil
 }
-
-// MapToCore converts a TaskwarriorTask to a core.Task
-// This is a placeholder - will be fully implemented in mapper.go
-func MapToCore(t TaskwarriorTask) core.Task {
-	// Basic mapping for now
-	// Full implementation will handle date parsing, depends, etc.
-	return core.Task{
-		UUID:        t.UUID,
-		Description: t.Description,
-		Project:     t.Project,
-		Tags:        t.Tags,
-		Priority:    t.Priority,
-		Status:      t.Status,
-		Urgency:     t.Urgency,
-	}
-}
