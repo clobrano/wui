@@ -11,6 +11,7 @@ import (
 // MapToCore converts a TaskwarriorTask to a core.Task
 func MapToCore(t TaskwarriorTask) core.Task {
 	coreTask := core.Task{
+		ID:          t.ID,
 		UUID:        t.UUID,
 		Description: t.Description,
 		Project:     t.Project,

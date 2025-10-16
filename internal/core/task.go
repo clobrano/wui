@@ -5,7 +5,8 @@ import "time"
 // Task represents a task in the domain model (UI-agnostic)
 type Task struct {
 	// Core fields
-	UUID        string
+	ID          int    // Taskwarrior's sequential ID (1, 2, 3, ...)
+	UUID        string // Unique identifier
 	Description string
 	Project     string
 	Tags        []string

@@ -99,19 +99,21 @@ func TestRenderTaskLine(t *testing.T) {
 	service := &core.MockTaskService{}
 	cfg := config.DefaultConfig()
 	model := NewModel(service, cfg)
+	model.width = 80
 
 	task := core.Task{
+		ID:          42,
 		UUID:        "abc-123-def",
 		Description: "Test task",
 		Project:     "TestProject",
 	}
 
-	line := model.renderTaskLine(task, false)
+	line := model.renderTaskLine(task, false, 80)
 	if !strings.Contains(line, "Test task") {
 		t.Error("Expected line to contain task description")
 	}
-	if !strings.Contains(line, "abc-123") {
-		t.Error("Expected line to contain shortened UUID")
+	if !strings.Contains(line, "42") {
+		t.Error("Expected line to contain task ID")
 	}
 }
 
@@ -119,13 +121,14 @@ func TestRenderTaskLineSelected(t *testing.T) {
 	service := &core.MockTaskService{}
 	cfg := config.DefaultConfig()
 	model := NewModel(service, cfg)
+	model.width = 80
 
 	task := core.Task{
 		UUID:        "abc-123",
 		Description: "Selected task",
 	}
 
-	line := model.renderTaskLine(task, true)
+	line := model.renderTaskLine(task, true, 80)
 	if !strings.Contains(line, "■") {
 		t.Error("Expected selected line to contain cursor")
 	}

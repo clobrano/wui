@@ -1,8 +1,11 @@
 package taskwarrior
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"os/exec"
 	"strings"
 
@@ -31,17 +34,32 @@ func NewClient(taskBin, taskrcPath string) (*Client, error) {
 
 // Export retrieves tasks matching the given filter
 func (c *Client) Export(filter string) ([]core.Task, error) {
-	args := c.buildArgs("export", filter)
+	// Split filter into separate arguments for proper parsing
+	filterArgs := strings.Fields(filter)
+	args := append([]string{"export"}, filterArgs...)
+	args = c.buildArgs(args...)
+
+	slog.Debug("Exporting tasks", "filter", filter)
+
 	output, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to export tasks", "error", err, "filter", filter)
 		return nil, fmt.Errorf("failed to export tasks: %w", err)
 	}
+
+	// Log raw output for debugging JSON parsing issues
+	slog.Debug("Raw taskwarrior output", "output_preview", string(output[:min(500, len(output))]))
 
 	// Parse JSON output
 	tasks, err := ParseTaskJSON(output)
 	if err != nil {
+		slog.Error("Failed to parse task JSON",
+			"error", err,
+			"output_preview", string(output[:min(500, len(output))]))
 		return nil, fmt.Errorf("failed to parse task JSON: %w", err)
 	}
+
+	slog.Info("Successfully exported tasks", "count", len(tasks))
 
 	// Map to core.Task
 	coreTasks := make([]core.Task, len(tasks))
@@ -135,7 +153,7 @@ func (c *Client) Edit(uuid string) error {
 	args := c.buildArgs(uuid, "edit")
 	cmd := exec.Command(c.taskBin, args...)
 	if c.taskrcPath != "" {
-		cmd.Env = append(cmd.Env, fmt.Sprintf("TASKRC=%s", c.taskrcPath))
+		cmd.Env = append(os.Environ(), fmt.Sprintf("TASKRC=%s", c.taskrcPath))
 	}
 
 	// Edit requires interactive terminal access
@@ -150,29 +168,60 @@ func (c *Client) Edit(uuid string) error {
 // buildArgs constructs command-line arguments for taskwarrior
 // It handles the taskrc path configuration
 func (c *Client) buildArgs(args ...string) []string {
-	result := make([]string, 0, len(args)+1)
-
-	// Add rc.confirmation=off for non-interactive operations
-	// This is added to specific commands in their respective methods
-
-	// Add taskrc path if specified
-	if c.taskrcPath != "" {
-		result = append(result, fmt.Sprintf("rc:%s", c.taskrcPath))
-	}
-
-	// Add the actual command arguments
-	result = append(result, args...)
-
-	return result
+	// Simply return the arguments as-is
+	// The taskrc path is handled via TASKRC environment variable in runCommand
+	return args
 }
 
 // runCommand executes a taskwarrior command and returns the output
 func (c *Client) runCommand(args ...string) ([]byte, error) {
 	cmd := exec.Command(c.taskBin, args...)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		// Include command output in error for debugging
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))
+
+	// Set TASKRC environment variable if taskrcPath is specified
+	if c.taskrcPath != "" {
+		// Preserve existing environment and add TASKRC
+		cmd.Env = append(os.Environ(), fmt.Sprintf("TASKRC=%s", c.taskrcPath))
 	}
-	return output, nil
+
+	// Capture stdout and stderr separately
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	// Log the command being executed
+	slog.Debug("Executing taskwarrior command",
+		"bin", c.taskBin,
+		"args", args,
+		"taskrc", c.taskrcPath)
+
+	err := cmd.Run()
+
+	// Log stderr if present (informational messages from taskwarrior)
+	if stderr.Len() > 0 {
+		slog.Debug("Taskwarrior stderr output",
+			"stderr", strings.TrimSpace(stderr.String()))
+	}
+
+	if err != nil {
+		// Log error with full context
+		slog.Error("Taskwarrior command failed",
+			"error", err,
+			"stderr", strings.TrimSpace(stderr.String()),
+			"stdout_preview", strings.TrimSpace(stdout.String()[:min(200, stdout.Len())]))
+		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	// Log successful execution
+	slog.Debug("Taskwarrior command succeeded",
+		"output_size", stdout.Len())
+
+	return stdout.Bytes(), nil
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

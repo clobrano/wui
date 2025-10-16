@@ -7,6 +7,7 @@ import (
 
 // TaskwarriorTask represents a task as returned by Taskwarrior JSON export
 type TaskwarriorTask struct {
+	ID          int                      `json:"id,omitempty"` // Sequential ID (only for pending tasks)
 	UUID        string                   `json:"uuid"`
 	Description string                   `json:"description"`
 	Project     string                   `json:"project,omitempty"`

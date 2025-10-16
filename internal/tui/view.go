@@ -67,18 +67,38 @@ func (m Model) renderContent() string {
 // renderTaskList renders the task list (and sidebar if enabled)
 func (m Model) renderTaskList() string {
 	if len(m.tasks) == 0 {
-		return lipgloss.NewStyle().
+		emptyMsg := lipgloss.NewStyle().
 			Padding(2, 4).
 			Render("No tasks found. Press 'n' to create a new task.")
+		// Fill remaining space
+		remaining := m.height - 4 // subtract header and footer
+		if remaining > 3 {
+			emptyMsg += strings.Repeat("\n", remaining-3)
+		}
+		return emptyMsg
 	}
 
 	var lines []string
 
-	// Calculate available height for task list (subtract header and footer)
-	availableHeight := m.height - 4
+	// Calculate available width for task list
+	taskListWidth := m.width
+	sidebarWidth := 0
+	if m.viewMode == ViewModeListWithSidebar {
+		sidebarWidth = m.width / 3
+		if sidebarWidth < 30 {
+			sidebarWidth = 30
+		}
+		taskListWidth = m.width - sidebarWidth
+	}
+
+	// Calculate available height for task list (subtract header, column header, and footer)
+	availableHeight := m.height - 5 // header(1) + column_header(1) + footer(2) + padding(1)
 	if availableHeight < 1 {
 		availableHeight = 10
 	}
+
+	// Add column headers
+	lines = append(lines, m.renderColumnHeaders(taskListWidth))
 
 	// Render tasks
 	startIdx := 0
@@ -104,8 +124,16 @@ func (m Model) renderTaskList() string {
 
 	for i := startIdx; i < endIdx; i++ {
 		task := m.tasks[i]
-		line := m.renderTaskLine(task, i == m.selectedIndex)
+		line := m.renderTaskLine(task, i == m.selectedIndex, taskListWidth)
 		lines = append(lines, line)
+	}
+
+	// Fill remaining vertical space
+	renderedLines := len(lines)
+	if renderedLines < availableHeight+1 { // +1 for header
+		for i := 0; i < availableHeight+1-renderedLines; i++ {
+			lines = append(lines, "")
+		}
 	}
 
 	taskListView := strings.Join(lines, "\n")
@@ -113,13 +141,7 @@ func (m Model) renderTaskList() string {
 	// Show sidebar if enabled
 	if m.viewMode == ViewModeListWithSidebar && m.selectedIndex < len(m.tasks) {
 		selectedTask := m.tasks[m.selectedIndex]
-		sidebar := m.renderSidebar(selectedTask)
-
-		// Split view horizontally
-		taskListWidth := m.width * 2 / 3
-		if taskListWidth < 40 {
-			taskListWidth = 40
-		}
+		sidebar := m.renderSidebar(selectedTask, availableHeight+1)
 
 		taskListStyle := lipgloss.NewStyle().Width(taskListWidth)
 		taskListView = taskListStyle.Render(taskListView)
@@ -130,42 +152,159 @@ func (m Model) renderTaskList() string {
 	return taskListView
 }
 
+// renderColumnHeaders renders the column headers for the task list
+func (m Model) renderColumnHeaders(width int) string {
+	// Calculate column widths dynamically
+	cols := m.calculateColumnWidths(width)
+
+	cursor := " "
+	id := "ID"
+	project := "PROJECT"
+	priority := "P"
+	due := "DUE"
+	description := "DESCRIPTION"
+
+	header := fmt.Sprintf("%s %-*s %-*s %s %-*s %s",
+		cursor,
+		cols.id, id,
+		cols.project, project,
+		priority,
+		cols.due, due,
+		description,
+	)
+
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("14")).
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderBottom(true).
+		BorderForeground(lipgloss.Color("8")).
+		Width(width)
+
+	return headerStyle.Render(header)
+}
+
+// columnWidths holds the calculated widths for each column
+type columnWidths struct {
+	id          int
+	project     int
+	priority    int
+	due         int
+	description int
+}
+
+// calculateColumnWidths determines column widths based on available space
+func (m Model) calculateColumnWidths(width int) columnWidths {
+	// Fixed widths for some columns
+	const (
+		cursorWidth   = 2  // " " or "■ "
+		idWidth       = 4  // Sequential ID (1-9999 should fit)
+		priorityWidth = 1  // H/M/L
+		dueWidth      = 10 // YYYY-MM-DD or "Today"
+		minProject    = 10
+		minDesc       = 20
+		spacing       = 6 // spaces between columns
+	)
+
+	// Calculate remaining space for flexible columns
+	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + spacing
+	remainingWidth := width - fixedWidth
+
+	if remainingWidth < minProject+minDesc {
+		// Minimal widths
+		return columnWidths{
+			id:          idWidth,
+			project:     minProject,
+			priority:    priorityWidth,
+			due:         dueWidth,
+			description: minDesc,
+		}
+	}
+
+	// Allocate 25% to project, 75% to description
+	projectWidth := remainingWidth / 4
+	if projectWidth < minProject {
+		projectWidth = minProject
+	}
+	if projectWidth > 20 {
+		projectWidth = 20
+	}
+
+	descWidth := remainingWidth - projectWidth
+
+	return columnWidths{
+		id:          idWidth,
+		project:     projectWidth,
+		priority:    priorityWidth,
+		due:         dueWidth,
+		description: descWidth,
+	}
+}
+
 // renderTaskLine renders a single task line
-func (m Model) renderTaskLine(task core.Task, isSelected bool) string {
-	// Simple format: [>] ID Project Description
+func (m Model) renderTaskLine(task core.Task, isSelected bool, width int) string {
+	cols := m.calculateColumnWidths(width)
+
+	// Cursor
 	cursor := " "
 	if isSelected {
 		cursor = "■"
 	}
 
-	// Format ID (first 8 chars of UUID)
-	id := task.UUID
-	if len(id) > 8 {
-		id = id[:8]
+	// ID (taskwarrior's sequential ID)
+	id := fmt.Sprintf("%d", task.ID)
+	if task.ID == 0 {
+		// Fall back to UUID prefix if ID is not set (e.g., for completed tasks)
+		id = task.UUID
+		if len(id) > cols.id {
+			id = id[:cols.id]
+		}
 	}
 
-	// Format project
+	// Project
 	project := task.Project
 	if project == "" {
 		project = "-"
 	}
-	if len(project) > 15 {
-		project = project[:12] + "..."
+	if len(project) > cols.project {
+		project = project[:cols.project-3] + "..."
 	}
 
-	// Format description
+	// Priority
+	priority := "-"
+	if task.Priority != "" {
+		priority = string(task.Priority[0]) // H, M, L
+	}
+
+	// Due date
+	due := "-"
+	if task.Due != nil {
+		due = task.FormatDueDate()
+		if len(due) > cols.due {
+			due = due[:cols.due]
+		}
+	}
+
+	// Description
 	description := task.Description
-	maxDescLen := 50
-	if len(description) > maxDescLen {
-		description = description[:maxDescLen-3] + "..."
+	if len(description) > cols.description {
+		description = description[:cols.description-3] + "..."
 	}
 
-	line := fmt.Sprintf("%s %s %-15s %s", cursor, id, project, description)
+	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %s",
+		cursor,
+		cols.id, id,
+		cols.project, project,
+		priority,
+		cols.due, due,
+		description,
+	)
 
 	if isSelected {
 		style := lipgloss.NewStyle().
 			Background(lipgloss.Color("12")).
-			Foreground(lipgloss.Color("0"))
+			Foreground(lipgloss.Color("0")).
+			Width(width)
 		return style.Render(line)
 	}
 
@@ -173,7 +312,7 @@ func (m Model) renderTaskLine(task core.Task, isSelected bool) string {
 }
 
 // renderSidebar renders the task detail sidebar
-func (m Model) renderSidebar(task core.Task) string {
+func (m Model) renderSidebar(task core.Task, height int) string {
 	lines := []string{
 		"Task Details",
 		"",
@@ -194,10 +333,16 @@ func (m Model) renderSidebar(task core.Task) string {
 
 	content := strings.Join(lines, "\n")
 
+	sidebarWidth := m.width / 3
+	if sidebarWidth < 30 {
+		sidebarWidth = 30
+	}
+
 	sidebarStyle := lipgloss.NewStyle().
 		Border(lipgloss.NormalBorder(), false, false, false, true).
 		Padding(1, 2).
-		Width(m.width / 3)
+		Width(sidebarWidth).
+		Height(height)
 
 	return sidebarStyle.Render(content)
 }

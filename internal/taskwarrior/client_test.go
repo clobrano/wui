@@ -169,3 +169,58 @@ func TestClientEdit(t *testing.T) {
 		t.Log("Edit returned no error (unexpected in test environment)")
 	}
 }
+
+func TestBuildArgs(t *testing.T) {
+	tests := []struct {
+		name     string
+		client   *Client
+		args     []string
+		expected []string
+	}{
+		{
+			name: "simple args",
+			client: &Client{
+				taskBin:    "/usr/bin/task",
+				taskrcPath: "/home/user/.taskrc",
+			},
+			args:     []string{"export"},
+			expected: []string{"export"},
+		},
+		{
+			name: "multiple args",
+			client: &Client{
+				taskBin:    "/usr/bin/task",
+				taskrcPath: "/home/user/.taskrc",
+			},
+			args:     []string{"export", "status:pending", "-WAITING"},
+			expected: []string{"export", "status:pending", "-WAITING"},
+		},
+		{
+			name: "no taskrc path",
+			client: &Client{
+				taskBin:    "/usr/bin/task",
+				taskrcPath: "",
+			},
+			args:     []string{"export", "status:pending"},
+			expected: []string{"export", "status:pending"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.client.buildArgs(tt.args...)
+			if len(result) != len(tt.expected) {
+				t.Errorf("Expected %d args, got %d", len(tt.expected), len(result))
+			}
+			for i, arg := range result {
+				if i >= len(tt.expected) {
+					t.Errorf("Extra arg at index %d: %s", i, arg)
+					continue
+				}
+				if arg != tt.expected[i] {
+					t.Errorf("Arg at index %d: expected %s, got %s", i, tt.expected[i], arg)
+				}
+			}
+		})
+	}
+}
