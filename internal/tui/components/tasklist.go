@@ -27,6 +27,9 @@ type TaskListStyles struct {
 	PriorityLow      lipgloss.Color
 	DueOverdue       lipgloss.Color
 	TagColor         lipgloss.Color
+	StatusCompleted  lipgloss.Color
+	StatusWaiting    lipgloss.Color
+	StatusActive     lipgloss.Color
 }
 
 // TaskList is a component for displaying and navigating a list of tasks or groups
@@ -454,13 +457,33 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		cols.description, description,
 	)
 
+	// Apply status-based styling
+	var lineStyle lipgloss.Style
+
 	if isSelected {
-		return t.styles.Selection.Width(t.width).Render(line)
+		lineStyle = t.styles.Selection
+	} else {
+		// Apply status styling based on task status
+		lineStyle = lipgloss.NewStyle()
+
+		switch task.Status {
+		case "completed":
+			// Strikethrough and dim color for completed tasks
+			lineStyle = lineStyle.
+				Foreground(t.styles.StatusCompleted).
+				Strikethrough(true)
+		case "waiting":
+			// Dim color for waiting tasks
+			lineStyle = lineStyle.Foreground(t.styles.StatusWaiting)
+		case "deleted":
+			// Very dim for deleted tasks
+			lineStyle = lineStyle.
+				Foreground(t.styles.StatusCompleted).
+				Strikethrough(true)
+		}
 	}
 
-	// Ensure non-selected lines also use full width
-	normalStyle := lipgloss.NewStyle().Width(t.width)
-	return normalStyle.Render(line)
+	return lineStyle.Width(t.width).Render(line)
 }
 
 // renderGroupHeader renders the header for group list view

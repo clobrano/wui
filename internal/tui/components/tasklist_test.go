@@ -13,14 +13,17 @@ import (
 // defaultTaskListStyles returns default styles for testing
 func defaultTaskListStyles() TaskListStyles {
 	return TaskListStyles{
-		Header:         lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")),
-		Separator:      lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
-		Selection:      lipgloss.NewStyle().Background(lipgloss.Color("12")).Foreground(lipgloss.Color("0")),
-		PriorityHigh:   lipgloss.Color("9"),
-		PriorityMedium: lipgloss.Color("11"),
-		PriorityLow:    lipgloss.Color("12"),
-		DueOverdue:     lipgloss.Color("9"),
-		TagColor:       lipgloss.Color("14"),
+		Header:          lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12")),
+		Separator:       lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+		Selection:       lipgloss.NewStyle().Background(lipgloss.Color("12")).Foreground(lipgloss.Color("0")),
+		PriorityHigh:    lipgloss.Color("9"),
+		PriorityMedium:  lipgloss.Color("11"),
+		PriorityLow:     lipgloss.Color("12"),
+		DueOverdue:      lipgloss.Color("9"),
+		TagColor:        lipgloss.Color("14"),
+		StatusCompleted: lipgloss.Color("8"),
+		StatusWaiting:   lipgloss.Color("8"),
+		StatusActive:    lipgloss.Color("15"),
 	}
 }
 

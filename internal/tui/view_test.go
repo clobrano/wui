@@ -22,9 +22,9 @@ func TestView(t *testing.T) {
 		t.Error("Expected non-empty view")
 	}
 
-	// Should contain title
-	if !strings.Contains(view, "wui") {
-		t.Error("Expected view to contain 'wui'")
+	// Should contain section tabs
+	if !strings.Contains(view, "Next") {
+		t.Error("Expected view to contain section tabs (Next)")
 	}
 }
 

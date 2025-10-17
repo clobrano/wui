@@ -365,14 +365,17 @@ func ThemeFromConfig(cfgTheme *config.Theme) Theme {
 // ToTaskListStyles converts Styles to component-specific TaskListStyles
 func (s *Styles) ToTaskListStyles() components.TaskListStyles {
 	return components.TaskListStyles{
-		Header:         s.TasklistHeader,
-		Separator:      s.Separator,
-		Selection:      s.Selection,
-		PriorityHigh:   s.theme.Colors.PriorityHigh,
-		PriorityMedium: s.theme.Colors.PriorityMedium,
-		PriorityLow:    s.theme.Colors.PriorityLow,
-		DueOverdue:     s.theme.Colors.DueOverdue,
-		TagColor:       s.theme.Colors.TagFg,
+		Header:          s.TasklistHeader,
+		Separator:       s.Separator,
+		Selection:       s.Selection,
+		PriorityHigh:    s.theme.Colors.PriorityHigh,
+		PriorityMedium:  s.theme.Colors.PriorityMedium,
+		PriorityLow:     s.theme.Colors.PriorityLow,
+		DueOverdue:      s.theme.Colors.DueOverdue,
+		TagColor:        s.theme.Colors.TagFg,
+		StatusCompleted: s.theme.Colors.StatusCompleted,
+		StatusWaiting:   s.theme.Colors.StatusWaiting,
+		StatusActive:    s.theme.Colors.StatusActive,
 	}
 }
 
