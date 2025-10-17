@@ -205,7 +205,8 @@ func (t TaskList) renderHeader() string {
 		Foreground(lipgloss.Color("14")).
 		BorderStyle(lipgloss.NormalBorder()).
 		BorderBottom(true).
-		BorderForeground(lipgloss.Color("8"))
+		BorderForeground(lipgloss.Color("8")).
+		Width(t.width)
 
 	return headerStyle.Render(header)
 }
@@ -346,7 +347,9 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		return style.Render(line)
 	}
 
-	return line
+	// Ensure non-selected lines also use full width
+	normalStyle := lipgloss.NewStyle().Width(t.width)
+	return normalStyle.Render(line)
 }
 
 // SelectedTask returns the currently selected task, or nil if no tasks
