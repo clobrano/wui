@@ -101,13 +101,13 @@ type Model struct {
 	height int
 
 	// Components
-	taskList    components.TaskList
-	sidebar     components.Sidebar
-	filter      components.Filter
-	modifyInput components.Filter // Reuse filter component for modify input
+	taskList      components.TaskList
+	sidebar       components.Sidebar
+	filter        components.Filter
+	modifyInput   components.Filter // Reuse filter component for modify input
 	annotateInput components.Filter // Reuse filter component for annotate input
-	newTaskInput components.Filter // Reuse filter component for new task input
-	// sections  components.Sections
+	newTaskInput  components.Filter // Reuse filter component for new task input
+	sections      components.Sections
 	// help      components.Help
 
 	// Confirm action tracking
@@ -116,7 +116,21 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel(service core.TaskService, cfg *config.Config) Model {
-	sections := core.DefaultSections()
+	// Get sections with bookmarks from config
+	var allSections []core.Section
+	if cfg.TUI != nil && len(cfg.TUI.Bookmarks) > 0 {
+		// Convert config.Bookmark to core.Bookmark
+		var coreBookmarks []core.Bookmark
+		for _, b := range cfg.TUI.Bookmarks {
+			coreBookmarks = append(coreBookmarks, core.Bookmark{
+				Name:   b.Name,
+				Filter: b.Filter,
+			})
+		}
+		allSections = core.SectionsWithBookmarks(coreBookmarks)
+	} else {
+		allSections = core.DefaultSections()
+	}
 
 	return Model{
 		service:        service,
@@ -124,16 +138,17 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		tasks:          []core.Task{},
 		viewMode:       ViewModeList,
 		state:          StateNormal,
-		currentSection: &sections[0], // Start with first section (Next)
-		activeFilter:   sections[0].Filter,
+		currentSection: &allSections[0], // Start with first section (Next)
+		activeFilter:   allSections[0].Filter,
 		statusMessage:  "",
 		errorMessage:   "",
-		taskList:       components.NewTaskList(80, 24), // Initial size, will be updated
-		sidebar:        components.NewSidebar(40, 24),  // Initial size, will be updated
+		taskList:       components.NewTaskList(80, 24),      // Initial size, will be updated
+		sidebar:        components.NewSidebar(40, 24),       // Initial size, will be updated
 		filter:         components.NewFilter(),
 		modifyInput:    components.NewFilter(),
 		annotateInput:  components.NewFilter(),
 		newTaskInput:   components.NewFilter(),
+		sections:       components.NewSections(allSections, 80), // Initial size, will be updated
 		confirmAction:  "",
 	}
 }
@@ -155,6 +170,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.updateComponentSizes()
 		return m, nil
 
+	case components.SectionChangedMsg:
+		// Section changed - load tasks with new filter
+		m.currentSection = &msg.Section
+		m.activeFilter = msg.Section.Filter
+		m.errorMessage = ""
+		m.statusMessage = ""
+		return m, loadTasksCmd(m.service, m.activeFilter)
+
 	case TasksLoadedMsg:
 		if msg.Err != nil {
 			m.errorMessage = "Failed to load tasks: " + msg.Err.Error()
@@ -170,6 +193,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Update task list component
 		m.taskList.SetTasks(m.tasks)
+
+		// Update task count in sections component
+		m.sections.SetTaskCount(len(m.tasks))
 
 		// Update sidebar with selected task
 		m.updateSidebar()
@@ -259,7 +285,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
-	case "tab":
+	case "enter":
 		// Toggle sidebar
 		if m.viewMode == ViewModeList {
 			m.viewMode = ViewModeListWithSidebar
@@ -267,6 +293,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.viewMode = ViewModeList
 		}
 		m.updateComponentSizes()
+		m.updateSidebar()
 		return m, nil
 
 	case "d":
@@ -328,7 +355,36 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "j", "down", "k", "up", "g", "G", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+	case "tab", "shift+tab":
+		// Delegate section navigation to sections component
+		m.sections, cmd = m.sections.Update(msg)
+		return m, cmd
+
+	case "1", "2", "3", "4", "5":
+		// Check if it's a section navigation (1-5 for sections)
+		// or task navigation (1-9 for tasks)
+		// Section navigation takes priority if there are sections
+		sectionCount := len(m.sections.Items)
+		if sectionCount > 0 {
+			key := msg.String()[0] - '0'
+			if int(key) <= sectionCount {
+				// It's a section navigation
+				m.sections, cmd = m.sections.Update(msg)
+				return m, cmd
+			}
+		}
+		// Otherwise, fall through to task list navigation
+		m.taskList, cmd = m.taskList.Update(msg)
+		m.updateSidebar()
+		return m, cmd
+
+	case "6", "7", "8", "9":
+		// These are only for task list navigation
+		m.taskList, cmd = m.taskList.Update(msg)
+		m.updateSidebar()
+		return m, cmd
+
+	case "j", "down", "k", "up", "g", "G":
 		// Delegate navigation to task list component
 		m.taskList, cmd = m.taskList.Update(msg)
 		m.updateSidebar()
@@ -353,8 +409,11 @@ func (m *Model) updateComponentSizes() {
 		return
 	}
 
-	// Calculate available height (subtract header and footer)
-	availableHeight := m.height - 3 // header(1) + footer(2)
+	// Update sections component width
+	m.sections.SetSize(m.width)
+
+	// Calculate available height (subtract header, sections bar, and footer)
+	availableHeight := m.height - 4 // header(1) + sections(1) + footer(2)
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||

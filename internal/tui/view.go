@@ -18,6 +18,9 @@ func (m Model) View() string {
 	// Header
 	sections = append(sections, m.renderHeader())
 
+	// Sections bar
+	sections = append(sections, m.renderSections())
+
 	// Main content area
 	sections = append(sections, m.renderContent())
 
@@ -37,11 +40,6 @@ func (m Model) View() string {
 func (m Model) renderHeader() string {
 	title := "wui - Warrior UI"
 
-	// Add current section if available
-	if m.currentSection != nil {
-		title += " | " + m.currentSection.Name
-	}
-
 	// Add active filter if not default
 	if m.activeFilter != "" && m.currentSection != nil && m.activeFilter != m.currentSection.Filter {
 		title += fmt.Sprintf(" | Filter: %s", m.activeFilter)
@@ -53,6 +51,11 @@ func (m Model) renderHeader() string {
 		Padding(0, 1)
 
 	return headerStyle.Render(title)
+}
+
+// renderSections renders the sections navigation bar
+func (m Model) renderSections() string {
+	return m.sections.View()
 }
 
 // renderContent renders the main content based on current state
@@ -86,15 +89,32 @@ func (m Model) renderHelp() string {
 	help := []string{
 		"Help - Keyboard Shortcuts",
 		"",
-		"Navigation:",
+		"Task Navigation:",
 		"  j/↓       - Move down",
 		"  k/↑       - Move up",
 		"  g         - Jump to first",
 		"  G         - Jump to last",
-		"  Tab       - Toggle sidebar",
+		"  1-9       - Quick jump to task",
 		"",
-		"Actions:",
+		"Section Navigation:",
+		"  Tab       - Next section",
+		"  Shift+Tab - Previous section",
+		"  1-5       - Jump to section",
+		"",
+		"Task Actions:",
+		"  d         - Mark done",
+		"  x         - Delete",
+		"  e         - Edit",
+		"  n         - New task",
+		"  m         - Modify",
+		"  a         - Annotate",
+		"  u         - Undo",
+		"",
+		"Other:",
+		"  Enter     - Toggle sidebar",
+		"  /         - Filter tasks",
 		"  r         - Refresh tasks",
+		"  ?         - Toggle help",
 		"  q         - Quit",
 		"",
 		"Press ? or Esc to close help",
