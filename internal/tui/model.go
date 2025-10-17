@@ -85,6 +85,11 @@ type Model struct {
 	tasks          []core.Task
 	currentSection *core.Section
 
+	// Grouping state (for Projects/Tags sections)
+	groups        []core.TaskGroup // Current groups (when in group list view)
+	selectedGroup *core.TaskGroup   // Selected group (when drilling into a group)
+	inGroupView   bool              // true = showing group list, false = showing tasks
+
 	// UI state
 	viewMode ViewMode
 	state    AppState
@@ -140,6 +145,9 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		state:          StateNormal,
 		currentSection: &allSections[0], // Start with first section (Next)
 		activeFilter:   allSections[0].Filter,
+		groups:         []core.TaskGroup{},
+		selectedGroup:  nil,
+		inGroupView:    false,
 		statusMessage:  "",
 		errorMessage:   "",
 		taskList:       components.NewTaskList(80, 24),      // Initial size, will be updated
@@ -176,6 +184,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activeFilter = msg.Section.Filter
 		m.errorMessage = ""
 		m.statusMessage = ""
+
+		// Reset grouping state when switching sections
+		m.selectedGroup = nil
+		m.groups = []core.TaskGroup{}
+
+		// Determine if we should show groups
+		if m.sections.IsProjectsView() || m.sections.IsTagsView() {
+			m.inGroupView = true
+		} else {
+			m.inGroupView = false
+		}
+
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
 	case TasksLoadedMsg:
@@ -191,14 +211,28 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.errorMessage = ""
 
-		// Update task list component
-		m.taskList.SetTasks(m.tasks)
+		// If in Projects or Tags view and showing group list, compute groups
+		if m.inGroupView {
+			if m.sections.IsProjectsView() {
+				m.groups = core.GroupByProject(m.tasks)
+			} else if m.sections.IsTagsView() {
+				m.groups = core.GroupByTag(m.tasks)
+			}
+			// Show group list in the task list component
+			m.taskList.SetGroups(m.groups)
+		} else {
+			// Normal view or drilling into a group
+			// Update task list component with actual tasks
+			m.taskList.SetTasks(m.tasks)
+		}
 
 		// Update task count in sections component
 		m.sections.SetTaskCount(len(m.tasks))
 
-		// Update sidebar with selected task
-		m.updateSidebar()
+		// Update sidebar with selected task (only if not in group view)
+		if !m.inGroupView {
+			m.updateSidebar()
+		}
 
 		return m, nil
 
@@ -275,6 +309,22 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = StateHelp
 		return m, nil
 
+	case "esc":
+		// Go back to group list if we drilled into a group
+		if !m.inGroupView && m.selectedGroup != nil && (m.sections.IsProjectsView() || m.sections.IsTagsView()) {
+			m.inGroupView = true
+			m.selectedGroup = nil
+			// Recompute groups from all tasks and display them
+			if m.sections.IsProjectsView() {
+				m.groups = core.GroupByProject(m.tasks)
+			} else if m.sections.IsTagsView() {
+				m.groups = core.GroupByTag(m.tasks)
+			}
+			m.taskList.SetGroups(m.groups)
+			return m, nil
+		}
+		return m, nil
+
 	case "/":
 		// Activate filter input
 		m.state = StateFilterInput
@@ -286,7 +336,21 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
 	case "enter":
-		// Toggle sidebar
+		// If in group view, drill into selected group
+		if m.inGroupView && len(m.groups) > 0 {
+			// Get the selected group index from task list cursor
+			selectedIndex := m.taskList.Cursor()
+			if selectedIndex >= 0 && selectedIndex < len(m.groups) {
+				m.selectedGroup = &m.groups[selectedIndex]
+				m.inGroupView = false
+				// Set tasks to the tasks in this group
+				m.taskList.SetTasks(m.selectedGroup.Tasks)
+				m.updateSidebar()
+			}
+			return m, nil
+		}
+
+		// Otherwise toggle sidebar
 		if m.viewMode == ViewModeList {
 			m.viewMode = ViewModeListWithSidebar
 		} else {
@@ -355,8 +419,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "tab", "shift+tab":
+	case "tab", "shift+tab", "h", "l", "left", "right":
 		// Delegate section navigation to sections component
+		// h/l are vim-like keybindings (h=left, l=right)
 		m.sections, cmd = m.sections.Update(msg)
 		return m, cmd
 
