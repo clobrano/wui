@@ -109,7 +109,6 @@ func TestModelStruct(t *testing.T) {
 		service:        service,
 		config:         cfg,
 		tasks:          []core.Task{},
-		selectedIndex:  0,
 		viewMode:       ViewModeList,
 		state:          StateNormal,
 		currentSection: &sections[0],
@@ -125,9 +124,6 @@ func TestModelStruct(t *testing.T) {
 	}
 	if len(model.tasks) != 0 {
 		t.Errorf("Expected 0 tasks, got %d", len(model.tasks))
-	}
-	if model.selectedIndex != 0 {
-		t.Errorf("Expected selectedIndex 0, got %d", model.selectedIndex)
 	}
 	if model.viewMode != ViewModeList {
 		t.Errorf("Expected ViewModeList, got %v", model.viewMode)

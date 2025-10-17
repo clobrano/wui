@@ -1,0 +1,538 @@
+package components
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/clobrano/wui/internal/core"
+)
+
+// Sidebar displays detailed information about a task
+type Sidebar struct {
+	task   *core.Task
+	width  int
+	height int
+	offset int // Scroll offset for content
+}
+
+// NewSidebar creates a new sidebar component
+func NewSidebar(width, height int) Sidebar {
+	return Sidebar{
+		task:   nil,
+		width:  width,
+		height: height,
+		offset: 0,
+	}
+}
+
+// SetTask updates the task being displayed
+func (s *Sidebar) SetTask(task *core.Task) {
+	s.task = task
+	s.offset = 0 // Reset scroll when task changes
+}
+
+// SetSize updates the sidebar dimensions
+func (s *Sidebar) SetSize(width, height int) {
+	s.width = width
+	s.height = height
+}
+
+// Update handles messages for the sidebar
+func (s Sidebar) Update(msg tea.Msg) (Sidebar, tea.Cmd) {
+	if s.task == nil {
+		return s, nil
+	}
+
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		return s.handleKey(msg), nil
+	}
+	return s, nil
+}
+
+// handleKey processes keyboard input for scrolling
+func (s Sidebar) handleKey(msg tea.KeyMsg) Sidebar {
+	// Only handle scrolling keys when sidebar is active
+	switch msg.String() {
+	case "ctrl+d":
+		s.scrollDown(s.height / 2)
+	case "ctrl+u":
+		s.scrollUp(s.height / 2)
+	case "ctrl+f":
+		s.scrollDown(s.height)
+	case "ctrl+b":
+		s.scrollUp(s.height)
+	}
+	return s
+}
+
+// scrollDown scrolls the sidebar content down
+func (s *Sidebar) scrollDown(amount int) {
+	// Calculate max content lines
+	contentLines := s.contentLineCount()
+	maxOffset := contentLines - s.height + 2 // Keep some padding
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	s.offset += amount
+	if s.offset > maxOffset {
+		s.offset = maxOffset
+	}
+}
+
+// scrollUp scrolls the sidebar content up
+func (s *Sidebar) scrollUp(amount int) {
+	s.offset -= amount
+	if s.offset < 0 {
+		s.offset = 0
+	}
+}
+
+// contentLineCount estimates the number of content lines
+func (s *Sidebar) contentLineCount() int {
+	if s.task == nil {
+		return 0
+	}
+
+	// Rough estimate based on content sections
+	lines := 10 // Base fields
+	lines += len(s.task.Tags)
+	lines += len(s.task.Annotations) * 3
+	lines += len(s.task.Depends) * 2
+	lines += len(s.task.UDAs)
+
+	// Description wrapping
+	if len(s.task.Description) > s.width-6 {
+		lines += len(s.task.Description) / (s.width - 6)
+	}
+
+	return lines
+}
+
+// View renders the sidebar
+func (s Sidebar) View() string {
+	if s.task == nil {
+		return s.renderEmpty()
+	}
+
+	// Render all content sections
+	sections := s.renderContent()
+
+	// Apply scrolling offset
+	lines := strings.Split(sections, "\n")
+	if s.offset >= len(lines) {
+		s.offset = 0
+	}
+
+	visibleLines := lines[s.offset:]
+	if len(visibleLines) > s.height {
+		visibleLines = visibleLines[:s.height]
+	}
+
+	// Fill remaining space
+	for len(visibleLines) < s.height {
+		visibleLines = append(visibleLines, "")
+	}
+
+	content := strings.Join(visibleLines, "\n")
+
+	// Apply sidebar styling
+	sidebarStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(lipgloss.Color("8")).
+		Padding(0, 1).
+		Width(s.width).
+		Height(s.height)
+
+	return sidebarStyle.Render(content)
+}
+
+// renderEmpty renders the empty state
+func (s Sidebar) renderEmpty() string {
+	emptyStyle := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder(), false, false, false, true).
+		BorderForeground(lipgloss.Color("8")).
+		Padding(2, 1).
+		Width(s.width).
+		Height(s.height).
+		Foreground(lipgloss.Color("8"))
+
+	return emptyStyle.Render("No task selected")
+}
+
+// renderContent renders all task details
+func (s Sidebar) renderContent() string {
+	var sections []string
+
+	// Title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("14"))
+
+	title := fmt.Sprintf("Task #%d", s.task.ID)
+	if s.task.ID == 0 {
+		title = "Task Details"
+	}
+	sections = append(sections, titleStyle.Render(title))
+	sections = append(sections, "")
+
+	// UUID
+	sections = append(sections, s.renderField("UUID", s.task.UUID))
+
+	// Description (wrapped)
+	sections = append(sections, s.renderWrappedField("Description", s.task.Description))
+
+	// Project
+	project := s.task.Project
+	if project == "" {
+		project = "-"
+	}
+	sections = append(sections, s.renderField("Project", project))
+
+	// Status
+	sections = append(sections, s.renderStatusField())
+
+	// Priority
+	priority := s.task.Priority
+	if priority == "" {
+		priority = "-"
+	}
+	sections = append(sections, s.renderPriorityField(priority))
+
+	// Tags
+	if len(s.task.Tags) > 0 {
+		sections = append(sections, "")
+		sections = append(sections, s.renderTags())
+	}
+
+	// Dates section
+	sections = append(sections, "")
+	sections = append(sections, s.renderDates())
+
+	// Dependencies
+	if len(s.task.Depends) > 0 {
+		sections = append(sections, "")
+		sections = append(sections, s.renderDependencies())
+	}
+
+	// Annotations
+	if len(s.task.Annotations) > 0 {
+		sections = append(sections, "")
+		sections = append(sections, s.renderAnnotations())
+	}
+
+	// UDAs (User Defined Attributes)
+	if len(s.task.UDAs) > 0 {
+		sections = append(sections, "")
+		sections = append(sections, s.renderUDAs())
+	}
+
+	// Urgency
+	sections = append(sections, "")
+	sections = append(sections, s.renderField("Urgency", fmt.Sprintf("%.2f", s.task.Urgency)))
+
+	return strings.Join(sections, "\n")
+}
+
+// renderField renders a simple label: value field
+func (s Sidebar) renderField(label, value string) string {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true)
+
+	return fmt.Sprintf("%s: %s", labelStyle.Render(label), value)
+}
+
+// renderWrappedField renders a field with wrapped text
+func (s Sidebar) renderWrappedField(label, value string) string {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true)
+
+	// Wrap text to fit width
+	maxWidth := s.width - 4 // Account for padding
+	wrapped := wrapText(value, maxWidth)
+
+	return fmt.Sprintf("%s:\n%s", labelStyle.Render(label), wrapped)
+}
+
+// renderStatusField renders the status with color coding
+func (s Sidebar) renderStatusField() string {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true)
+
+	statusStyle := lipgloss.NewStyle()
+	switch s.task.Status {
+	case "pending":
+		statusStyle = statusStyle.Foreground(lipgloss.Color("11")) // Yellow
+	case "completed":
+		statusStyle = statusStyle.Foreground(lipgloss.Color("10")) // Green
+	case "deleted":
+		statusStyle = statusStyle.Foreground(lipgloss.Color("8")) // Gray
+	case "waiting":
+		statusStyle = statusStyle.Foreground(lipgloss.Color("12")) // Blue
+	}
+
+	return fmt.Sprintf("%s: %s", labelStyle.Render("Status"), statusStyle.Render(s.task.Status))
+}
+
+// renderPriorityField renders priority with color coding
+func (s Sidebar) renderPriorityField(priority string) string {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true)
+
+	priorityStyle := lipgloss.NewStyle()
+	switch priority {
+	case "H":
+		priorityStyle = priorityStyle.Foreground(lipgloss.Color("9")) // Red
+	case "M":
+		priorityStyle = priorityStyle.Foreground(lipgloss.Color("11")) // Yellow
+	case "L":
+		priorityStyle = priorityStyle.Foreground(lipgloss.Color("12")) // Blue
+	}
+
+	return fmt.Sprintf("%s: %s", labelStyle.Render("Priority"), priorityStyle.Render(priority))
+}
+
+// renderTags renders the tags section
+func (s Sidebar) renderTags() string {
+	labelStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true)
+
+	tagStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("13"))
+
+	tags := make([]string, len(s.task.Tags))
+	for i, tag := range s.task.Tags {
+		tags[i] = tagStyle.Render("+" + tag)
+	}
+
+	return fmt.Sprintf("%s: %s", labelStyle.Render("Tags"), strings.Join(tags, " "))
+}
+
+// renderDates renders all date fields
+func (s Sidebar) renderDates() string {
+	var lines []string
+
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true).
+		Underline(true)
+
+	lines = append(lines, headerStyle.Render("Dates"))
+
+	// Due date
+	if s.task.Due != nil {
+		dueStr := formatDateWithRelative(*s.task.Due)
+		style := lipgloss.NewStyle()
+		if s.task.IsOverdue() {
+			style = style.Foreground(lipgloss.Color("9")) // Red
+		}
+		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(dueStr)))
+	}
+
+	// Scheduled date
+	if s.task.Scheduled != nil {
+		lines = append(lines, fmt.Sprintf("  Scheduled: %s", formatDateWithRelative(*s.task.Scheduled)))
+	}
+
+	// Wait date
+	if s.task.Wait != nil {
+		lines = append(lines, fmt.Sprintf("  Wait: %s", formatDateWithRelative(*s.task.Wait)))
+	}
+
+	// Entry date
+	lines = append(lines, fmt.Sprintf("  Created: %s", formatDateWithRelative(s.task.Entry)))
+
+	// Modified date
+	if s.task.Modified != nil {
+		lines = append(lines, fmt.Sprintf("  Modified: %s", formatDateWithRelative(*s.task.Modified)))
+	}
+
+	// End date (for completed tasks)
+	if s.task.End != nil {
+		lines = append(lines, fmt.Sprintf("  Completed: %s", formatDateWithRelative(*s.task.End)))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderDependencies renders task dependencies
+func (s Sidebar) renderDependencies() string {
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true).
+		Underline(true)
+
+	var lines []string
+	lines = append(lines, headerStyle.Render("Dependencies"))
+
+	if len(s.task.Depends) > 0 {
+		lines = append(lines, "  Blocked by:")
+		for _, uuid := range s.task.Depends {
+			// Show shortened UUID
+			shortUUID := uuid
+			if len(shortUUID) > 8 {
+				shortUUID = shortUUID[:8]
+			}
+			lines = append(lines, fmt.Sprintf("    - %s", shortUUID))
+		}
+	} else {
+		lines = append(lines, "  None")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderAnnotations renders task annotations
+func (s Sidebar) renderAnnotations() string {
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true).
+		Underline(true)
+
+	var lines []string
+	lines = append(lines, headerStyle.Render("Annotations"))
+
+	for _, ann := range s.task.Annotations {
+		dateStr := formatDateWithRelative(ann.Entry)
+		lines = append(lines, fmt.Sprintf("  [%s]", dateStr))
+
+		// Wrap annotation text
+		wrapped := wrapText(ann.Description, s.width-4)
+		for _, line := range strings.Split(wrapped, "\n") {
+			lines = append(lines, fmt.Sprintf("  %s", line))
+		}
+		lines = append(lines, "")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderUDAs renders user-defined attributes
+func (s Sidebar) renderUDAs() string {
+	headerStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")).
+		Bold(true).
+		Underline(true)
+
+	var lines []string
+	lines = append(lines, headerStyle.Render("Custom Fields"))
+
+	// Sort keys for consistent display
+	for key, value := range s.task.UDAs {
+		lines = append(lines, fmt.Sprintf("  %s: %s", key, value))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// formatDateWithRelative formats a date with relative time
+func formatDateWithRelative(t time.Time) string {
+	// Format: "2006-01-02 (2 days ago)"
+	dateStr := t.Format("2006-01-02 15:04")
+	relativeStr := formatRelativeTime(t)
+
+	if relativeStr != "" {
+		return fmt.Sprintf("%s (%s)", dateStr, relativeStr)
+	}
+	return dateStr
+}
+
+// formatRelativeTime returns a human-readable relative time string
+func formatRelativeTime(t time.Time) string {
+	now := time.Now()
+	diff := now.Sub(t)
+
+	if diff < 0 {
+		diff = -diff
+		// Future dates
+		if diff < time.Minute {
+			return "in moments"
+		} else if diff < time.Hour {
+			mins := int(diff.Minutes())
+			if mins == 1 {
+				return "in 1 minute"
+			}
+			return fmt.Sprintf("in %d minutes", mins)
+		} else if diff < 24*time.Hour {
+			hours := int(diff.Hours())
+			if hours == 1 {
+				return "in 1 hour"
+			}
+			return fmt.Sprintf("in %d hours", hours)
+		} else if diff < 36*time.Hour {
+			// 24-36 hours = tomorrow
+			return "tomorrow"
+		} else if diff < 7*24*time.Hour {
+			days := int(diff.Hours() / 24)
+			return fmt.Sprintf("in %d days", days)
+		}
+		return ""
+	}
+
+	// Past dates
+	if diff < time.Minute {
+		return "just now"
+	} else if diff < time.Hour {
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 minute ago"
+		}
+		return fmt.Sprintf("%d minutes ago", mins)
+	} else if diff < 24*time.Hour {
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	} else if diff < 7*24*time.Hour {
+		days := int(diff.Hours() / 24)
+		if days == 1 {
+			return "yesterday"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	} else if diff < 30*24*time.Hour {
+		weeks := int(diff.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1 week ago"
+		}
+		return fmt.Sprintf("%d weeks ago", weeks)
+	}
+
+	return ""
+}
+
+// wrapText wraps text to fit within the specified width
+func wrapText(text string, width int) string {
+	if width <= 0 {
+		return text
+	}
+
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return text
+	}
+
+	var lines []string
+	currentLine := words[0]
+
+	for _, word := range words[1:] {
+		if len(currentLine)+1+len(word) <= width {
+			currentLine += " " + word
+		} else {
+			lines = append(lines, currentLine)
+			currentLine = word
+		}
+	}
+	lines = append(lines, currentLine)
+
+	return strings.Join(lines, "\n")
+}

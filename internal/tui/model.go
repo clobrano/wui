@@ -4,6 +4,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
+	"github.com/clobrano/wui/internal/tui/components"
 )
 
 // ViewMode represents the view layout mode
@@ -66,7 +67,6 @@ type Model struct {
 
 	// Task data
 	tasks          []core.Task
-	selectedIndex  int
 	currentSection *core.Section
 
 	// UI state
@@ -84,9 +84,9 @@ type Model struct {
 	width  int
 	height int
 
-	// TODO: Components will be added later
-	// taskList  components.TaskList
-	// sidebar   components.Sidebar
+	// Components
+	taskList components.TaskList
+	sidebar  components.Sidebar
 	// sections  components.Sections
 	// filter    components.Filter
 	// help      components.Help
@@ -100,13 +100,14 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		service:        service,
 		config:         cfg,
 		tasks:          []core.Task{},
-		selectedIndex:  0,
 		viewMode:       ViewModeList,
 		state:          StateNormal,
 		currentSection: &sections[0], // Start with first section (Next)
 		activeFilter:   sections[0].Filter,
 		statusMessage:  "",
 		errorMessage:   "",
+		taskList:       components.NewTaskList(80, 24), // Initial size, will be updated
+		sidebar:        components.NewSidebar(40, 24),  // Initial size, will be updated
 	}
 }
 
@@ -122,6 +123,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+
+		// Update component sizes
+		m.updateComponentSizes()
 		return m, nil
 
 	case TasksLoadedMsg:
@@ -131,10 +135,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.tasks = msg.Tasks
 		m.errorMessage = ""
-		// Reset selection if out of bounds
-		if m.selectedIndex >= len(m.tasks) {
-			m.selectedIndex = 0
-		}
+
+		// Update task list component
+		m.taskList.SetTasks(m.tasks)
+
+		// Update sidebar with selected task
+		m.updateSidebar()
+
 		return m, nil
 
 	case TaskModifiedMsg:
@@ -193,6 +200,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleNormalKeys handles keys in normal state
 func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg.String() {
 	case "q":
 		return m, tea.Quit
@@ -204,28 +213,6 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
-	case "j", "down":
-		if m.selectedIndex < len(m.tasks)-1 {
-			m.selectedIndex++
-		}
-		return m, nil
-
-	case "k", "up":
-		if m.selectedIndex > 0 {
-			m.selectedIndex--
-		}
-		return m, nil
-
-	case "g":
-		m.selectedIndex = 0
-		return m, nil
-
-	case "G":
-		if len(m.tasks) > 0 {
-			m.selectedIndex = len(m.tasks) - 1
-		}
-		return m, nil
-
 	case "tab":
 		// Toggle sidebar
 		if m.viewMode == ViewModeList {
@@ -233,10 +220,57 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.viewMode = ViewModeList
 		}
+		m.updateComponentSizes()
 		return m, nil
+
+	case "j", "down", "k", "up", "g", "G", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		// Delegate navigation to task list component
+		m.taskList, cmd = m.taskList.Update(msg)
+		m.updateSidebar()
+		return m, cmd
+	}
+
+	// If sidebar is visible, check for sidebar scrolling keys
+	if m.viewMode == ViewModeListWithSidebar {
+		switch msg.String() {
+		case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+			m.sidebar, cmd = m.sidebar.Update(msg)
+			return m, cmd
+		}
 	}
 
 	return m, nil
+}
+
+// updateComponentSizes updates the sizes of all components based on terminal dimensions
+func (m *Model) updateComponentSizes() {
+	if m.width == 0 || m.height == 0 {
+		return
+	}
+
+	// Calculate available height (subtract header and footer)
+	availableHeight := m.height - 3 // header(1) + footer(2)
+
+	if m.viewMode == ViewModeListWithSidebar {
+		// Split view: task list and sidebar
+		sidebarWidth := m.width / 3
+		if sidebarWidth < 30 {
+			sidebarWidth = 30
+		}
+		taskListWidth := m.width - sidebarWidth
+
+		m.taskList.SetSize(taskListWidth, availableHeight)
+		m.sidebar.SetSize(sidebarWidth, availableHeight)
+	} else {
+		// Full width task list
+		m.taskList.SetSize(m.width, availableHeight)
+	}
+}
+
+// updateSidebar updates the sidebar with the currently selected task
+func (m *Model) updateSidebar() {
+	selectedTask := m.taskList.SelectedTask()
+	m.sidebar.SetTask(selectedTask)
 }
 
 // handleFilterKeys handles keys in filter input state

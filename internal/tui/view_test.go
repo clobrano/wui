@@ -36,9 +36,13 @@ func TestViewWithTasks(t *testing.T) {
 	model.width = 80
 	model.height = 24
 	model.tasks = []core.Task{
-		{UUID: "task-1", Description: "Test task 1", Project: "TestProject"},
-		{UUID: "task-2", Description: "Test task 2", Project: "TestProject"},
+		{ID: 1, UUID: "task-1", Description: "Test task 1", Project: "TestProject", Status: "pending"},
+		{ID: 2, UUID: "task-2", Description: "Test task 2", Project: "TestProject", Status: "pending"},
 	}
+	// Update component sizes first
+	model.updateComponentSizes()
+	// Set tasks in the task list component
+	model.taskList.SetTasks(model.tasks)
 
 	view := model.View()
 	if !strings.Contains(view, "Test task 1") {
@@ -85,52 +89,15 @@ func TestViewWithSidebar(t *testing.T) {
 	model.height = 30
 	model.viewMode = ViewModeListWithSidebar
 	model.tasks = []core.Task{
-		{UUID: "task-1", Description: "Test task", Project: "Project1", Status: "pending"},
+		{ID: 1, UUID: "task-1", Description: "Test task", Project: "Project1", Status: "pending"},
 	}
-	model.selectedIndex = 0
+	model.taskList.SetTasks(model.tasks)
+	model.updateSidebar()
 
 	view := model.View()
-	if !strings.Contains(view, "Task Details") {
-		t.Error("Expected view to contain sidebar")
-	}
-}
-
-func TestRenderTaskLine(t *testing.T) {
-	service := &core.MockTaskService{}
-	cfg := config.DefaultConfig()
-	model := NewModel(service, cfg)
-	model.width = 80
-
-	task := core.Task{
-		ID:          42,
-		UUID:        "abc-123-def",
-		Description: "Test task",
-		Project:     "TestProject",
-	}
-
-	line := model.renderTaskLine(task, false, 80)
-	if !strings.Contains(line, "Test task") {
-		t.Error("Expected line to contain task description")
-	}
-	if !strings.Contains(line, "42") {
-		t.Error("Expected line to contain task ID")
-	}
-}
-
-func TestRenderTaskLineSelected(t *testing.T) {
-	service := &core.MockTaskService{}
-	cfg := config.DefaultConfig()
-	model := NewModel(service, cfg)
-	model.width = 80
-
-	task := core.Task{
-		UUID:        "abc-123",
-		Description: "Selected task",
-	}
-
-	line := model.renderTaskLine(task, true, 80)
-	if !strings.Contains(line, "■") {
-		t.Error("Expected selected line to contain cursor")
+	// The sidebar should show task details
+	if !strings.Contains(view, "Task #") {
+		t.Error("Expected view to contain sidebar task title")
 	}
 }
 
