@@ -87,8 +87,8 @@ type Model struct {
 	// Components
 	taskList components.TaskList
 	sidebar  components.Sidebar
+	filter   components.Filter
 	// sections  components.Sections
-	// filter    components.Filter
 	// help      components.Help
 }
 
@@ -108,6 +108,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		errorMessage:   "",
 		taskList:       components.NewTaskList(80, 24), // Initial size, will be updated
 		sidebar:        components.NewSidebar(40, 24),  // Initial size, will be updated
+		filter:         components.NewFilter(),
 	}
 }
 
@@ -131,6 +132,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TasksLoadedMsg:
 		if msg.Err != nil {
 			m.errorMessage = "Failed to load tasks: " + msg.Err.Error()
+			// If error was from filter, reopen filter input
+			if m.state == StateNormal && m.activeFilter != "" {
+				m.state = StateFilterInput
+				return m, m.filter.Focus()
+			}
 			return m, nil
 		}
 		m.tasks = msg.Tasks
@@ -210,6 +216,12 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = StateHelp
 		return m, nil
 
+	case "/":
+		// Activate filter input
+		m.state = StateFilterInput
+		m.filter.SetValue(m.activeFilter)
+		return m, m.filter.Focus()
+
 	case "r":
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
@@ -275,16 +287,29 @@ func (m *Model) updateSidebar() {
 
 // handleFilterKeys handles keys in filter input state
 func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg.String() {
 	case "esc":
 		m.state = StateNormal
+		m.filter.Blur()
 		return m, nil
+
 	case "enter":
-		// Apply filter (will be implemented with filter component)
+		// Apply the filter
+		filterText := m.filter.Value()
 		m.state = StateNormal
-		return m, nil
+		m.filter.Blur()
+		m.activeFilter = filterText
+
+		// Load tasks with new filter
+		return m, loadTasksCmd(m.service, filterText)
+
+	default:
+		// Delegate to filter component for text input
+		m.filter, cmd = m.filter.Update(msg)
+		return m, cmd
 	}
-	return m, nil
 }
 
 // handleHelpKeys handles keys in help state

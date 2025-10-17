@@ -83,3 +83,49 @@ func TestBookmarkStruct(t *testing.T) {
 		t.Errorf("Expected Filter '+work due:today', got %s", bookmark.Filter)
 	}
 }
+
+func TestSectionsWithBookmarks(t *testing.T) {
+	bookmarks := []Bookmark{
+		{Name: "Work", Filter: "+work"},
+		{Name: "Home", Filter: "+home"},
+	}
+
+	sections := SectionsWithBookmarks(bookmarks)
+
+	// Should have default sections + bookmarks
+	defaultCount := len(DefaultSections())
+	expectedCount := defaultCount + len(bookmarks)
+
+	if len(sections) != expectedCount {
+		t.Errorf("Expected %d sections, got %d", expectedCount, len(sections))
+	}
+
+	// Verify bookmarks are included
+	foundWork := false
+	foundHome := false
+	for _, s := range sections {
+		if s.Name == "Work" && s.Filter == "+work" {
+			foundWork = true
+		}
+		if s.Name == "Home" && s.Filter == "+home" {
+			foundHome = true
+		}
+	}
+
+	if !foundWork {
+		t.Error("Expected to find 'Work' bookmark section")
+	}
+	if !foundHome {
+		t.Error("Expected to find 'Home' bookmark section")
+	}
+}
+
+func TestSectionsWithEmptyBookmarks(t *testing.T) {
+	sections := SectionsWithBookmarks([]Bookmark{})
+
+	// Should just return default sections
+	defaultSections := DefaultSections()
+	if len(sections) != len(defaultSections) {
+		t.Errorf("Expected %d sections, got %d", len(defaultSections), len(sections))
+	}
+}

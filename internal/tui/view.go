@@ -102,9 +102,20 @@ func (m Model) renderHelp() string {
 
 // renderFilterInput renders the filter input prompt
 func (m Model) renderFilterInput() string {
+	prompt := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("12")).
+		Render("Filter: ")
+
+	hint := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Render(" (Enter to apply, Esc to cancel)")
+
+	content := prompt + m.filter.View() + hint
+
 	return lipgloss.NewStyle().
-		Padding(2, 4).
-		Render("Filter: (Enter to apply, Esc to cancel)")
+		Padding(1, 2).
+		Render(content)
 }
 
 // renderConfirm renders the confirmation prompt
@@ -134,7 +145,7 @@ func (m Model) renderFooter() string {
 	keybindings := ""
 	switch m.state {
 	case StateNormal:
-		keybindings = "q: quit | ?: help | r: refresh | tab: sidebar"
+		keybindings = "q: quit | ?: help | /: filter | r: refresh | tab: sidebar"
 	case StateHelp:
 		keybindings = "?: close help"
 	case StateFilterInput:

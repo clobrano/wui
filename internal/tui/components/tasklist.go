@@ -193,12 +193,12 @@ func (t TaskList) View() string {
 func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
-	header := fmt.Sprintf("  %-*s %-*s %s %-*s %s",
+	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s",
 		cols.id, "ID",
 		cols.project, "PROJECT",
 		"P",
 		cols.due, "DUE",
-		"DESCRIPTION",
+		cols.description, "DESCRIPTION",
 	)
 
 	headerStyle := lipgloss.NewStyle().
@@ -329,19 +329,19 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		// TODO: Add "today" and "soon" color coding
 	}
 
-	// Description
+	// Description - pad to fill remaining width
 	description := task.Description
 	if len(description) > cols.description {
 		description = description[:cols.description-3] + "..."
 	}
 
-	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %s",
+	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s",
 		cursor,
 		cols.id, id,
 		cols.project, project,
 		priorityStyle.Render(priority),
 		cols.due, dueStyle.Render(due),
-		description,
+		cols.description, description,
 	)
 
 	if isSelected {

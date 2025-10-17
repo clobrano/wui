@@ -50,7 +50,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file path (default: ~/.config/wui/config.yaml)")
 	rootCmd.PersistentFlags().StringVar(&taskrcPath, "taskrc", "", "taskrc file path (default: ~/.taskrc)")
 	rootCmd.PersistentFlags().StringVar(&taskBinPath, "task-bin", "", "task binary path (default: /usr/local/bin/task)")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "log level (debug, info, warn, error)")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "error", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (text, json)")
 }
 
@@ -123,14 +123,32 @@ func initLogging() {
 		level = slog.LevelInfo
 	}
 
+	// For TUI mode, log to file instead of stderr to avoid interfering with display
+	logFile := os.Getenv("WUI_LOG_FILE")
+	if logFile == "" {
+		// Default to temp file
+		logFile = "/tmp/wui.log"
+	}
+
+	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// Fallback to discarding logs if file can't be opened
+		f = nil
+	}
+
 	// Create handler based on format
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{Level: level}
 
+	output := os.Stderr
+	if f != nil {
+		output = f
+	}
+
 	if logFormat == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
+		handler = slog.NewJSONHandler(output, opts)
 	} else {
-		handler = slog.NewTextHandler(os.Stderr, opts)
+		handler = slog.NewTextHandler(output, opts)
 	}
 
 	// Set default logger

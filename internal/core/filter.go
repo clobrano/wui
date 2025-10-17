@@ -49,3 +49,19 @@ func DefaultSections() []Section {
 		},
 	}
 }
+
+// SectionsWithBookmarks returns sections including bookmarks
+func SectionsWithBookmarks(bookmarks []Bookmark) []Section {
+	sections := DefaultSections()
+
+	// Add bookmarks as sections
+	for _, bookmark := range bookmarks {
+		sections = append(sections, Section{
+			Name:        bookmark.Name,
+			Filter:      bookmark.Filter,
+			Description: "Saved filter",
+		})
+	}
+
+	return sections
+}

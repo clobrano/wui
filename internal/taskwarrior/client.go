@@ -35,8 +35,9 @@ func NewClient(taskBin, taskrcPath string) (*Client, error) {
 // Export retrieves tasks matching the given filter
 func (c *Client) Export(filter string) ([]core.Task, error) {
 	// Split filter into separate arguments for proper parsing
+	// Taskwarrior syntax: task [filter] [command]
 	filterArgs := strings.Fields(filter)
-	args := append([]string{"export"}, filterArgs...)
+	args := append(filterArgs, "export")
 	args = c.buildArgs(args...)
 
 	slog.Debug("Exporting tasks", "filter", filter)
