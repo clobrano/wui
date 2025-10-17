@@ -17,6 +17,18 @@ const (
 	DisplayModeGroups
 )
 
+// TaskListStyles holds the styles needed for rendering the task list
+type TaskListStyles struct {
+	Header           lipgloss.Style
+	Separator        lipgloss.Style
+	Selection        lipgloss.Style
+	PriorityHigh     lipgloss.Color
+	PriorityMedium   lipgloss.Color
+	PriorityLow      lipgloss.Color
+	DueOverdue       lipgloss.Color
+	TagColor         lipgloss.Color
+}
+
 // TaskList is a component for displaying and navigating a list of tasks or groups
 type TaskList struct {
 	tasks          []core.Task
@@ -27,10 +39,11 @@ type TaskList struct {
 	height         int
 	displayColumns []string // Column names to display
 	offset         int      // Scroll offset for viewport
+	styles         TaskListStyles
 }
 
 // NewTaskList creates a new task list component
-func NewTaskList(width, height int) TaskList {
+func NewTaskList(width, height int, styles TaskListStyles) TaskList {
 	return TaskList{
 		tasks:          []core.Task{},
 		groups:         []core.TaskGroup{},
@@ -40,6 +53,7 @@ func NewTaskList(width, height int) TaskList {
 		height:         height,
 		displayColumns: []string{"ID", "PROJECT", "P", "DUE", "TAGS", "DESCRIPTION"},
 		offset:         0,
+		styles:         styles,
 	}
 }
 
@@ -287,19 +301,11 @@ func (t TaskList) renderHeader() string {
 		cols.description, "DESCRIPTION",
 	)
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("12")). // Bright cyan for visibility
-		Width(t.width)
-
 	// Render header with underline separator
-	styledHeader := headerStyle.Render(header)
+	styledHeader := t.styles.Header.Width(t.width).Render(header)
 	separator := strings.Repeat("─", t.width)
-	separatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Width(t.width)
 
-	return styledHeader + "\n" + separatorStyle.Render(separator)
+	return styledHeader + "\n" + t.styles.Separator.Width(t.width).Render(separator)
 }
 
 // columnWidths holds calculated column widths
@@ -397,11 +403,11 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		priority = string(task.Priority[0])
 		switch task.Priority {
 		case "H":
-			priorityStyle = priorityStyle.Foreground(lipgloss.Color("9")) // Red
+			priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
 		case "M":
-			priorityStyle = priorityStyle.Foreground(lipgloss.Color("11")) // Yellow
+			priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
 		case "L":
-			priorityStyle = priorityStyle.Foreground(lipgloss.Color("12")) // Blue
+			priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
 		}
 	}
 
@@ -414,7 +420,7 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 			due = due[:cols.due]
 		}
 		if task.IsOverdue() {
-			dueStyle = dueStyle.Foreground(lipgloss.Color("9")) // Red - overdue
+			dueStyle = dueStyle.Foreground(t.styles.DueOverdue)
 		}
 		// TODO: Add "today" and "soon" color coding
 	}
@@ -449,11 +455,7 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	)
 
 	if isSelected {
-		style := lipgloss.NewStyle().
-			Background(lipgloss.Color("12")).
-			Foreground(lipgloss.Color("0")).
-			Width(t.width)
-		return style.Render(line)
+		return t.styles.Selection.Width(t.width).Render(line)
 	}
 
 	// Ensure non-selected lines also use full width
@@ -465,18 +467,10 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 func (t TaskList) renderGroupHeader() string {
 	header := "  GROUP NAME                                        TASK COUNT"
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("12")).
-		Width(t.width)
-
-	styledHeader := headerStyle.Render(header)
+	styledHeader := t.styles.Header.Width(t.width).Render(header)
 	separator := strings.Repeat("─", t.width)
-	separatorStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Width(t.width)
 
-	return styledHeader + "\n" + separatorStyle.Render(separator)
+	return styledHeader + "\n" + t.styles.Separator.Width(t.width).Render(separator)
 }
 
 // renderGroupLine renders a single group row
@@ -511,11 +505,7 @@ func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJu
 	)
 
 	if isSelected {
-		style := lipgloss.NewStyle().
-			Background(lipgloss.Color("12")).
-			Foreground(lipgloss.Color("0")).
-			Width(t.width)
-		return style.Render(line)
+		return t.styles.Selection.Width(t.width).Render(line)
 	}
 
 	normalStyle := lipgloss.NewStyle().Width(t.width)

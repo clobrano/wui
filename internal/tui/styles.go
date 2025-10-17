@@ -3,6 +3,7 @@ package tui
 import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/clobrano/wui/internal/config"
+	"github.com/clobrano/wui/internal/tui/components"
 	"github.com/muesli/termenv"
 )
 
@@ -358,5 +359,47 @@ func ThemeFromConfig(cfgTheme *config.Theme) Theme {
 			SectionActiveBg:   lipgloss.Color(cfgTheme.SectionActiveBg),
 			SectionInactiveFg: lipgloss.Color(cfgTheme.SectionInactiveFg),
 		},
+	}
+}
+
+// ToTaskListStyles converts Styles to component-specific TaskListStyles
+func (s *Styles) ToTaskListStyles() components.TaskListStyles {
+	return components.TaskListStyles{
+		Header:         s.TasklistHeader,
+		Separator:      s.Separator,
+		Selection:      s.Selection,
+		PriorityHigh:   s.theme.Colors.PriorityHigh,
+		PriorityMedium: s.theme.Colors.PriorityMedium,
+		PriorityLow:    s.theme.Colors.PriorityLow,
+		DueOverdue:     s.theme.Colors.DueOverdue,
+		TagColor:       s.theme.Colors.TagFg,
+	}
+}
+
+// ToSidebarStyles converts Styles to component-specific SidebarStyles
+func (s *Styles) ToSidebarStyles() components.SidebarStyles {
+	return components.SidebarStyles{
+		Border:         s.SidebarBorder,
+		Title:          s.SidebarTitle,
+		Label:          s.Label,
+		Value:          s.Value,
+		Dim:            s.Dim,
+		PriorityHigh:   s.theme.Colors.PriorityHigh,
+		PriorityMedium: s.theme.Colors.PriorityMedium,
+		PriorityLow:    s.theme.Colors.PriorityLow,
+		DueOverdue:     s.theme.Colors.DueOverdue,
+		StatusPending:  s.theme.Colors.StatusActive,
+		StatusDone:     s.theme.Colors.SuccessFg,
+		StatusWaiting:  s.theme.Colors.StatusWaiting,
+		Tag:            s.theme.Colors.TagFg,
+	}
+}
+
+// ToSectionsStyles converts Styles to component-specific SectionsStyles
+func (s *Styles) ToSectionsStyles() components.SectionsStyles {
+	return components.SectionsStyles{
+		Active:   s.SectionActive,
+		Inactive: s.SectionInactive,
+		Count:    s.SectionCount,
 	}
 }

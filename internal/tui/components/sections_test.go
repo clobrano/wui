@@ -5,13 +5,23 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/clobrano/wui/internal/core"
 )
+
+// defaultSectionsStyles returns default styles for testing
+func defaultSectionsStyles() SectionsStyles {
+	return SectionsStyles{
+		Active:   lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("15")).Background(lipgloss.Color("63")).Padding(0, 1),
+		Inactive: lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Padding(0, 1),
+		Count:    lipgloss.NewStyle().Foreground(lipgloss.Color("246")).Padding(0, 1),
+	}
+}
 
 // Test constructor (10.1-10.2)
 func TestNewSections(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	if s.ActiveIndex != 0 {
 		t.Errorf("Expected ActiveIndex to be 0, got %d", s.ActiveIndex)
@@ -25,7 +35,7 @@ func TestNewSections(t *testing.T) {
 }
 
 func TestNewSectionsEmpty(t *testing.T) {
-	s := NewSections([]core.Section{}, 80)
+	s := NewSections([]core.Section{}, 80, defaultSectionsStyles())
 
 	if s.ActiveIndex != 0 {
 		t.Errorf("Expected ActiveIndex to be 0, got %d", s.ActiveIndex)
@@ -38,7 +48,7 @@ func TestNewSectionsEmpty(t *testing.T) {
 // Test section switching with Tab (10.3)
 func TestSectionsUpdateTab(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Press Tab to move to next section
 	msg := tea.KeyMsg{Type: tea.KeyTab}
@@ -66,7 +76,7 @@ func TestSectionsUpdateTab(t *testing.T) {
 
 func TestSectionsUpdateTabWrapAround(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = len(sections) - 1 // Last section
 
 	// Press Tab should wrap to first section
@@ -81,7 +91,7 @@ func TestSectionsUpdateTabWrapAround(t *testing.T) {
 // Test section switching with Shift+Tab (10.3)
 func TestSectionsUpdateShiftTab(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = 2 // Start at third section
 
 	// Press Shift+Tab to move to previous section
@@ -98,7 +108,7 @@ func TestSectionsUpdateShiftTab(t *testing.T) {
 
 func TestSectionsUpdateShiftTabWrapAround(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = 0 // First section
 
 	// Press Shift+Tab should wrap to last section
@@ -113,7 +123,7 @@ func TestSectionsUpdateShiftTabWrapAround(t *testing.T) {
 // Test number key navigation (1-9)
 func TestSectionsUpdateNumberKey(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	tests := []struct {
 		key           rune
@@ -143,7 +153,7 @@ func TestSectionsUpdateNumberKey(t *testing.T) {
 
 func TestSectionsUpdateNumberKeyOutOfRange(t *testing.T) {
 	sections := core.DefaultSections() // 5 sections
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Press '9' when only 5 sections exist
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'9'}}
@@ -161,7 +171,7 @@ func TestSectionsUpdateNumberKeyOutOfRange(t *testing.T) {
 // Test view rendering (10.4, 10.6)
 func TestSectionsView(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	view := s.View()
 
@@ -179,7 +189,7 @@ func TestSectionsView(t *testing.T) {
 
 func TestSectionsViewHighlightActive(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = 1 // Waiting section
 
 	view := s.View()
@@ -192,7 +202,7 @@ func TestSectionsViewHighlightActive(t *testing.T) {
 }
 
 func TestSectionsViewEmpty(t *testing.T) {
-	s := NewSections([]core.Section{}, 100)
+	s := NewSections([]core.Section{}, 100, defaultSectionsStyles())
 
 	view := s.View()
 
@@ -209,7 +219,7 @@ func TestSectionsWithBookmarks(t *testing.T) {
 		{Name: "Home", Filter: "+home status:pending"},
 	}
 	sections := core.SectionsWithBookmarks(bookmarks)
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Should have default sections + bookmarks
 	expectedCount := len(core.DefaultSections()) + len(bookmarks)
@@ -230,7 +240,7 @@ func TestSectionsWithBookmarks(t *testing.T) {
 // Test active section getter
 func TestGetActiveSection(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = 2
 
 	activeSection := s.GetActiveSection()
@@ -244,7 +254,7 @@ func TestGetActiveSection(t *testing.T) {
 }
 
 func TestGetActiveSectionEmpty(t *testing.T) {
-	s := NewSections([]core.Section{}, 100)
+	s := NewSections([]core.Section{}, 100, defaultSectionsStyles())
 
 	activeSection := s.GetActiveSection()
 
@@ -257,7 +267,7 @@ func TestGetActiveSectionEmpty(t *testing.T) {
 // Test task count integration (10.10)
 func TestSetTaskCount(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	s.SetTaskCount(42)
 
@@ -274,7 +284,7 @@ func TestSetTaskCount(t *testing.T) {
 
 func TestSetTaskCountZero(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	s.SetTaskCount(0)
 
@@ -286,7 +296,7 @@ func TestSetTaskCountZero(t *testing.T) {
 // Test window size updates
 func TestSectionsUpdateWindowSize(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	msg := tea.WindowSizeMsg{Width: 120, Height: 40}
 	updated, cmd := s.Update(msg)
@@ -302,7 +312,7 @@ func TestSectionsUpdateWindowSize(t *testing.T) {
 // Test SetSize method
 func TestSectionsSetSize(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	s.SetSize(150)
 
@@ -329,7 +339,7 @@ func TestSectionChangedMsg(t *testing.T) {
 // Test that unchanged keys return model unchanged
 func TestSectionsUpdateOtherKeys(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	initialIndex := s.ActiveIndex
 
 	// Press an unrelated key
@@ -347,7 +357,7 @@ func TestSectionsUpdateOtherKeys(t *testing.T) {
 // Test Projects section flag (10.7)
 func TestIsProjectsSection(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Find the Projects section index
 	projectsIndex := -1
@@ -378,7 +388,7 @@ func TestIsProjectsSection(t *testing.T) {
 // Test Tags section flag (10.8)
 func TestIsTagsSection(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Find the Tags section index
 	tagsIndex := -1
@@ -409,7 +419,7 @@ func TestIsTagsSection(t *testing.T) {
 // Test vim-like h/l navigation
 func TestSectionsUpdateVimKeysL(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Press 'l' to move to next section (vim-like)
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}}
@@ -425,7 +435,7 @@ func TestSectionsUpdateVimKeysL(t *testing.T) {
 
 func TestSectionsUpdateVimKeysH(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 	s.ActiveIndex = 2 // Start at third section
 
 	// Press 'h' to move to previous section (vim-like)
@@ -442,7 +452,7 @@ func TestSectionsUpdateVimKeysH(t *testing.T) {
 
 func TestSectionsUpdateVimKeysWrapAround(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Test 'h' wrap around from first to last
 	s.ActiveIndex = 0
@@ -466,7 +476,7 @@ func TestSectionsUpdateVimKeysWrapAround(t *testing.T) {
 // Test arrow key navigation
 func TestSectionsUpdateArrowKeys(t *testing.T) {
 	sections := core.DefaultSections()
-	s := NewSections(sections, 100)
+	s := NewSections(sections, 100, defaultSectionsStyles())
 
 	// Test right arrow (next section)
 	msg := tea.KeyMsg{Type: tea.KeyRight}

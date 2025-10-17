@@ -9,12 +9,20 @@ import (
 	"github.com/clobrano/wui/internal/core"
 )
 
+// SectionsStyles holds the styles needed for rendering sections
+type SectionsStyles struct {
+	Active   lipgloss.Style
+	Inactive lipgloss.Style
+	Count    lipgloss.Style
+}
+
 // Sections represents the section navigation component
 type Sections struct {
 	Items       []core.Section
 	ActiveIndex int
 	TaskCount   int
 	Width       int
+	styles      SectionsStyles
 }
 
 // SectionChangedMsg is sent when the active section changes
@@ -23,12 +31,13 @@ type SectionChangedMsg struct {
 }
 
 // NewSections creates a new Sections component
-func NewSections(sections []core.Section, width int) Sections {
+func NewSections(sections []core.Section, width int, styles SectionsStyles) Sections {
 	return Sections{
 		Items:       sections,
 		ActiveIndex: 0,
 		TaskCount:   0,
 		Width:       width,
+		styles:      styles,
 	}
 }
 
@@ -130,16 +139,10 @@ func (s Sections) View() string {
 
 		if i == s.ActiveIndex {
 			// Active section style
-			style = lipgloss.NewStyle().
-				Bold(true).
-				Foreground(lipgloss.Color("15")).
-				Background(lipgloss.Color("63")).
-				Padding(0, 1)
+			style = s.styles.Active
 		} else {
 			// Inactive section style
-			style = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("246")).
-				Padding(0, 1)
+			style = s.styles.Inactive
 		}
 
 		tabs = append(tabs, style.Render(section.Name))
@@ -149,10 +152,7 @@ func (s Sections) View() string {
 
 	// Add task count for active section if set
 	if s.TaskCount > 0 {
-		countStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("246")).
-			Padding(0, 1)
-		taskCountStr := countStyle.Render(fmt.Sprintf("(%d)", s.TaskCount))
+		taskCountStr := s.styles.Count.Render(fmt.Sprintf("(%d)", s.TaskCount))
 		tabsLine += " " + taskCountStr
 	}
 

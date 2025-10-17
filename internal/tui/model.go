@@ -80,6 +80,7 @@ type Model struct {
 	// Core dependencies
 	service core.TaskService
 	config  *config.Config
+	styles  *Styles // Centralized styling
 
 	// Task data
 	tasks          []core.Task
@@ -121,6 +122,15 @@ type Model struct {
 
 // NewModel creates a new TUI model
 func NewModel(service core.TaskService, cfg *config.Config) Model {
+	// Create styles from config theme
+	var theme Theme
+	if cfg.TUI != nil && cfg.TUI.Theme != nil {
+		theme = ThemeFromConfig(cfg.TUI.Theme)
+	} else {
+		theme = DefaultDarkTheme()
+	}
+	styles := NewStyles(theme)
+
 	// Get sections with bookmarks from config
 	var allSections []core.Section
 	if cfg.TUI != nil && len(cfg.TUI.Bookmarks) > 0 {
@@ -140,6 +150,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	return Model{
 		service:        service,
 		config:         cfg,
+		styles:         styles,
 		tasks:          []core.Task{},
 		viewMode:       ViewModeList,
 		state:          StateNormal,
@@ -150,13 +161,13 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		inGroupView:    false,
 		statusMessage:  "",
 		errorMessage:   "",
-		taskList:       components.NewTaskList(80, 24),      // Initial size, will be updated
-		sidebar:        components.NewSidebar(40, 24),       // Initial size, will be updated
+		taskList:       components.NewTaskList(80, 24, styles.ToTaskListStyles()),      // Initial size, will be updated
+		sidebar:        components.NewSidebar(40, 24, styles.ToSidebarStyles()),       // Initial size, will be updated
 		filter:         components.NewFilter(),
 		modifyInput:    components.NewFilter(),
 		annotateInput:  components.NewFilter(),
 		newTaskInput:   components.NewFilter(),
-		sections:       components.NewSections(allSections, 80), // Initial size, will be updated
+		sections:       components.NewSections(allSections, 80, styles.ToSectionsStyles()), // Initial size, will be updated
 		confirmAction:  "",
 	}
 }

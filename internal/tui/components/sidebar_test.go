@@ -6,11 +6,34 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/clobrano/wui/internal/core"
 )
 
+// defaultSidebarStyles returns default styles for testing
+func defaultSidebarStyles() SidebarStyles {
+	return SidebarStyles{
+		Border: lipgloss.NewStyle().
+			Border(lipgloss.NormalBorder(), false, false, false, true).
+			BorderForeground(lipgloss.Color("8")).
+			Padding(0, 1),
+		Title:          lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")),
+		Label:          lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("14")),
+		Value:          lipgloss.NewStyle().Foreground(lipgloss.Color("15")),
+		Dim:            lipgloss.NewStyle().Foreground(lipgloss.Color("8")),
+		PriorityHigh:   lipgloss.Color("9"),
+		PriorityMedium: lipgloss.Color("11"),
+		PriorityLow:    lipgloss.Color("12"),
+		DueOverdue:     lipgloss.Color("9"),
+		StatusPending:  lipgloss.Color("11"),
+		StatusDone:     lipgloss.Color("10"),
+		StatusWaiting:  lipgloss.Color("12"),
+		Tag:            lipgloss.Color("13"),
+	}
+}
+
 func TestNewSidebar(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 
 	if sb.width != 40 {
 		t.Errorf("Expected width 40, got %d", sb.width)
@@ -27,7 +50,7 @@ func TestNewSidebar(t *testing.T) {
 }
 
 func TestSetTask(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		UUID:        "test-uuid",
@@ -48,7 +71,7 @@ func TestSetTask(t *testing.T) {
 }
 
 func TestSetSize(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	sb.SetSize(50, 30)
 
 	if sb.width != 50 {
@@ -60,7 +83,7 @@ func TestSetSize(t *testing.T) {
 }
 
 func TestSidebarViewEmpty(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 
 	view := sb.View()
 
@@ -70,7 +93,7 @@ func TestSidebarViewEmpty(t *testing.T) {
 }
 
 func TestViewWithTask(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          42,
 		UUID:        "test-uuid-1234",
@@ -95,7 +118,7 @@ func TestViewWithTask(t *testing.T) {
 }
 
 func TestViewWithUUID(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		UUID:        "abc-123-def-456",
 		Description: "Test task",
@@ -110,7 +133,7 @@ func TestViewWithUUID(t *testing.T) {
 }
 
 func TestViewWithTags(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -136,7 +159,7 @@ func TestViewWithDates(t *testing.T) {
 	yesterday := now.Add(-24 * time.Hour)
 	tomorrow := now.Add(24 * time.Hour)
 
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -161,7 +184,7 @@ func TestViewWithDates(t *testing.T) {
 
 func TestViewWithAnnotations(t *testing.T) {
 	now := time.Now()
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -186,7 +209,7 @@ func TestViewWithAnnotations(t *testing.T) {
 }
 
 func TestViewWithDependencies(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -205,7 +228,7 @@ func TestViewWithDependencies(t *testing.T) {
 }
 
 func TestViewWithUDAs(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -235,7 +258,7 @@ func TestViewWithStatus(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.status, func(t *testing.T) {
-			sb := NewSidebar(40, 24)
+			sb := NewSidebar(40, 24, defaultSidebarStyles())
 			task := &core.Task{
 				ID:          1,
 				Description: "Test task",
@@ -263,7 +286,7 @@ func TestViewWithPriority(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.priority, func(t *testing.T) {
-			sb := NewSidebar(40, 24)
+			sb := NewSidebar(40, 24, defaultSidebarStyles())
 			task := &core.Task{
 				ID:          1,
 				Description: "Test task",
@@ -281,7 +304,7 @@ func TestViewWithPriority(t *testing.T) {
 }
 
 func TestSidebarScrolling(t *testing.T) {
-	sb := NewSidebar(40, 10) // Small height for testing scroll
+	sb := NewSidebar(40, 10, defaultSidebarStyles()) // Small height for testing scroll
 
 	// Create task with lots of content
 	annotations := make([]core.Annotation, 20)
@@ -324,7 +347,7 @@ func TestSidebarScrolling(t *testing.T) {
 }
 
 func TestScrollingKeyboard(t *testing.T) {
-	sb := NewSidebar(40, 10)
+	sb := NewSidebar(40, 10, defaultSidebarStyles())
 
 	annotations := make([]core.Annotation, 20)
 	for i := 0; i < 20; i++ {
@@ -430,7 +453,7 @@ func TestWrapText(t *testing.T) {
 }
 
 func TestViewUrgency(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -450,7 +473,7 @@ func TestViewUrgency(t *testing.T) {
 
 func TestOverdueHighlight(t *testing.T) {
 	yesterday := time.Now().Add(-24 * time.Hour)
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	task := &core.Task{
 		ID:          1,
 		Description: "Overdue task",
@@ -469,7 +492,7 @@ func TestOverdueHighlight(t *testing.T) {
 }
 
 func TestLongDescription(t *testing.T) {
-	sb := NewSidebar(40, 24)
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
 	longDesc := strings.Repeat("This is a very long description that should be wrapped properly. ", 5)
 	task := &core.Task{
 		ID:          1,

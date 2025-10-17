@@ -10,21 +10,40 @@ import (
 	"github.com/clobrano/wui/internal/core"
 )
 
+// SidebarStyles holds the styles needed for rendering the sidebar
+type SidebarStyles struct {
+	Border        lipgloss.Style
+	Title         lipgloss.Style
+	Label         lipgloss.Style
+	Value         lipgloss.Style
+	Dim           lipgloss.Style
+	PriorityHigh  lipgloss.Color
+	PriorityMedium lipgloss.Color
+	PriorityLow   lipgloss.Color
+	DueOverdue    lipgloss.Color
+	StatusPending lipgloss.Color
+	StatusDone    lipgloss.Color
+	StatusWaiting lipgloss.Color
+	Tag           lipgloss.Color
+}
+
 // Sidebar displays detailed information about a task
 type Sidebar struct {
 	task   *core.Task
 	width  int
 	height int
 	offset int // Scroll offset for content
+	styles SidebarStyles
 }
 
 // NewSidebar creates a new sidebar component
-func NewSidebar(width, height int) Sidebar {
+func NewSidebar(width, height int, styles SidebarStyles) Sidebar {
 	return Sidebar{
 		task:   nil,
 		width:  width,
 		height: height,
 		offset: 0,
+		styles: styles,
 	}
 }
 
@@ -141,27 +160,19 @@ func (s Sidebar) View() string {
 	content := strings.Join(visibleLines, "\n")
 
 	// Apply sidebar styling
-	sidebarStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(lipgloss.Color("8")).
-		Padding(0, 1).
+	return s.styles.Border.
 		Width(s.width).
-		Height(s.height)
-
-	return sidebarStyle.Render(content)
+		Height(s.height).
+		Render(content)
 }
 
 // renderEmpty renders the empty state
 func (s Sidebar) renderEmpty() string {
-	emptyStyle := lipgloss.NewStyle().
-		Border(lipgloss.NormalBorder(), false, false, false, true).
-		BorderForeground(lipgloss.Color("8")).
-		Padding(2, 1).
+	return s.styles.Border.
 		Width(s.width).
 		Height(s.height).
-		Foreground(lipgloss.Color("8"))
-
-	return emptyStyle.Render("No task selected")
+		Padding(2, 1).
+		Render(s.styles.Dim.Render("No task selected"))
 }
 
 // renderContent renders all task details
@@ -169,15 +180,11 @@ func (s Sidebar) renderContent() string {
 	var sections []string
 
 	// Title
-	titleStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("14"))
-
 	title := fmt.Sprintf("Task #%d", s.task.ID)
 	if s.task.ID == 0 {
 		title = "Task Details"
 	}
-	sections = append(sections, titleStyle.Render(title))
+	sections = append(sections, s.styles.Title.Render(title))
 	sections = append(sections, "")
 
 	// UUID
@@ -240,100 +247,75 @@ func (s Sidebar) renderContent() string {
 
 // renderField renders a simple label: value field
 func (s Sidebar) renderField(label, value string) string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true)
-
-	return fmt.Sprintf("%s: %s", labelStyle.Render(label), value)
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render(label), value)
 }
 
 // renderWrappedField renders a field with wrapped text
 func (s Sidebar) renderWrappedField(label, value string) string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true)
-
 	// Wrap text to fit width
 	maxWidth := s.width - 4 // Account for padding
 	wrapped := wrapText(value, maxWidth)
 
-	return fmt.Sprintf("%s:\n%s", labelStyle.Render(label), wrapped)
+	return fmt.Sprintf("%s:\n%s", s.styles.Label.Render(label), wrapped)
 }
 
 // renderStatusField renders the status with color coding
 func (s Sidebar) renderStatusField() string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true)
-
 	statusStyle := lipgloss.NewStyle()
 	switch s.task.Status {
 	case "pending":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("11")) // Yellow
+		statusStyle = statusStyle.Foreground(s.styles.StatusPending)
 	case "completed":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("10")) // Green
+		statusStyle = statusStyle.Foreground(s.styles.StatusDone)
 	case "deleted":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("8")) // Gray
+		statusStyle = statusStyle.Foreground(s.styles.Dim.GetForeground())
 	case "waiting":
-		statusStyle = statusStyle.Foreground(lipgloss.Color("12")) // Blue
+		statusStyle = statusStyle.Foreground(s.styles.StatusWaiting)
 	}
 
-	return fmt.Sprintf("%s: %s", labelStyle.Render("Status"), statusStyle.Render(s.task.Status))
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Status"), statusStyle.Render(s.task.Status))
 }
 
 // renderPriorityField renders priority with color coding
 func (s Sidebar) renderPriorityField(priority string) string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true)
-
 	priorityStyle := lipgloss.NewStyle()
 	switch priority {
 	case "H":
-		priorityStyle = priorityStyle.Foreground(lipgloss.Color("9")) // Red
+		priorityStyle = priorityStyle.Foreground(s.styles.PriorityHigh)
 	case "M":
-		priorityStyle = priorityStyle.Foreground(lipgloss.Color("11")) // Yellow
+		priorityStyle = priorityStyle.Foreground(s.styles.PriorityMedium)
 	case "L":
-		priorityStyle = priorityStyle.Foreground(lipgloss.Color("12")) // Blue
+		priorityStyle = priorityStyle.Foreground(s.styles.PriorityLow)
 	}
 
-	return fmt.Sprintf("%s: %s", labelStyle.Render("Priority"), priorityStyle.Render(priority))
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Priority"), priorityStyle.Render(priority))
 }
 
 // renderTags renders the tags section
 func (s Sidebar) renderTags() string {
-	labelStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true)
-
 	tagStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("13"))
+		Foreground(s.styles.Tag)
 
 	tags := make([]string, len(s.task.Tags))
 	for i, tag := range s.task.Tags {
 		tags[i] = tagStyle.Render("+" + tag)
 	}
 
-	return fmt.Sprintf("%s: %s", labelStyle.Render("Tags"), strings.Join(tags, " "))
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Tags"), strings.Join(tags, " "))
 }
 
 // renderDates renders all date fields
 func (s Sidebar) renderDates() string {
 	var lines []string
 
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true).
-		Underline(true)
-
-	lines = append(lines, headerStyle.Render("Dates"))
+	lines = append(lines, s.styles.Label.Underline(true).Render("Dates"))
 
 	// Due date
 	if s.task.Due != nil {
 		dueStr := formatDateWithRelative(*s.task.Due)
 		style := lipgloss.NewStyle()
 		if s.task.IsOverdue() {
-			style = style.Foreground(lipgloss.Color("9")) // Red
+			style = style.Foreground(s.styles.DueOverdue)
 		}
 		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(dueStr)))
 	}
@@ -366,13 +348,8 @@ func (s Sidebar) renderDates() string {
 
 // renderDependencies renders task dependencies
 func (s Sidebar) renderDependencies() string {
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true).
-		Underline(true)
-
 	var lines []string
-	lines = append(lines, headerStyle.Render("Dependencies"))
+	lines = append(lines, s.styles.Label.Underline(true).Render("Dependencies"))
 
 	if len(s.task.Depends) > 0 {
 		lines = append(lines, "  Blocked by:")
@@ -393,13 +370,8 @@ func (s Sidebar) renderDependencies() string {
 
 // renderAnnotations renders task annotations
 func (s Sidebar) renderAnnotations() string {
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true).
-		Underline(true)
-
 	var lines []string
-	lines = append(lines, headerStyle.Render("Annotations"))
+	lines = append(lines, s.styles.Label.Underline(true).Render("Annotations"))
 
 	for _, ann := range s.task.Annotations {
 		dateStr := formatDateWithRelative(ann.Entry)
@@ -418,13 +390,8 @@ func (s Sidebar) renderAnnotations() string {
 
 // renderUDAs renders user-defined attributes
 func (s Sidebar) renderUDAs() string {
-	headerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("14")).
-		Bold(true).
-		Underline(true)
-
 	var lines []string
-	lines = append(lines, headerStyle.Render("Custom Fields"))
+	lines = append(lines, s.styles.Label.Underline(true).Render("Custom Fields"))
 
 	// Sort keys for consistent display
 	for key, value := range s.task.UDAs {
