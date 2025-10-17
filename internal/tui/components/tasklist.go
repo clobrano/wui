@@ -9,10 +9,20 @@ import (
 	"github.com/clobrano/wui/internal/core"
 )
 
-// TaskList is a component for displaying and navigating a list of tasks
+// DisplayMode indicates what the task list is displaying
+type DisplayMode int
+
+const (
+	DisplayModeTasks DisplayMode = iota
+	DisplayModeGroups
+)
+
+// TaskList is a component for displaying and navigating a list of tasks or groups
 type TaskList struct {
 	tasks          []core.Task
-	cursor         int // Selected task index
+	groups         []core.TaskGroup // For displaying groups (Projects/Tags)
+	displayMode    DisplayMode      // What to display: tasks or groups
+	cursor         int              // Selected task/group index
 	width          int
 	height         int
 	displayColumns []string // Column names to display
@@ -23,19 +33,33 @@ type TaskList struct {
 func NewTaskList(width, height int) TaskList {
 	return TaskList{
 		tasks:          []core.Task{},
+		groups:         []core.TaskGroup{},
+		displayMode:    DisplayModeTasks,
 		cursor:         0,
 		width:          width,
 		height:         height,
-		displayColumns: []string{"ID", "PROJECT", "P", "DUE", "DESCRIPTION"},
+		displayColumns: []string{"ID", "PROJECT", "P", "DUE", "TAGS", "DESCRIPTION"},
 		offset:         0,
 	}
 }
 
-// SetTasks updates the task list
+// SetTasks updates the task list and switches to task display mode
 func (t *TaskList) SetTasks(tasks []core.Task) {
 	t.tasks = tasks
+	t.displayMode = DisplayModeTasks
 	// Reset cursor if out of bounds
 	if t.cursor >= len(t.tasks) {
+		t.cursor = 0
+	}
+	t.updateScroll()
+}
+
+// SetGroups updates the groups and switches to group display mode
+func (t *TaskList) SetGroups(groups []core.TaskGroup) {
+	t.groups = groups
+	t.displayMode = DisplayModeGroups
+	// Reset cursor if out of bounds
+	if t.cursor >= len(t.groups) {
 		t.cursor = 0
 	}
 	t.updateScroll()
@@ -77,10 +101,11 @@ func (t TaskList) handleKey(msg tea.KeyMsg) TaskList {
 
 // moveDown moves cursor down one position
 func (t *TaskList) moveDown() {
-	if len(t.tasks) == 0 {
+	itemCount := t.itemCount()
+	if itemCount == 0 {
 		return
 	}
-	if t.cursor < len(t.tasks)-1 {
+	if t.cursor < itemCount-1 {
 		t.cursor++
 		t.updateScroll()
 	}
@@ -96,7 +121,7 @@ func (t *TaskList) moveUp() {
 
 // moveToStart jumps to first task
 func (t *TaskList) moveToStart() {
-	if len(t.tasks) > 0 {
+	if t.itemCount() > 0 {
 		t.cursor = 0
 		t.updateScroll()
 	}
@@ -104,8 +129,9 @@ func (t *TaskList) moveToStart() {
 
 // moveToEnd jumps to last task
 func (t *TaskList) moveToEnd() {
-	if len(t.tasks) > 0 {
-		t.cursor = len(t.tasks) - 1
+	itemCount := t.itemCount()
+	if itemCount > 0 {
+		t.cursor = itemCount - 1
 		t.updateScroll()
 	}
 }
@@ -114,14 +140,24 @@ func (t *TaskList) moveToEnd() {
 func (t *TaskList) quickJump(key string) {
 	num := int(key[0] - '0') // Convert '1'-'9' to 1-9
 	targetIndex := t.offset + num - 1
-	if targetIndex >= 0 && targetIndex < len(t.tasks) && targetIndex < t.offset+t.height-1 {
+	itemCount := t.itemCount()
+	if targetIndex >= 0 && targetIndex < itemCount && targetIndex < t.offset+t.height-1 {
 		t.cursor = targetIndex
 	}
 }
 
+// itemCount returns the count of current items (tasks or groups)
+func (t TaskList) itemCount() int {
+	if t.displayMode == DisplayModeGroups {
+		return len(t.groups)
+	}
+	return len(t.tasks)
+}
+
 // updateScroll adjusts the scroll offset to keep cursor visible
 func (t *TaskList) updateScroll() {
-	if len(t.tasks) == 0 {
+	itemCount := t.itemCount()
+	if itemCount == 0 {
 		t.offset = 0
 		return
 	}
@@ -139,7 +175,7 @@ func (t *TaskList) updateScroll() {
 	}
 
 	// Don't scroll past the end
-	maxOffset := len(t.tasks) - visibleHeight
+	maxOffset := itemCount - visibleHeight
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
@@ -148,8 +184,16 @@ func (t *TaskList) updateScroll() {
 	}
 }
 
-// View renders the task list
+// View renders the task list or group list
 func (t TaskList) View() string {
+	if t.displayMode == DisplayModeGroups {
+		return t.renderGroupList()
+	}
+	return t.renderTaskList()
+}
+
+// renderTaskList renders the task list
+func (t TaskList) renderTaskList() string {
 	if len(t.tasks) == 0 {
 		return lipgloss.NewStyle().
 			Padding(2, 4).
@@ -189,15 +233,57 @@ func (t TaskList) View() string {
 	return strings.Join(lines, "\n")
 }
 
+// renderGroupList renders the group list (for Projects/Tags sections)
+func (t TaskList) renderGroupList() string {
+	if len(t.groups) == 0 {
+		return lipgloss.NewStyle().
+			Padding(2, 4).
+			Render("No groups found.")
+	}
+
+	var lines []string
+
+	// Render group header
+	headerLines := strings.Split(t.renderGroupHeader(), "\n")
+	lines = append(lines, headerLines...)
+
+	// Calculate visible range
+	visibleHeight := t.height - 2 // Subtract 2 for header rows
+	endIdx := t.offset + visibleHeight
+	if endIdx > len(t.groups) {
+		endIdx = len(t.groups)
+	}
+
+	// Render visible groups
+	for i := t.offset; i < endIdx; i++ {
+		group := t.groups[i]
+		isSelected := i == t.cursor
+		quickJump := ""
+		if i-t.offset < 9 {
+			quickJump = fmt.Sprintf("%d", i-t.offset+1)
+		}
+		line := t.renderGroupLine(group, isSelected, quickJump)
+		lines = append(lines, line)
+	}
+
+	// Fill remaining space
+	for len(lines) < t.height {
+		lines = append(lines, "")
+	}
+
+	return strings.Join(lines, "\n")
+}
+
 // renderHeader renders the column header row
 func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
-	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s",
+	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s %-*s",
 		cols.id, "ID",
 		cols.project, "PROJECT",
 		"P",
 		cols.due, "DUE",
+		cols.tags, "TAGS",
 		cols.description, "DESCRIPTION",
 	)
 
@@ -222,6 +308,7 @@ type columnWidths struct {
 	project     int
 	priority    int
 	due         int
+	tags        int
 	description int
 }
 
@@ -232,12 +319,13 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 		idWidth       = 4  // Sequential ID
 		priorityWidth = 1  // H/M/L
 		dueWidth      = 10 // Date format
+		tagsWidth     = 15 // Tags column
 		minProject    = 10
 		minDesc       = 20
-		spacing       = 6
+		spacing       = 7
 	)
 
-	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + spacing
+	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + tagsWidth + spacing
 	remainingWidth := t.width - fixedWidth
 
 	if remainingWidth < minProject+minDesc {
@@ -246,6 +334,7 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 			project:     minProject,
 			priority:    priorityWidth,
 			due:         dueWidth,
+			tags:        tagsWidth,
 			description: minDesc,
 		}
 	}
@@ -266,6 +355,7 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 		project:     projectWidth,
 		priority:    priorityWidth,
 		due:         dueWidth,
+		tags:        tagsWidth,
 		description: descWidth,
 	}
 }
@@ -329,18 +419,32 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		// TODO: Add "today" and "soon" color coding
 	}
 
+	// Tags - format with + prefix like taskwarrior
+	tags := "-"
+	if len(task.Tags) > 0 {
+		var tagList []string
+		for _, tag := range task.Tags {
+			tagList = append(tagList, "+"+tag)
+		}
+		tags = strings.Join(tagList, " ")
+		if len(tags) > cols.tags {
+			tags = tags[:cols.tags-3] + "..."
+		}
+	}
+
 	// Description - pad to fill remaining width
 	description := task.Description
 	if len(description) > cols.description {
 		description = description[:cols.description-3] + "..."
 	}
 
-	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s",
+	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s %-*s",
 		cursor,
 		cols.id, id,
 		cols.project, project,
 		priorityStyle.Render(priority),
 		cols.due, dueStyle.Render(due),
+		cols.tags, tags,
 		cols.description, description,
 	)
 
@@ -357,12 +461,84 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	return normalStyle.Render(line)
 }
 
+// renderGroupHeader renders the header for group list view
+func (t TaskList) renderGroupHeader() string {
+	header := "  GROUP NAME                                        TASK COUNT"
+
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("12")).
+		Width(t.width)
+
+	styledHeader := headerStyle.Render(header)
+	separator := strings.Repeat("─", t.width)
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Width(t.width)
+
+	return styledHeader + "\n" + separatorStyle.Render(separator)
+}
+
+// renderGroupLine renders a single group row
+func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJump string) string {
+	// Cursor or quick jump number
+	cursor := " "
+	if isSelected {
+		cursor = "■"
+	} else if quickJump != "" {
+		cursor = quickJump
+	}
+
+	// Group name - truncate if too long
+	groupName := group.Name
+	maxNameWidth := t.width - 20 // Leave space for cursor and count
+	if len(groupName) > maxNameWidth {
+		groupName = groupName[:maxNameWidth-3] + "..."
+	}
+
+	// Task count
+	countStr := fmt.Sprintf("%d", group.Count)
+	if group.Count == 1 {
+		countStr += " task"
+	} else {
+		countStr += " tasks"
+	}
+
+	line := fmt.Sprintf("%s %-*s %s",
+		cursor,
+		maxNameWidth, groupName,
+		countStr,
+	)
+
+	if isSelected {
+		style := lipgloss.NewStyle().
+			Background(lipgloss.Color("12")).
+			Foreground(lipgloss.Color("0")).
+			Width(t.width)
+		return style.Render(line)
+	}
+
+	normalStyle := lipgloss.NewStyle().Width(t.width)
+	return normalStyle.Render(line)
+}
+
 // SelectedTask returns the currently selected task, or nil if no tasks
 func (t TaskList) SelectedTask() *core.Task {
 	if len(t.tasks) == 0 || t.cursor < 0 || t.cursor >= len(t.tasks) {
 		return nil
 	}
 	return &t.tasks[t.cursor]
+}
+
+// SelectedGroup returns the currently selected group, or nil if not in group mode
+func (t TaskList) SelectedGroup() *core.TaskGroup {
+	if t.displayMode != DisplayModeGroups || len(t.groups) == 0 {
+		return nil
+	}
+	if t.cursor < 0 || t.cursor >= len(t.groups) {
+		return nil
+	}
+	return &t.groups[t.cursor]
 }
 
 // SelectedIndex returns the index of the currently selected task
@@ -373,4 +549,9 @@ func (t TaskList) SelectedIndex() int {
 // TaskCount returns the total number of tasks
 func (t TaskList) TaskCount() int {
 	return len(t.tasks)
+}
+
+// Cursor returns the current cursor position (exported for Model access)
+func (t TaskList) Cursor() int {
+	return t.cursor
 }
