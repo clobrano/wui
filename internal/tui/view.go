@@ -15,10 +15,7 @@ func (m Model) View() string {
 
 	var sections []string
 
-	// Header
-	sections = append(sections, m.renderHeader())
-
-	// Sections bar
+	// Sections bar (includes title info)
 	sections = append(sections, m.renderSections())
 
 	// Main content area
@@ -45,12 +42,7 @@ func (m Model) renderHeader() string {
 		title += fmt.Sprintf(" | Filter: %s", m.activeFilter)
 	}
 
-	headerStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("12")).
-		Padding(0, 1)
-
-	return headerStyle.Render(title)
+	return m.styles.Header.Width(m.width).Render(title)
 }
 
 // renderSections renders the sections navigation bar
@@ -150,20 +142,10 @@ func (m Model) renderInputPrompt() string {
 		return ""
 	}
 
-	promptStyle := lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("12"))
-
-	hintStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8"))
-
-	content := promptStyle.Render(prompt) + inputView + hintStyle.Render(hint)
+	content := m.styles.InputPrompt.Render(prompt) + inputView + m.styles.InputHint.Render(hint)
 
 	// Add a separator line above the input
-	separator := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Width(m.width).
-		Render(strings.Repeat("─", m.width))
+	separator := m.styles.Separator.Width(m.width).Render(strings.Repeat("─", m.width))
 
 	return separator + "\n" + lipgloss.NewStyle().
 		Padding(0, 1).
@@ -192,14 +174,9 @@ func (m Model) renderFooter() string {
 
 	// Show error message if present
 	if m.errorMessage != "" {
-		errorStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("9")).
-			Bold(true)
-		parts = append(parts, errorStyle.Render("Error: "+m.errorMessage))
+		parts = append(parts, m.styles.Error.Render("Error: "+m.errorMessage))
 	} else if m.statusMessage != "" {
-		statusStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("10"))
-		parts = append(parts, statusStyle.Render(m.statusMessage))
+		parts = append(parts, m.styles.Success.Render(m.statusMessage))
 	}
 
 	// Show keybindings based on state
@@ -227,9 +204,5 @@ func (m Model) renderFooter() string {
 
 	footer := strings.Join(parts, " | ")
 
-	footerStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("8")).
-		Padding(1, 1)
-
-	return footerStyle.Render(footer)
+	return m.styles.Footer.Render(footer)
 }
