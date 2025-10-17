@@ -72,21 +72,44 @@ func DefaultKeybindings() map[string]string {
 	}
 }
 
-// DefaultTheme returns the default color theme
+// DefaultTheme returns the default color theme (dark theme)
 func DefaultTheme() *Theme {
 	return &Theme{
+		Name: "dark",
+
 		// Priority colors
-		PriorityHigh:   "red",
-		PriorityMedium: "yellow",
-		PriorityLow:    "blue",
+		PriorityHigh:   "9",  // Red
+		PriorityMedium: "11", // Yellow
+		PriorityLow:    "12", // Blue
 
 		// Due date colors
-		Overdue:  "red",
-		DueToday: "orange",
-		DueSoon:  "yellow",
+		DueOverdue: "9",  // Red
+		DueToday:   "11", // Yellow
+		DueSoon:    "11", // Yellow
 
-		// UI elements
-		Selected: "reverse",
-		Border:   "gray",
+		// Status colors
+		StatusActive:    "15", // White
+		StatusWaiting:   "8",  // Dim gray
+		StatusCompleted: "8",  // Dim gray
+
+		// UI element colors
+		HeaderFg:       "12", // Bright cyan
+		FooterFg:       "8",  // Dim gray
+		SeparatorFg:    "8",  // Dim gray
+		SelectionBg:    "12", // Cyan
+		SelectionFg:    "0",  // Black
+		SidebarBorder:  "8",  // Dim gray
+		SidebarTitle:   "12", // Bright cyan
+		LabelFg:        "12", // Bright cyan
+		ValueFg:        "15", // White
+		DimFg:          "8",  // Dim gray
+		ErrorFg:        "9",  // Red
+		SuccessFg:      "10", // Green
+		TagFg:          "14", // Cyan
+
+		// Section colors
+		SectionActiveFg:   "15",  // White
+		SectionActiveBg:   "63",  // Purple/blue
+		SectionInactiveFg: "246", // Dim
 	}
 }

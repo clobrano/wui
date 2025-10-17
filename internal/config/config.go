@@ -146,6 +146,12 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 func mergeThem(defaultTheme, loaded *Theme) *Theme {
 	result := DefaultTheme()
 
+	// If a named theme is specified, use the built-in theme
+	if loaded.Name != "" {
+		result.Name = loaded.Name
+	}
+
+	// Priority colors
 	if loaded.PriorityHigh != "" {
 		result.PriorityHigh = loaded.PriorityHigh
 	}
@@ -155,8 +161,10 @@ func mergeThem(defaultTheme, loaded *Theme) *Theme {
 	if loaded.PriorityLow != "" {
 		result.PriorityLow = loaded.PriorityLow
 	}
-	if loaded.Overdue != "" {
-		result.Overdue = loaded.Overdue
+
+	// Due date colors
+	if loaded.DueOverdue != "" {
+		result.DueOverdue = loaded.DueOverdue
 	}
 	if loaded.DueToday != "" {
 		result.DueToday = loaded.DueToday
@@ -164,11 +172,68 @@ func mergeThem(defaultTheme, loaded *Theme) *Theme {
 	if loaded.DueSoon != "" {
 		result.DueSoon = loaded.DueSoon
 	}
-	if loaded.Selected != "" {
-		result.Selected = loaded.Selected
+
+	// Status colors
+	if loaded.StatusActive != "" {
+		result.StatusActive = loaded.StatusActive
 	}
-	if loaded.Border != "" {
-		result.Border = loaded.Border
+	if loaded.StatusWaiting != "" {
+		result.StatusWaiting = loaded.StatusWaiting
+	}
+	if loaded.StatusCompleted != "" {
+		result.StatusCompleted = loaded.StatusCompleted
+	}
+
+	// UI element colors
+	if loaded.HeaderFg != "" {
+		result.HeaderFg = loaded.HeaderFg
+	}
+	if loaded.FooterFg != "" {
+		result.FooterFg = loaded.FooterFg
+	}
+	if loaded.SeparatorFg != "" {
+		result.SeparatorFg = loaded.SeparatorFg
+	}
+	if loaded.SelectionBg != "" {
+		result.SelectionBg = loaded.SelectionBg
+	}
+	if loaded.SelectionFg != "" {
+		result.SelectionFg = loaded.SelectionFg
+	}
+	if loaded.SidebarBorder != "" {
+		result.SidebarBorder = loaded.SidebarBorder
+	}
+	if loaded.SidebarTitle != "" {
+		result.SidebarTitle = loaded.SidebarTitle
+	}
+	if loaded.LabelFg != "" {
+		result.LabelFg = loaded.LabelFg
+	}
+	if loaded.ValueFg != "" {
+		result.ValueFg = loaded.ValueFg
+	}
+	if loaded.DimFg != "" {
+		result.DimFg = loaded.DimFg
+	}
+	if loaded.ErrorFg != "" {
+		result.ErrorFg = loaded.ErrorFg
+	}
+	if loaded.SuccessFg != "" {
+		result.SuccessFg = loaded.SuccessFg
+	}
+	if loaded.TagFg != "" {
+		result.TagFg = loaded.TagFg
+	}
+
+	// Section colors
+	if loaded.SectionActiveFg != "" {
+		result.SectionActiveFg = loaded.SectionActiveFg
+	}
+	if loaded.SectionActiveBg != "" {
+		result.SectionActiveBg = loaded.SectionActiveBg
+	}
+	if loaded.SectionInactiveFg != "" {
+		result.SectionInactiveFg = loaded.SectionInactiveFg
 	}
 
 	return result

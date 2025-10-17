@@ -82,24 +82,25 @@ func TestDefaultTUIConfig(t *testing.T) {
 
 func TestThemeStruct(t *testing.T) {
 	theme := &Theme{
+		Name:           "custom",
 		PriorityHigh:   "red",
 		PriorityMedium: "yellow",
 		PriorityLow:    "blue",
-		Overdue:        "red",
+		DueOverdue:     "red",
 		DueToday:       "orange",
 		DueSoon:        "yellow",
-		Selected:       "reverse",
-		Border:         "gray",
+		SelectionBg:    "reverse",
+		SidebarBorder:  "gray",
 	}
 
 	if theme.PriorityHigh != "red" {
 		t.Errorf("Expected PriorityHigh 'red', got %s", theme.PriorityHigh)
 	}
-	if theme.Overdue != "red" {
-		t.Errorf("Expected Overdue 'red', got %s", theme.Overdue)
+	if theme.DueOverdue != "red" {
+		t.Errorf("Expected DueOverdue 'red', got %s", theme.DueOverdue)
 	}
-	if theme.Selected != "reverse" {
-		t.Errorf("Expected Selected 'reverse', got %s", theme.Selected)
+	if theme.SelectionBg != "reverse" {
+		t.Errorf("Expected SelectionBg 'reverse', got %s", theme.SelectionBg)
 	}
 }
 
@@ -108,6 +109,11 @@ func TestDefaultTheme(t *testing.T) {
 
 	if theme == nil {
 		t.Fatal("Expected theme, got nil")
+	}
+
+	// Check theme name
+	if theme.Name != "dark" {
+		t.Errorf("Expected Name 'dark', got %s", theme.Name)
 	}
 
 	// Check all color fields are set
@@ -120,8 +126,8 @@ func TestDefaultTheme(t *testing.T) {
 	if theme.PriorityLow == "" {
 		t.Error("Expected PriorityLow to be set")
 	}
-	if theme.Overdue == "" {
-		t.Error("Expected Overdue to be set")
+	if theme.DueOverdue == "" {
+		t.Error("Expected DueOverdue to be set")
 	}
 	if theme.DueToday == "" {
 		t.Error("Expected DueToday to be set")
@@ -129,11 +135,14 @@ func TestDefaultTheme(t *testing.T) {
 	if theme.DueSoon == "" {
 		t.Error("Expected DueSoon to be set")
 	}
-	if theme.Selected == "" {
-		t.Error("Expected Selected to be set")
+	if theme.SelectionBg == "" {
+		t.Error("Expected SelectionBg to be set")
 	}
-	if theme.Border == "" {
-		t.Error("Expected Border to be set")
+	if theme.SidebarBorder == "" {
+		t.Error("Expected SidebarBorder to be set")
+	}
+	if theme.HeaderFg == "" {
+		t.Error("Expected HeaderFg to be set")
 	}
 }
 
