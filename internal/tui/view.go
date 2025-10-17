@@ -95,10 +95,11 @@ func (m Model) renderHelp() string {
 		"",
 		"Task Actions:",
 		"  d         - Mark done",
+		"  s         - Start/Stop toggle",
 		"  x         - Delete",
 		"  e         - Edit",
 		"  n         - New task",
-		"  m         - Modify",
+		"  m         - Modify (e.g. wait:tomorrow)",
 		"  a         - Annotate",
 		"  u         - Undo",
 		"",
@@ -183,7 +184,7 @@ func (m Model) renderFooter() string {
 	keybindings := ""
 	switch m.state {
 	case StateNormal:
-		keybindings = "d: done | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo | /: filter | r: refresh"
+		keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
 	case StateHelp:
 		keybindings = "?: close help"
 	case StateFilterInput:

@@ -392,6 +392,7 @@ func (s *Styles) ToSidebarStyles() components.SidebarStyles {
 		PriorityLow:    s.theme.Colors.PriorityLow,
 		DueOverdue:     s.theme.Colors.DueOverdue,
 		StatusPending:  s.theme.Colors.StatusActive,
+		StatusActive:   s.theme.Colors.StatusActive,
 		StatusDone:     s.theme.Colors.SuccessFg,
 		StatusWaiting:  s.theme.Colors.StatusWaiting,
 		Tag:            s.theme.Colors.TagFg,

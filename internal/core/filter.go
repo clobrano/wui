@@ -24,8 +24,8 @@ func DefaultSections() []Section {
 	return []Section{
 		{
 			Name:        "Next",
-			Filter:      "status:pending -WAITING",
-			Description: "Next tasks to work on (pending, not waiting)",
+			Filter:      "( status:pending or status:active ) -WAITING",
+			Description: "Next tasks to work on (pending or active, not waiting)",
 		},
 		{
 			Name:        "Waiting",
@@ -34,18 +34,18 @@ func DefaultSections() []Section {
 		},
 		{
 			Name:        "Projects",
-			Filter:      "status:pending",
+			Filter:      "status:pending or status:active",
 			Description: "Tasks grouped by project",
 		},
 		{
 			Name:        "Tags",
-			Filter:      "status:pending",
+			Filter:      "status:pending or status:active",
 			Description: "Tasks grouped by tags",
 		},
 		{
 			Name:        "All",
-			Filter:      "status:pending",
-			Description: "All pending tasks",
+			Filter:      "status:pending or status:active",
+			Description: "All pending and active tasks",
 		},
 	}
 }

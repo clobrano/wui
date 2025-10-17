@@ -17,6 +17,7 @@ type TaskwarriorTask struct {
 	Due         string                   `json:"due,omitempty"`
 	Scheduled   string                   `json:"scheduled,omitempty"`
 	Wait        string                   `json:"wait,omitempty"`
+	Start       string                   `json:"start,omitempty"`
 	Entry       string                   `json:"entry"`
 	Modified    string                   `json:"modified,omitempty"`
 	End         string                   `json:"end,omitempty"`

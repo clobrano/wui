@@ -43,11 +43,11 @@ func TestDefaultSections(t *testing.T) {
 
 	// Test that expected sections exist
 	expectedSections := map[string]string{
-		"Next":     "status:pending -WAITING",
+		"Next":     "( status:pending or status:active ) -WAITING",
 		"Waiting":  "status:waiting",
-		"Projects": "status:pending",
-		"Tags":     "status:pending",
-		"All":      "status:pending",
+		"Projects": "status:pending or status:active",
+		"Tags":     "status:pending or status:active",
+		"All":      "status:pending or status:active",
 	}
 
 	sectionMap := make(map[string]Section)

@@ -39,4 +39,12 @@ type TaskService interface {
 	// This typically suspends the TUI and launches the configured editor
 	// Returns an error if the task is not found or the edit fails
 	Edit(uuid string) error
+
+	// Start marks a task as started (active)
+	// Returns an error if the task is not found or already started
+	Start(uuid string) error
+
+	// Stop marks a task as stopped (pending)
+	// Returns an error if the task is not found or not started
+	Stop(uuid string) error
 }

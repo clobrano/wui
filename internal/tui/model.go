@@ -379,6 +379,18 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "s":
+		// Toggle start/stop
+		selectedTask := m.taskList.SelectedTask()
+		if selectedTask != nil {
+			// If task is started (has Start field), stop it; otherwise start it
+			if selectedTask.Start != nil {
+				return m, stopTaskCmd(m.service, selectedTask.UUID)
+			}
+			return m, startTaskCmd(m.service, selectedTask.UUID)
+		}
+		return m, nil
+
 	case "x":
 		// Delete task (with confirmation)
 		selectedTask := m.taskList.SelectedTask()
@@ -760,4 +772,24 @@ func editTaskCmd(taskBin, taskrcPath, uuid string) tea.Cmd {
 		// Return success - will trigger refresh
 		return TaskModifiedMsg{Err: nil}
 	})
+}
+
+// startTaskCmd creates a command to start a task
+func startTaskCmd(service core.TaskService, uuid string) tea.Cmd {
+	return func() tea.Msg {
+		err := service.Start(uuid)
+		return TaskModifiedMsg{
+			Err: err,
+		}
+	}
+}
+
+// stopTaskCmd creates a command to stop a task
+func stopTaskCmd(service core.TaskService, uuid string) tea.Cmd {
+	return func() tea.Msg {
+		err := service.Stop(uuid)
+		return TaskModifiedMsg{
+			Err: err,
+		}
+	}
 }

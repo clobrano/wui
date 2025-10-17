@@ -12,6 +12,8 @@ type MockTaskService struct {
 	AddFunc      func(description string) (string, error)
 	UndoFunc     func() error
 	EditFunc     func(uuid string) error
+	StartFunc    func(uuid string) error
+	StopFunc     func(uuid string) error
 }
 
 func (m *MockTaskService) Export(filter string) ([]Task, error) {
@@ -66,6 +68,20 @@ func (m *MockTaskService) Undo() error {
 func (m *MockTaskService) Edit(uuid string) error {
 	if m.EditFunc != nil {
 		return m.EditFunc(uuid)
+	}
+	return errors.New("not implemented")
+}
+
+func (m *MockTaskService) Start(uuid string) error {
+	if m.StartFunc != nil {
+		return m.StartFunc(uuid)
+	}
+	return errors.New("not implemented")
+}
+
+func (m *MockTaskService) Stop(uuid string) error {
+	if m.StopFunc != nil {
+		return m.StopFunc(uuid)
 	}
 	return errors.New("not implemented")
 }

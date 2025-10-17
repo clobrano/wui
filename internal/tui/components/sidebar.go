@@ -22,6 +22,7 @@ type SidebarStyles struct {
 	PriorityLow   lipgloss.Color
 	DueOverdue    lipgloss.Color
 	StatusPending lipgloss.Color
+	StatusActive  lipgloss.Color
 	StatusDone    lipgloss.Color
 	StatusWaiting lipgloss.Color
 	Tag           lipgloss.Color
@@ -216,6 +217,14 @@ func (s Sidebar) renderContent() string {
 		sections = append(sections, s.renderTags())
 	}
 
+	// Virtual Tags (based on status)
+	virtualTags := s.getVirtualTags()
+	if len(virtualTags) > 0 {
+		// Always add spacing before virtual tags
+		sections = append(sections, "")
+		sections = append(sections, s.renderVirtualTags(virtualTags))
+	}
+
 	// Dates section
 	sections = append(sections, "")
 	sections = append(sections, s.renderDates())
@@ -262,18 +271,26 @@ func (s Sidebar) renderWrappedField(label, value string) string {
 // renderStatusField renders the status with color coding
 func (s Sidebar) renderStatusField() string {
 	statusStyle := lipgloss.NewStyle()
-	switch s.task.Status {
-	case "pending":
-		statusStyle = statusStyle.Foreground(s.styles.StatusPending)
-	case "completed":
-		statusStyle = statusStyle.Foreground(s.styles.StatusDone)
-	case "deleted":
-		statusStyle = statusStyle.Foreground(s.styles.Dim.GetForeground())
-	case "waiting":
-		statusStyle = statusStyle.Foreground(s.styles.StatusWaiting)
+	statusText := s.task.Status
+
+	// Check if task is started (has Start field set)
+	if s.task.Start != nil {
+		statusStyle = statusStyle.Foreground(s.styles.StatusActive).Bold(true)
+		statusText = s.task.Status + " (started)"
+	} else {
+		switch s.task.Status {
+		case "pending":
+			statusStyle = statusStyle.Foreground(s.styles.StatusPending)
+		case "completed":
+			statusStyle = statusStyle.Foreground(s.styles.StatusDone)
+		case "deleted":
+			statusStyle = statusStyle.Foreground(s.styles.Dim.GetForeground())
+		case "waiting":
+			statusStyle = statusStyle.Foreground(s.styles.StatusWaiting)
+		}
 	}
 
-	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Status"), statusStyle.Render(s.task.Status))
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Status"), statusStyle.Render(statusText))
 }
 
 // renderPriorityField renders priority with color coding
@@ -304,6 +321,38 @@ func (s Sidebar) renderTags() string {
 	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Tags"), strings.Join(tags, " "))
 }
 
+// getVirtualTags returns virtual tags based on task state
+// Only shows the most relevant virtual tags (ACTIVE, WAITING)
+func (s Sidebar) getVirtualTags() []string {
+	var virtualTags []string
+
+	// A task is ACTIVE if it has a start time set
+	if s.task.Start != nil {
+		virtualTags = append(virtualTags, "ACTIVE")
+	}
+
+	// A task is WAITING if status is waiting
+	if s.task.Status == "waiting" {
+		virtualTags = append(virtualTags, "WAITING")
+	}
+
+	return virtualTags
+}
+
+// renderVirtualTags renders virtual tags
+func (s Sidebar) renderVirtualTags(virtualTags []string) string {
+	// Use tag color for virtual tags to make them visible
+	tagStyle := lipgloss.NewStyle().
+		Foreground(s.styles.Tag)
+
+	styledTags := make([]string, len(virtualTags))
+	for i, tag := range virtualTags {
+		styledTags[i] = tagStyle.Render("+" + tag)
+	}
+
+	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Virtual"), strings.Join(styledTags, " "))
+}
+
 // renderDates renders all date fields
 func (s Sidebar) renderDates() string {
 	var lines []string
@@ -328,6 +377,11 @@ func (s Sidebar) renderDates() string {
 	// Wait date
 	if s.task.Wait != nil {
 		lines = append(lines, fmt.Sprintf("  Wait: %s", formatDateWithRelative(*s.task.Wait)))
+	}
+
+	// Start date (when task was started)
+	if s.task.Start != nil {
+		lines = append(lines, fmt.Sprintf("  Started: %s", formatDateWithRelative(*s.task.Start)))
 	}
 
 	// Entry date

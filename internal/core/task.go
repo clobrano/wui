@@ -17,6 +17,7 @@ type Task struct {
 	Due       *time.Time // Due date
 	Scheduled *time.Time // Scheduled date
 	Wait      *time.Time // Wait until date
+	Start     *time.Time // Start date (when task was started)
 	Entry     time.Time  // Created date
 	Modified  *time.Time // Last modified date
 	End       *time.Time // Completion date

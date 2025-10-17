@@ -174,6 +174,26 @@ func (c *Client) Edit(uuid string) error {
 	return nil
 }
 
+// Start marks a task as started (active)
+func (c *Client) Start(uuid string) error {
+	args := c.buildArgs(uuid, "start")
+	_, err := c.runCommand(args...)
+	if err != nil {
+		return fmt.Errorf("failed to start task %s: %w", uuid, err)
+	}
+	return nil
+}
+
+// Stop marks a task as stopped (pending)
+func (c *Client) Stop(uuid string) error {
+	args := c.buildArgs(uuid, "stop")
+	_, err := c.runCommand(args...)
+	if err != nil {
+		return fmt.Errorf("failed to stop task %s: %w", uuid, err)
+	}
+	return nil
+}
+
 // buildArgs constructs command-line arguments for taskwarrior
 // It handles the taskrc path configuration
 func (c *Client) buildArgs(args ...string) []string {

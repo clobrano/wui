@@ -399,33 +399,47 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		project = project[:cols.project-3] + "..."
 	}
 
-	// Priority with color coding
+	// Priority - conditionally style based on selection
 	priority := "-"
-	priorityStyle := lipgloss.NewStyle()
+	var priorityText string
 	if task.Priority != "" {
 		priority = string(task.Priority[0])
-		switch task.Priority {
-		case "H":
-			priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
-		case "M":
-			priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
-		case "L":
-			priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
+		if !isSelected {
+			// Apply color only when not selected
+			priorityStyle := lipgloss.NewStyle()
+			switch task.Priority {
+			case "H":
+				priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
+			case "M":
+				priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
+			case "L":
+				priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
+			}
+			priorityText = priorityStyle.Render(priority)
+		} else {
+			priorityText = priority
 		}
+	} else {
+		priorityText = priority
 	}
 
-	// Due date with color coding
+	// Due date - conditionally style based on selection
 	due := "-"
-	dueStyle := lipgloss.NewStyle()
+	var dueText string
 	if task.Due != nil {
 		due = task.FormatDueDate()
 		if len(due) > cols.due {
 			due = due[:cols.due]
 		}
-		if task.IsOverdue() {
-			dueStyle = dueStyle.Foreground(t.styles.DueOverdue)
+		if !isSelected && task.IsOverdue() {
+			// Apply overdue color only when not selected
+			dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
+			dueText = dueStyle.Render(due)
+		} else {
+			dueText = due
 		}
-		// TODO: Add "today" and "soon" color coding
+	} else {
+		dueText = due
 	}
 
 	// Tags - format with + prefix like taskwarrior
@@ -441,18 +455,28 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		}
 	}
 
-	// Description - pad to fill remaining width
-	description := task.Description
+	// Status icon prefix for description
+	statusIcon := ""
+	if task.Start != nil {
+		// Task is started (has Start field)
+		statusIcon = "▶ "
+	} else if task.Status == "waiting" {
+		statusIcon = "⏸ "
+	}
+
+	// Description - pad to fill remaining width (accounting for status icon)
+	description := statusIcon + task.Description
 	if len(description) > cols.description {
 		description = description[:cols.description-3] + "..."
 	}
 
+	// Build line with conditionally styled text
 	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s %-*s",
 		cursor,
 		cols.id, id,
 		cols.project, project,
-		priorityStyle.Render(priority),
-		cols.due, dueStyle.Render(due),
+		priorityText,
+		cols.due, dueText,
 		cols.tags, tags,
 		cols.description, description,
 	)
@@ -466,20 +490,31 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		// Apply status styling based on task status
 		lineStyle = lipgloss.NewStyle()
 
-		switch task.Status {
-		case "completed":
-			// Strikethrough and dim color for completed tasks
+		// Check if task is started (has Start field)
+		if task.Start != nil {
+			// Bold and colored for started tasks
 			lineStyle = lineStyle.
-				Foreground(t.styles.StatusCompleted).
-				Strikethrough(true)
-		case "waiting":
-			// Dim color for waiting tasks
-			lineStyle = lineStyle.Foreground(t.styles.StatusWaiting)
-		case "deleted":
-			// Very dim for deleted tasks
-			lineStyle = lineStyle.
-				Foreground(t.styles.StatusCompleted).
-				Strikethrough(true)
+				Foreground(t.styles.StatusActive).
+				Bold(true)
+		} else {
+			// Apply status styling
+			switch task.Status {
+			case "completed":
+				// Strikethrough and dim color for completed tasks
+				lineStyle = lineStyle.
+					Foreground(t.styles.StatusCompleted).
+					Strikethrough(true)
+			case "waiting":
+				// Dim and italic for waiting tasks
+				lineStyle = lineStyle.
+					Foreground(t.styles.StatusWaiting).
+					Italic(true)
+			case "deleted":
+				// Very dim for deleted tasks
+				lineStyle = lineStyle.
+					Foreground(t.styles.StatusCompleted).
+					Strikethrough(true)
+			}
 		}
 	}
 

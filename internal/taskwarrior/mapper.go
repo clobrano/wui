@@ -25,6 +25,7 @@ func MapToCore(t TaskwarriorTask) core.Task {
 	coreTask.Due, _ = parseTaskwarriorDate(t.Due)
 	coreTask.Scheduled, _ = parseTaskwarriorDate(t.Scheduled)
 	coreTask.Wait, _ = parseTaskwarriorDate(t.Wait)
+	coreTask.Start, _ = parseTaskwarriorDate(t.Start)
 	coreTask.Modified, _ = parseTaskwarriorDate(t.Modified)
 	coreTask.End, _ = parseTaskwarriorDate(t.End)
 
