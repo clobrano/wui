@@ -126,7 +126,7 @@ func (t *TaskList) updateScroll() {
 		return
 	}
 
-	visibleHeight := t.height - 1 // Subtract 1 for header row
+	visibleHeight := t.height - 2 // Subtract 2 for header rows (title + separator)
 
 	// Cursor is above viewport
 	if t.cursor < t.offset {
@@ -158,11 +158,12 @@ func (t TaskList) View() string {
 
 	var lines []string
 
-	// Render column headers
-	lines = append(lines, t.renderHeader())
+	// Render column headers (returns 2 lines: header + separator)
+	headerLines := strings.Split(t.renderHeader(), "\n")
+	lines = append(lines, headerLines...)
 
 	// Calculate visible range
-	visibleHeight := t.height - 1 // Subtract header
+	visibleHeight := t.height - 2 // Subtract 2 for header rows
 	endIdx := t.offset + visibleHeight
 	if endIdx > len(t.tasks) {
 		endIdx = len(t.tasks)
@@ -181,7 +182,7 @@ func (t TaskList) View() string {
 	}
 
 	// Fill remaining space
-	for i := len(lines) - 1; i < t.height; i++ {
+	for len(lines) < t.height {
 		lines = append(lines, "")
 	}
 
@@ -202,13 +203,17 @@ func (t TaskList) renderHeader() string {
 
 	headerStyle := lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("14")).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderBottom(true).
-		BorderForeground(lipgloss.Color("8")).
+		Foreground(lipgloss.Color("12")). // Bright cyan for visibility
 		Width(t.width)
 
-	return headerStyle.Render(header)
+	// Render header with underline separator
+	styledHeader := headerStyle.Render(header)
+	separator := strings.Repeat("─", t.width)
+	separatorStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Width(t.width)
+
+	return styledHeader + "\n" + separatorStyle.Render(separator)
 }
 
 // columnWidths holds calculated column widths
