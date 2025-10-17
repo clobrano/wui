@@ -405,3 +405,88 @@ func TestIsTagsSection(t *testing.T) {
 		t.Error("Expected IsTagsView to return false for non-Tags section")
 	}
 }
+
+// Test vim-like h/l navigation
+func TestSectionsUpdateVimKeysL(t *testing.T) {
+	sections := core.DefaultSections()
+	s := NewSections(sections, 100)
+
+	// Press 'l' to move to next section (vim-like)
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}}
+	updated, cmd := s.Update(msg)
+
+	if updated.ActiveIndex != 1 {
+		t.Errorf("Expected ActiveIndex to be 1 after 'l', got %d", updated.ActiveIndex)
+	}
+	if cmd == nil {
+		t.Error("Expected command to be returned for section change")
+	}
+}
+
+func TestSectionsUpdateVimKeysH(t *testing.T) {
+	sections := core.DefaultSections()
+	s := NewSections(sections, 100)
+	s.ActiveIndex = 2 // Start at third section
+
+	// Press 'h' to move to previous section (vim-like)
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	updated, cmd := s.Update(msg)
+
+	if updated.ActiveIndex != 1 {
+		t.Errorf("Expected ActiveIndex to be 1 after 'h', got %d", updated.ActiveIndex)
+	}
+	if cmd == nil {
+		t.Error("Expected command to be returned for section change")
+	}
+}
+
+func TestSectionsUpdateVimKeysWrapAround(t *testing.T) {
+	sections := core.DefaultSections()
+	s := NewSections(sections, 100)
+
+	// Test 'h' wrap around from first to last
+	s.ActiveIndex = 0
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	updated, _ := s.Update(msg)
+
+	if updated.ActiveIndex != len(sections)-1 {
+		t.Errorf("Expected ActiveIndex to wrap to %d, got %d", len(sections)-1, updated.ActiveIndex)
+	}
+
+	// Test 'l' wrap around from last to first
+	s.ActiveIndex = len(sections) - 1
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}}
+	updated, _ = s.Update(msg)
+
+	if updated.ActiveIndex != 0 {
+		t.Errorf("Expected ActiveIndex to wrap to 0, got %d", updated.ActiveIndex)
+	}
+}
+
+// Test arrow key navigation
+func TestSectionsUpdateArrowKeys(t *testing.T) {
+	sections := core.DefaultSections()
+	s := NewSections(sections, 100)
+
+	// Test right arrow (next section)
+	msg := tea.KeyMsg{Type: tea.KeyRight}
+	updated, cmd := s.Update(msg)
+
+	if updated.ActiveIndex != 1 {
+		t.Errorf("Expected ActiveIndex to be 1 after right arrow, got %d", updated.ActiveIndex)
+	}
+	if cmd == nil {
+		t.Error("Expected command to be returned for section change")
+	}
+
+	// Test left arrow (previous section)
+	msg = tea.KeyMsg{Type: tea.KeyLeft}
+	updated, cmd = updated.Update(msg)
+
+	if updated.ActiveIndex != 0 {
+		t.Errorf("Expected ActiveIndex to be 0 after left arrow, got %d", updated.ActiveIndex)
+	}
+	if cmd == nil {
+		t.Error("Expected command to be returned for section change")
+	}
+}

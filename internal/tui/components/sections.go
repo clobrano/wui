@@ -54,10 +54,12 @@ func (s Sections) handleKeyPress(msg tea.KeyMsg) (Sections, tea.Cmd) {
 	oldIndex := s.ActiveIndex
 
 	switch msg.Type {
-	case tea.KeyTab:
+	case tea.KeyTab, tea.KeyRight:
+		// Tab or right arrow -> next section
 		s.ActiveIndex = (s.ActiveIndex + 1) % len(s.Items)
 
-	case tea.KeyShiftTab:
+	case tea.KeyShiftTab, tea.KeyLeft:
+		// Shift+Tab or left arrow -> previous section
 		s.ActiveIndex--
 		if s.ActiveIndex < 0 {
 			s.ActiveIndex = len(s.Items) - 1
@@ -65,6 +67,7 @@ func (s Sections) handleKeyPress(msg tea.KeyMsg) (Sections, tea.Cmd) {
 
 	case tea.KeyRunes:
 		// Handle number keys 1-9 for quick section selection
+		// Also handle h/l for vim-like navigation
 		if len(msg.Runes) == 1 {
 			key := msg.Runes[0]
 			if key >= '1' && key <= '9' {
@@ -77,8 +80,17 @@ func (s Sections) handleKeyPress(msg tea.KeyMsg) (Sections, tea.Cmd) {
 					// Out of range, don't change section
 					return s, nil
 				}
+			} else if key == 'l' {
+				// 'l' -> next section (vim-like)
+				s.ActiveIndex = (s.ActiveIndex + 1) % len(s.Items)
+			} else if key == 'h' {
+				// 'h' -> previous section (vim-like)
+				s.ActiveIndex--
+				if s.ActiveIndex < 0 {
+					s.ActiveIndex = len(s.Items) - 1
+				}
 			} else {
-				// Not a number key, ignore
+				// Not a recognized key, ignore
 				return s, nil
 			}
 		} else {
