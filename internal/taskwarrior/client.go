@@ -73,7 +73,11 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 
 // Modify updates a task with the given modifications
 func (c *Client) Modify(uuid, modifications string) error {
-	args := c.buildArgs(uuid, "modify", modifications)
+	// Split modifications into separate arguments so taskwarrior parses them correctly
+	// e.g., "project:home +duties" becomes ["project:home", "+duties"]
+	modArgs := strings.Fields(modifications)
+	args := append([]string{uuid, "modify"}, modArgs...)
+	args = c.buildArgs(args...)
 	_, err := c.runCommand(args...)
 	if err != nil {
 		return fmt.Errorf("failed to modify task %s: %w", uuid, err)
@@ -113,7 +117,11 @@ func (c *Client) Delete(uuid string) error {
 
 // Add creates a new task
 func (c *Client) Add(description string) (string, error) {
-	args := c.buildArgs("add", description)
+	// Split description into separate arguments so taskwarrior parses them correctly
+	// e.g., "Buy milk project:home +shopping" becomes ["Buy", "milk", "project:home", "+shopping"]
+	descArgs := strings.Fields(description)
+	args := append([]string{"add"}, descArgs...)
+	args = c.buildArgs(args...)
 	_, err := c.runCommand(args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to add task: %w", err)
