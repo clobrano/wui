@@ -164,18 +164,7 @@ func (s Sidebar) View() string {
 		visibleLines = append(visibleLines, "")
 	}
 
-	// Truncate each line to fit within sidebar width
-	maxLineWidth := s.width - 4 // Account for padding
-	var truncatedLines []string
-	for _, line := range visibleLines {
-		if len(line) > maxLineWidth {
-			truncatedLines = append(truncatedLines, line[:maxLineWidth])
-		} else {
-			truncatedLines = append(truncatedLines, line)
-		}
-	}
-
-	content := strings.Join(truncatedLines, "\n")
+	content := strings.Join(visibleLines, "\n")
 
 	// Render sidebar content without border, just with left padding
 	return lipgloss.NewStyle().
