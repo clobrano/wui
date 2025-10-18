@@ -192,11 +192,14 @@ func (m Model) renderConfirm() string {
 func (m Model) renderFooter() string {
 	var parts []string
 
-	// Show error message if present
-	if m.errorMessage != "" {
-		parts = append(parts, m.styles.Error.Render("Error: "+m.errorMessage))
+	// Show loading indicator if loading
+	if m.isLoading {
+		parts = append(parts, m.styles.LoadingIndicator.Render("⣾ Loading..."))
+	} else if m.errorMessage != "" {
+		// Show error message if present
+		parts = append(parts, m.styles.Error.Render("✗ "+m.errorMessage))
 	} else if m.statusMessage != "" {
-		parts = append(parts, m.styles.Success.Render(m.statusMessage))
+		parts = append(parts, m.styles.Success.Render("✓ "+m.statusMessage))
 	}
 
 	// Show keybindings based on state

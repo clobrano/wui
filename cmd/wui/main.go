@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"os/exec"
 
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/taskwarrior"
@@ -93,6 +94,12 @@ func runTUI() error {
 		"task_bin", cfg.TaskBin,
 		"taskrc_path", cfg.TaskrcPath)
 
+	// Check if task binary exists and is executable
+	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		slog.Error("Task binary not found or not executable", "error", err, "path", cfg.TaskBin)
+		return err
+	}
+
 	// Create Taskwarrior client
 	client, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
 	if err != nil {
@@ -153,4 +160,27 @@ func initLogging() {
 
 	// Set default logger
 	slog.SetDefault(slog.New(handler))
+}
+
+// checkTaskBinary verifies that the task binary exists and is executable
+func checkTaskBinary(taskBin string) error {
+	// Use exec.LookPath to check if the binary is in PATH or at the specified location
+	path, err := exec.LookPath(taskBin)
+	if err != nil {
+		return fmt.Errorf(`task binary not found: %w
+
+Taskwarrior is required to run wui. Please install it:
+
+  • Ubuntu/Debian:    sudo apt install taskwarrior
+  • Fedora/RHEL:      sudo dnf install task
+  • macOS (Homebrew): brew install task
+  • Arch Linux:       sudo pacman -S task
+
+Or specify a custom path with: wui --task-bin /path/to/task
+
+Visit https://taskwarrior.org for more information.`, err)
+	}
+
+	slog.Debug("Task binary found", "path", path)
+	return nil
 }

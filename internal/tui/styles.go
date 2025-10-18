@@ -155,6 +155,7 @@ type Styles struct {
 	Error            lipgloss.Style
 	Success          lipgloss.Style
 	Tag              lipgloss.Style
+	LoadingIndicator lipgloss.Style
 	SectionActive    lipgloss.Style
 	SectionInactive  lipgloss.Style
 	SectionCount     lipgloss.Style
@@ -214,6 +215,10 @@ func NewStyles(theme Theme) *Styles {
 
 	s.Success = lipgloss.NewStyle().
 		Foreground(theme.Colors.SuccessFg)
+
+	s.LoadingIndicator = lipgloss.NewStyle().
+		Foreground(theme.Colors.HeaderFg).
+		Bold(true)
 
 	s.Tag = lipgloss.NewStyle().
 		Foreground(theme.Colors.TagFg)

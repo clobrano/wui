@@ -101,6 +101,7 @@ type Model struct {
 	// Status and error messages
 	statusMessage string
 	errorMessage  string
+	isLoading     bool // Indicates if an async operation is in progress
 
 	// Terminal dimensions
 	width  int
@@ -174,7 +175,8 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 
 // Init initializes the model and returns the initial command
 func (m Model) Init() tea.Cmd {
-	// Load tasks with the current section's filter
+	// Set loading state and load tasks with the current section's filter
+	m.isLoading = true
 	return loadTasksCmd(m.service, m.activeFilter)
 }
 
@@ -195,6 +197,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activeFilter = msg.Section.Filter
 		m.errorMessage = ""
 		m.statusMessage = ""
+		m.isLoading = true
 
 		// Reset grouping state when switching sections
 		m.selectedGroup = nil
@@ -210,6 +213,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
 	case TasksLoadedMsg:
+		m.isLoading = false
 		if msg.Err != nil {
 			m.errorMessage = "Failed to load tasks: " + msg.Err.Error()
 			// If error was from filter, reopen filter input
@@ -250,10 +254,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskModifiedMsg:
 		if msg.Err != nil {
 			m.errorMessage = "Task operation failed: " + msg.Err.Error()
+			m.isLoading = false
 			return m, nil
 		}
 		m.errorMessage = "" // Clear any previous error
 		m.statusMessage = "Task updated successfully"
+		m.isLoading = true
 		// Refresh tasks
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
@@ -344,6 +350,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.filter.Focus()
 
 	case "r":
+		m.isLoading = true
 		return m, loadTasksCmd(m.service, m.activeFilter)
 
 	case "enter":
@@ -549,6 +556,7 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = StateNormal
 		m.filter.Blur()
 		m.activeFilter = filterText
+		m.isLoading = true
 		m.updateComponentSizes()
 
 		// Load tasks with new filter

@@ -66,7 +66,7 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 		slog.Error("Failed to parse task JSON",
 			"error", err,
 			"output_preview", string(output[:min(500, len(output))]))
-		return nil, fmt.Errorf("failed to parse task JSON: %w", err)
+		return nil, fmt.Errorf("failed to parse task data (corrupted JSON): %w\nPlease check your Taskwarrior database integrity with 'task diagnostics'", err)
 	}
 
 	slog.Info("Successfully exported tasks", "count", len(tasks))
