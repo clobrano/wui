@@ -1,0 +1,122 @@
+# GoReleaser configuration for wui
+# See https://goreleaser.com for documentation
+
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - main: ./cmd/wui
+    binary: wui
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/clobrano/wui/internal/version.Version={{.Version}}
+      - -X github.com/clobrano/wui/internal/version.Commit={{.Commit}}
+      - -X github.com/clobrano/wui/internal/version.Date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- .Os }}_
+      {{- .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - '^ci:'
+  groups:
+    - title: Features
+      regexp: '^feat:'
+      order: 0
+    - title: Bug Fixes
+      regexp: '^fix:'
+      order: 1
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: clobrano
+    name: wui
+  draft: false
+  prerelease: auto
+  mode: replace
+  header: |
+    ## wui {{.Tag}} ({{.Date}})
+
+    A modern TUI for Taskwarrior.
+  footer: |
+    ---
+
+    **Full Changelog**: https://github.com/clobrano/wui/compare/{{.PreviousTag}}...{{.Tag}}
+
+    ## Installation
+
+    ### Binary (easiest)
+
+    Download the appropriate archive for your platform from the assets below and extract it.
+
+    ### Go install
+
+    ```bash
+    go install github.com/clobrano/wui@{{.Tag}}
+    ```
+
+    ### Homebrew (macOS/Linux)
+
+    ```bash
+    # Coming soon
+    brew install clobrano/tap/wui
+    ```
+
+# Homebrew tap (future)
+# brews:
+#   - repository:
+#       owner: clobrano
+#       name: homebrew-tap
+#     folder: Formula
+#     homepage: https://github.com/clobrano/wui
+#     description: A modern TUI for Taskwarrior
+#     license: MIT
+
+# AUR package (future)
+# aurs:
+#   - name: wui-bin
+#     homepage: https://github.com/clobrano/wui
+#     description: A modern TUI for Taskwarrior
+#     maintainers:
+#       - 'Your Name <your.email@example.com>'
+#     license: MIT
+#     private_key: '{{ .Env.AUR_KEY }}'
+#     git_url: 'ssh://aur@aur.archlinux.org/wui-bin.git'
