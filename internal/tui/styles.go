@@ -270,11 +270,20 @@ func (s *Styles) Priority(priority string) lipgloss.Style {
 }
 
 // DueDate returns a style for a due date based on its urgency
-func (s *Styles) DueDate(isOverdue bool) lipgloss.Style {
-	if isOverdue {
+func (s *Styles) DueDate(task interface {
+	IsOverdue() bool
+	IsDueToday() bool
+	IsDueSoon() bool
+}) lipgloss.Style {
+	if task.IsOverdue() {
 		return lipgloss.NewStyle().Foreground(s.theme.Colors.DueOverdue)
 	}
-	// TODO: Add logic for today and soon
+	if task.IsDueToday() {
+		return lipgloss.NewStyle().Foreground(s.theme.Colors.DueToday)
+	}
+	if task.IsDueSoon() {
+		return lipgloss.NewStyle().Foreground(s.theme.Colors.DueSoon)
+	}
 	return lipgloss.NewStyle()
 }
 

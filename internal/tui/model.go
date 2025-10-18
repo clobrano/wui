@@ -500,8 +500,9 @@ func (m *Model) updateComponentSizes() {
 	// Update sections component width
 	m.sections.SetSize(m.width)
 
-	// Calculate available height (subtract header, sections bar, and footer)
-	availableHeight := m.height - 4 // header(1) + sections(1) + footer(2)
+	// Calculate available height (subtract sections bar and footer with padding)
+	// Footer has .Padding(1, 1) which adds 1 line top + 1 line bottom = 2 lines padding + 1 content = 3 total
+	availableHeight := m.height - 4 // sections(1) + footer(3: 1 pad top + 1 content + 1 pad bottom)
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||

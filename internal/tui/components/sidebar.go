@@ -148,32 +148,47 @@ func (s Sidebar) View() string {
 		s.offset = 0
 	}
 
-	visibleLines := lines[s.offset:]
-	if len(visibleLines) > s.height {
-		visibleLines = visibleLines[:s.height]
+	// Account for border padding (2 lines for top/bottom border + 2 for padding)
+	contentHeight := s.height - 4
+	if contentHeight < 1 {
+		contentHeight = 1
 	}
 
-	// Fill remaining space
-	for len(visibleLines) < s.height {
+	visibleLines := lines[s.offset:]
+	if len(visibleLines) > contentHeight {
+		visibleLines = visibleLines[:contentHeight]
+	}
+
+	// Fill remaining space to match content height
+	for len(visibleLines) < contentHeight {
 		visibleLines = append(visibleLines, "")
 	}
 
 	content := strings.Join(visibleLines, "\n")
 
-	// Apply sidebar styling
+	// Apply sidebar styling - don't set explicit height, let the border determine it
 	return s.styles.Border.
-		Width(s.width).
-		Height(s.height).
+		Width(s.width - 4). // Account for border width
 		Render(content)
 }
 
 // renderEmpty renders the empty state
 func (s Sidebar) renderEmpty() string {
+	// Fill empty content to match expected height
+	contentHeight := s.height - 4
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	var lines []string
+	lines = append(lines, s.styles.Dim.Render("No task selected"))
+	for len(lines) < contentHeight {
+		lines = append(lines, "")
+	}
+
 	return s.styles.Border.
-		Width(s.width).
-		Height(s.height).
-		Padding(2, 1).
-		Render(s.styles.Dim.Render("No task selected"))
+		Width(s.width - 4).
+		Render(strings.Join(lines, "\n"))
 }
 
 // renderContent renders all task details

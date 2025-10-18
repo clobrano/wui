@@ -295,20 +295,43 @@ func (t TaskList) renderGroupList() string {
 func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
+	// Build header with exact column widths (same format as task lines)
 	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s %-*s",
-		cols.id, "ID",
-		cols.project, "PROJECT",
+		cols.id, truncate("ID", cols.id),
+		cols.project, truncate("PROJECT", cols.project),
 		"P",
-		cols.due, "DUE",
-		cols.tags, "TAGS",
-		cols.description, "DESCRIPTION",
+		cols.due, truncate("DUE", cols.due),
+		cols.tags, truncate("TAGS", cols.tags),
+		cols.description, truncate("DESCRIPTION", cols.description),
 	)
 
-	// Render header with underline separator
-	styledHeader := t.styles.Header.Width(t.width).Render(header)
-	separator := strings.Repeat("─", t.width)
+	// Truncate header to width if necessary
+	if len(header) > t.width {
+		header = header[:t.width]
+	}
 
-	return styledHeader + "\n" + t.styles.Separator.Width(t.width).Render(separator)
+	// Render header with exact width
+	styledHeader := t.styles.Header.Render(header)
+
+	// Separator should match the actual width
+	separatorWidth := t.width
+	if len(header) < t.width {
+		separatorWidth = len(header)
+	}
+	separator := strings.Repeat("─", separatorWidth)
+
+	return styledHeader + "\n" + t.styles.Separator.Render(separator)
+}
+
+// truncate truncates a string to the given length
+func truncate(s string, length int) string {
+	if len(s) <= length {
+		return s
+	}
+	if length <= 3 {
+		return s[:length]
+	}
+	return s[:length-3] + "..."
 }
 
 // columnWidths holds calculated column widths

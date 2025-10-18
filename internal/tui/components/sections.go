@@ -156,7 +156,8 @@ func (s Sections) View() string {
 		tabsLine += " " + taskCountStr
 	}
 
-	return tabsLine
+	// Ensure the line spans the full width and add newline for proper vertical spacing
+	return lipgloss.NewStyle().Width(s.Width).Render(tabsLine)
 }
 
 // GetActiveSection returns the currently active section

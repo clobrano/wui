@@ -70,3 +70,33 @@ func (t *Task) IsOverdue() bool {
 	}
 	return t.Due.Before(time.Now())
 }
+
+// IsDueToday returns true if the task is due today
+func (t *Task) IsDueToday() bool {
+	if t.Due == nil {
+		return false
+	}
+	if t.Status == "completed" || t.Status == "deleted" {
+		return false
+	}
+	now := time.Now()
+	year, month, day := now.Date()
+	today := time.Date(year, month, day, 0, 0, 0, 0, now.Location())
+	tomorrow := today.AddDate(0, 0, 1)
+
+	return !t.Due.Before(today) && t.Due.Before(tomorrow)
+}
+
+// IsDueSoon returns true if the task is due within the next 7 days
+func (t *Task) IsDueSoon() bool {
+	if t.Due == nil {
+		return false
+	}
+	if t.Status == "completed" || t.Status == "deleted" {
+		return false
+	}
+	now := time.Now()
+	sevenDaysFromNow := now.AddDate(0, 0, 7)
+
+	return t.Due.After(now) && t.Due.Before(sevenDaysFromNow)
+}

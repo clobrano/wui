@@ -198,6 +198,77 @@ func TestIsOverdue(t *testing.T) {
 	}
 }
 
+func TestIsDueToday(t *testing.T) {
+	now := time.Now()
+	year, month, day := now.Date()
+	today := time.Date(year, month, day, 12, 0, 0, 0, now.Location())
+	yesterday := today.Add(-24 * time.Hour)
+	tomorrow := today.Add(24 * time.Hour)
+
+	tests := []struct {
+		name     string
+		due      *time.Time
+		status   string
+		expected bool
+	}{
+		{"no due date", nil, "pending", false},
+		{"completed task due today", &today, "completed", false},
+		{"deleted task due today", &today, "deleted", false},
+		{"due today", &today, "pending", true},
+		{"due yesterday", &yesterday, "pending", false},
+		{"due tomorrow", &tomorrow, "pending", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := Task{
+				Due:    tt.due,
+				Status: tt.status,
+			}
+			result := task.IsDueToday()
+			if result != tt.expected {
+				t.Errorf("IsDueToday() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestIsDueSoon(t *testing.T) {
+	now := time.Now()
+	in3Days := now.Add(3 * 24 * time.Hour)
+	in6Days := now.Add(6 * 24 * time.Hour)
+	in8Days := now.Add(8 * 24 * time.Hour)
+	yesterday := now.Add(-24 * time.Hour)
+
+	tests := []struct {
+		name     string
+		due      *time.Time
+		status   string
+		expected bool
+	}{
+		{"no due date", nil, "pending", false},
+		{"completed task due in 3 days", &in3Days, "completed", false},
+		{"deleted task due in 3 days", &in3Days, "deleted", false},
+		{"due in 3 days", &in3Days, "pending", true},
+		{"due in 6 days", &in6Days, "pending", true},
+		{"due in 8 days", &in8Days, "pending", false},
+		{"due yesterday", &yesterday, "pending", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			task := Task{
+				Due:    tt.due,
+				Status: tt.status,
+			}
+			result := task.IsDueSoon()
+			if result != tt.expected {
+				t.Errorf("IsDueSoon() = %v, expected %v", result, tt.expected)
+			}
+		})
+	}
+}
+
 // Helper function to create time pointer
 func timePtr(t time.Time) *time.Time {
 	return &t

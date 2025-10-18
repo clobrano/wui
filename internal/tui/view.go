@@ -13,22 +13,41 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	// Build the view components
+	sectionsBar := m.renderSections()
+	content := m.renderContent()
+	footer := m.renderFooter()
+
+	// Calculate actual heights
+	sectionsHeight := strings.Count(sectionsBar, "\n") + 1
+	contentLines := strings.Split(content, "\n")
+	footerHeight := strings.Count(footer, "\n") + 1
+
+	// Ensure content doesn't exceed available space
+	maxContentHeight := m.height - sectionsHeight - footerHeight
+	if m.state == StateFilterInput || m.state == StateModifyInput ||
+		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
+		maxContentHeight -= 2 // Input prompt takes 2 lines
+	}
+
+	// Trim content if necessary
+	if len(contentLines) > maxContentHeight {
+		contentLines = contentLines[:maxContentHeight]
+		content = strings.Join(contentLines, "\n")
+	}
+
+	// Build sections slice for vertical join
 	var sections []string
-
-	// Sections bar (includes title info)
-	sections = append(sections, m.renderSections())
-
-	// Main content area
-	sections = append(sections, m.renderContent())
+	sections = append(sections, sectionsBar)
+	sections = append(sections, content)
 
 	// Input prompt area (if in input mode)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
-	   m.state == StateAnnotateInput || m.state == StateNewTaskInput {
+		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
 		sections = append(sections, m.renderInputPrompt())
 	}
 
-	// Footer with keybindings
-	sections = append(sections, m.renderFooter())
+	sections = append(sections, footer)
 
 	return lipgloss.JoinVertical(lipgloss.Left, sections...)
 }

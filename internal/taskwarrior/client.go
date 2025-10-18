@@ -38,6 +38,15 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 	// Taskwarrior syntax: task [filter] [command]
 	filterArgs := strings.Fields(filter)
 	args := append(filterArgs, "export")
+
+	// TODO: Add sorting support
+	// Allow changing sort order from wui (e.g., via keybinding or config)
+	// Examples:
+	//   args = append(args, "rc.report.export.sort=urgency-")
+	//   args = append(args, "rc.report.export.sort=due+,priority-")
+	//   args = append(args, "rc.report.export.sort=start-,urgency-")
+	// Could be configurable per-section or globally via Settings
+
 	args = c.buildArgs(args...)
 
 	slog.Debug("Exporting tasks", "filter", filter)
