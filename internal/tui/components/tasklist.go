@@ -396,15 +396,14 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump string) string {
 	cols := t.calculateColumnWidths()
 
-	// Cursor or quick jump number
+	// First column: cursor (selection marker only, quick-jump is keyboard-only)
 	cursor := " "
 	if isSelected {
 		cursor = "■"
-	} else if quickJump != "" {
-		cursor = quickJump
 	}
+	// Note: quickJump numbers (1-9) are for keyboard shortcuts only, not displayed
 
-	// ID
+	// ID column: task ID
 	id := fmt.Sprintf("%d", task.ID)
 	if task.ID == 0 {
 		id = task.UUID
