@@ -21,13 +21,19 @@ func (m Model) View() string {
 	// Calculate actual heights
 	sectionsHeight := strings.Count(sectionsBar, "\n") + 1
 	contentLines := strings.Split(content, "\n")
-	footerHeight := strings.Count(footer, "\n") + 1
+	// Footer has padding(1,1) which adds 2 extra lines (top and bottom)
+	footerHeight := strings.Count(footer, "\n") + 1 + 2 // +2 for vertical padding
 
 	// Ensure content doesn't exceed available space
 	maxContentHeight := m.height - sectionsHeight - footerHeight
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
 		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
 		maxContentHeight -= 2 // Input prompt takes 2 lines
+	}
+
+	// Add safety margin to ensure footer is always visible
+	if maxContentHeight < 1 {
+		maxContentHeight = 1
 	}
 
 	// Trim content if necessary
@@ -190,5 +196,8 @@ func (m Model) renderFooter() string {
 
 	footer := strings.Join(parts, " | ")
 
-	return m.styles.Footer.Render(footer)
+	return m.styles.Footer.
+		Width(m.width).
+		MaxWidth(m.width).
+		Render(footer)
 }
