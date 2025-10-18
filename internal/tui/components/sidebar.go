@@ -168,10 +168,8 @@ func (s Sidebar) View() string {
 
 	// Render sidebar content without border, just with left padding
 	return lipgloss.NewStyle().
-		Width(s.width - 2). // Account for padding
-		MaxWidth(s.width - 2).
+		Width(s.width).
 		Height(s.height).
-		MaxHeight(s.height).
 		PaddingLeft(2).
 		Render(content)
 }
@@ -192,10 +190,8 @@ func (s Sidebar) renderEmpty() string {
 
 	// Render empty state without border, just with left padding
 	return lipgloss.NewStyle().
-		Width(s.width - 2). // Account for padding
-		MaxWidth(s.width - 2).
+		Width(s.width).
 		Height(s.height).
-		MaxHeight(s.height).
 		PaddingLeft(2).
 		Render(strings.Join(lines, "\n"))
 }
