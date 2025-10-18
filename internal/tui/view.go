@@ -25,6 +25,7 @@ func (m Model) View() string {
 	footerHeight := strings.Count(footer, "\n") + 1 + 2 // +2 for vertical padding
 
 	// Ensure content doesn't exceed available space
+	// Reserve space for the bottom border line (1 line)
 	maxContentHeight := m.height - sectionsHeight - footerHeight
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
 		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
@@ -32,13 +33,16 @@ func (m Model) View() string {
 	}
 
 	// Add safety margin to ensure footer is always visible
-	if maxContentHeight < 1 {
-		maxContentHeight = 1
+	if maxContentHeight < 2 {
+		maxContentHeight = 2 // At least 2 lines: 1 for content, 1 for bottom border
 	}
 
-	// Trim content if necessary
+	// Trim content if necessary, but keep the last line (bottom border)
 	if len(contentLines) > maxContentHeight {
-		contentLines = contentLines[:maxContentHeight]
+		// Keep the bottom border (last line) and trim the rest
+		bottomBorderLine := contentLines[len(contentLines)-1]
+		contentLines = contentLines[:maxContentHeight-1]
+		contentLines = append(contentLines, bottomBorderLine)
 		content = strings.Join(contentLines, "\n")
 	}
 
