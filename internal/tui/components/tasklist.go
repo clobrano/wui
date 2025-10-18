@@ -242,10 +242,6 @@ func (t TaskList) renderTaskList() string {
 		lines = append(lines, line)
 	}
 
-	// Add bottom separator line
-	separator := t.styles.Separator.Width(t.width).Render(strings.Repeat("─", t.width))
-	lines = append(lines, separator)
-
 	// Fill remaining space
 	for len(lines) < t.height {
 		lines = append(lines, "")
@@ -286,10 +282,6 @@ func (t TaskList) renderGroupList() string {
 		line := t.renderGroupLine(group, isSelected, quickJump)
 		lines = append(lines, line)
 	}
-
-	// Add bottom separator line
-	separator := t.styles.Separator.Width(t.width).Render(strings.Repeat("─", t.width))
-	lines = append(lines, separator)
 
 	// Fill remaining space
 	for len(lines) < t.height {
