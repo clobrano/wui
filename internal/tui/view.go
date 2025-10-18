@@ -97,31 +97,10 @@ func (m Model) renderTaskListWithComponents() string {
 	var content string
 
 	if m.viewMode == ViewModeListWithSidebar {
-		// Render task list and sidebar side by side with vertical separator
+		// Render task list and sidebar side by side
 		taskListView := m.taskList.View()
 		sidebarView := m.sidebar.View()
-
-		// Create vertical separator
-		taskListLines := strings.Split(taskListView, "\n")
-		sidebarLines := strings.Split(sidebarView, "\n")
-		maxLines := len(taskListLines)
-		if len(sidebarLines) > maxLines {
-			maxLines = len(sidebarLines)
-		}
-
-		var combinedLines []string
-		for i := 0; i < maxLines; i++ {
-			taskLine := ""
-			if i < len(taskListLines) {
-				taskLine = taskListLines[i]
-			}
-			sidebarLine := ""
-			if i < len(sidebarLines) {
-				sidebarLine = sidebarLines[i]
-			}
-			combinedLines = append(combinedLines, taskLine+" │ "+sidebarLine)
-		}
-		content = strings.Join(combinedLines, "\n")
+		content = lipgloss.JoinHorizontal(lipgloss.Top, taskListView, sidebarView)
 	} else {
 		// Render just the task list
 		content = m.taskList.View()
