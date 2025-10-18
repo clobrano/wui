@@ -148,9 +148,8 @@ func (s Sidebar) View() string {
 		s.offset = 0
 	}
 
-	// Account for border (2 lines) + padding (2 lines) = 4 lines total
-	// But Height() setting handles the border, so we only account for content + padding
-	contentHeight := s.height - 6 // border(2) + padding(2) + safety margin(2)
+	// No border anymore, just use available height minus small margin
+	contentHeight := s.height - 2 // Small margin for padding
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -167,17 +166,18 @@ func (s Sidebar) View() string {
 
 	content := strings.Join(visibleLines, "\n")
 
-	// Apply sidebar styling with explicit height to ensure border closes at bottom
-	return s.styles.Border.
-		Width(s.width - 4).
-		MaxHeight(s.height). // Use MaxHeight instead of Height to prevent overflow
+	// Render sidebar content without border, just with left padding
+	return lipgloss.NewStyle().
+		Width(s.width).
+		Height(s.height).
+		PaddingLeft(2).
 		Render(content)
 }
 
 // renderEmpty renders the empty state
 func (s Sidebar) renderEmpty() string {
 	// Fill empty content to match expected height
-	contentHeight := s.height - 6 // border(2) + padding(2) + safety margin(2)
+	contentHeight := s.height - 2 // Small margin for padding
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -188,9 +188,11 @@ func (s Sidebar) renderEmpty() string {
 		lines = append(lines, "")
 	}
 
-	return s.styles.Border.
-		Width(s.width - 4).
-		MaxHeight(s.height). // Use MaxHeight to prevent overflow
+	// Render empty state without border, just with left padding
+	return lipgloss.NewStyle().
+		Width(s.width).
+		Height(s.height).
+		PaddingLeft(2).
 		Render(strings.Join(lines, "\n"))
 }
 
