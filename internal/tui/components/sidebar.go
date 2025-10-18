@@ -166,9 +166,10 @@ func (s Sidebar) View() string {
 
 	content := strings.Join(visibleLines, "\n")
 
-	// Apply sidebar styling - don't set explicit height, let the border determine it
+	// Apply sidebar styling with explicit height to ensure border closes at bottom
 	return s.styles.Border.
-		Width(s.width - 4). // Account for border width
+		Width(s.width - 4).  // Account for border width
+		Height(s.height - 2). // Set explicit height to ensure bottom border shows
 		Render(content)
 }
 
@@ -188,6 +189,7 @@ func (s Sidebar) renderEmpty() string {
 
 	return s.styles.Border.
 		Width(s.width - 4).
+		Height(s.height - 2). // Set explicit height to ensure bottom border shows
 		Render(strings.Join(lines, "\n"))
 }
 
