@@ -90,15 +90,21 @@ func (m Model) renderContent() string {
 
 // renderTaskListWithComponents renders the task list using components
 func (m Model) renderTaskListWithComponents() string {
+	var content string
+
 	if m.viewMode == ViewModeListWithSidebar {
 		// Render task list and sidebar side by side
 		taskListView := m.taskList.View()
 		sidebarView := m.sidebar.View()
-		return lipgloss.JoinHorizontal(lipgloss.Top, taskListView, sidebarView)
+		content = lipgloss.JoinHorizontal(lipgloss.Top, taskListView, sidebarView)
+	} else {
+		// Render just the task list
+		content = m.taskList.View()
 	}
 
-	// Render just the task list
-	return m.taskList.View()
+	// Add bottom border line
+	bottomBorder := m.styles.Separator.Width(m.width).Render(strings.Repeat("─", m.width))
+	return content + "\n" + bottomBorder
 }
 
 // renderHelp renders the help screen
