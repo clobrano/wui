@@ -72,9 +72,9 @@ func DefaultDarkTheme() Theme {
 			StatusCompleted: lipgloss.Color("8"),  // Dim gray
 
 			// UI element colors
-			HeaderFg:       lipgloss.Color("12"), // Bright cyan
-			FooterFg:       lipgloss.Color("8"),  // Dim gray
-			SeparatorFg:    lipgloss.Color("8"),  // Dim gray
+			HeaderFg:       lipgloss.Color("12"),  // Bright cyan
+			FooterFg:       lipgloss.Color("246"), // Light gray (more visible)
+			SeparatorFg:    lipgloss.Color("8"),   // Dim gray
 			SelectionBg:    lipgloss.Color("12"), // Cyan background
 			SelectionFg:    lipgloss.Color("0"),  // Black foreground
 			SidebarBorder:  lipgloss.Color("8"),  // Dim gray
@@ -116,7 +116,7 @@ func DefaultLightTheme() Theme {
 
 			// UI element colors
 			HeaderFg:       lipgloss.Color("4"),   // Dark blue
-			FooterFg:       lipgloss.Color("8"),   // Gray
+			FooterFg:       lipgloss.Color("240"), // Darker gray (more visible on light background)
 			SeparatorFg:    lipgloss.Color("8"),   // Gray
 			SelectionBg:    lipgloss.Color("12"),  // Light cyan
 			SelectionFg:    lipgloss.Color("0"),   // Black
