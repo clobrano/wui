@@ -97,44 +97,7 @@ func (m Model) renderTaskListWithComponents() string {
 
 // renderHelp renders the help screen
 func (m Model) renderHelp() string {
-	help := []string{
-		"Help - Keyboard Shortcuts",
-		"",
-		"Task Navigation:",
-		"  j/↓       - Move down",
-		"  k/↑       - Move up",
-		"  g         - Jump to first",
-		"  G         - Jump to last",
-		"  1-9       - Quick jump to task",
-		"",
-		"Section Navigation:",
-		"  Tab/l/→   - Next section",
-		"  Shift+Tab/h/← - Previous section",
-		"  1-5       - Jump to section",
-		"",
-		"Task Actions:",
-		"  d         - Mark done",
-		"  s         - Start/Stop toggle",
-		"  x         - Delete",
-		"  e         - Edit",
-		"  n         - New task",
-		"  m         - Modify (e.g. wait:tomorrow)",
-		"  a         - Annotate",
-		"  u         - Undo",
-		"",
-		"Other:",
-		"  Enter     - Toggle sidebar",
-		"  /         - Filter tasks",
-		"  r         - Refresh tasks",
-		"  ?         - Toggle help",
-		"  q         - Quit",
-		"",
-		"Press ? or Esc to close help",
-	}
-
-	return lipgloss.NewStyle().
-		Padding(2, 4).
-		Render(strings.Join(help, "\n"))
+	return m.help.View()
 }
 
 // renderInputPrompt renders the input prompt area at the bottom

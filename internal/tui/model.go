@@ -115,7 +115,7 @@ type Model struct {
 	annotateInput components.Filter // Reuse filter component for annotate input
 	newTaskInput  components.Filter // Reuse filter component for new task input
 	sections      components.Sections
-	// help      components.Help
+	help          components.Help
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -169,6 +169,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		annotateInput:  components.NewFilter(),
 		newTaskInput:   components.NewFilter(),
 		sections:       components.NewSections(allSections, 80, styles.ToSectionsStyles()), // Initial size, will be updated
+		help:           components.NewHelp(80, 24, components.DefaultHelpStyles()),         // Initial size, will be updated
 		confirmAction:  "",
 	}
 }
@@ -507,6 +508,9 @@ func (m *Model) updateComponentSizes() {
 	// Update sections component width
 	m.sections.SetSize(m.width)
 
+	// Update help component size
+	m.help.SetSize(m.width, m.height)
+
 	// Calculate available height (subtract sections bar and footer with padding)
 	// Footer has .Padding(1, 1) which adds 1 line top + 1 line bottom = 2 lines padding + 1 content = 3 total
 	availableHeight := m.height - 4 // sections(1) + footer(3: 1 pad top + 1 content + 1 pad bottom)
@@ -571,12 +575,17 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleHelpKeys handles keys in help state
 func (m Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg.String() {
 	case "esc", "q", "?":
 		m.state = StateNormal
 		return m, nil
+	default:
+		// Delegate to help component for scrolling
+		m.help, cmd = m.help.Update(msg)
+		return m, cmd
 	}
-	return m, nil
 }
 
 // handleConfirmKeys handles keys in confirm state
