@@ -150,7 +150,7 @@ func TestMapToCore_Dependencies(t *testing.T) {
 		Description: "Task with dependencies",
 		Status:      "pending",
 		Entry:       "20251016T120000Z",
-		Depends:     "dep1,dep2,dep3",
+		Depends:     []string{"dep1", "dep2", "dep3"},
 		Urgency:     5.0,
 	}
 
@@ -174,7 +174,7 @@ func TestMapToCore_EmptyDependencies(t *testing.T) {
 		Description: "Task without dependencies",
 		Status:      "pending",
 		Entry:       "20251016T120000Z",
-		Depends:     "",
+		Depends:     []string{},
 		Urgency:     5.0,
 	}
 

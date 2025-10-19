@@ -2,7 +2,6 @@ package taskwarrior
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/clobrano/wui/internal/core"
@@ -37,9 +36,9 @@ func MapToCore(t TaskwarriorTask) core.Task {
 		coreTask.Entry = time.Time{}
 	}
 
-	// Parse dependencies (comma-separated UUIDs)
-	if t.Depends != "" {
-		coreTask.Depends = strings.Split(t.Depends, ",")
+	// Parse dependencies (array of UUIDs)
+	if t.Depends != nil && len(t.Depends) > 0 {
+		coreTask.Depends = t.Depends
 	} else {
 		coreTask.Depends = []string{}
 	}

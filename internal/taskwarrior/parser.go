@@ -21,7 +21,7 @@ type TaskwarriorTask struct {
 	Entry       string                   `json:"entry"`
 	Modified    string                   `json:"modified,omitempty"`
 	End         string                   `json:"end,omitempty"`
-	Depends     string                   `json:"depends,omitempty"`
+	Depends     []string                 `json:"depends,omitempty"`
 	Annotations []TaskwarriorAnnotation  `json:"annotations,omitempty"`
 	UDA         map[string]interface{}   `json:"-"` // Populated from unmapped JSON fields
 	Urgency     float64                  `json:"urgency"`

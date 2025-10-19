@@ -98,7 +98,7 @@ func TestParseTaskJSON_WithOptionalFields(t *testing.T) {
 			"wait": "20251017T000000Z",
 			"entry": "20251016T120000Z",
 			"modified": "20251016T130000Z",
-			"depends": "other-task-uuid",
+			"depends": ["other-task-uuid"],
 			"urgency": 8.5
 		}
 	]`)
@@ -124,8 +124,8 @@ func TestParseTaskJSON_WithOptionalFields(t *testing.T) {
 	if task.Due != "20251020T000000Z" {
 		t.Errorf("Expected due '20251020T000000Z', got %s", task.Due)
 	}
-	if task.Depends != "other-task-uuid" {
-		t.Errorf("Expected depends 'other-task-uuid', got %s", task.Depends)
+	if len(task.Depends) != 1 || task.Depends[0] != "other-task-uuid" {
+		t.Errorf("Expected depends ['other-task-uuid'], got %v", task.Depends)
 	}
 }
 
