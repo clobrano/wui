@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
@@ -434,6 +435,14 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "M":
+		// Export task to markdown
+		selectedTask := m.taskList.SelectedTask()
+		if selectedTask != nil {
+			return m, exportMarkdownCmd(*selectedTask)
+		}
+		return m, nil
+
 	case "a":
 		// Add annotation
 		selectedTask := m.taskList.SelectedTask()
@@ -816,6 +825,28 @@ func stopTaskCmd(service core.TaskService, uuid string) tea.Cmd {
 		err := service.Stop(uuid)
 		return TaskModifiedMsg{
 			Err: err,
+		}
+	}
+}
+
+// exportMarkdownCmd exports a task to markdown format and copies to clipboard
+func exportMarkdownCmd(task core.Task) tea.Cmd {
+	return func() tea.Msg {
+		markdown := task.ToMarkdown()
+
+		// Try to copy to clipboard
+		err := clipboard.WriteAll(markdown)
+
+		if err != nil {
+			return StatusMsg{
+				Message: "Failed to copy to clipboard: " + markdown,
+				IsError: true,
+			}
+		}
+
+		return StatusMsg{
+			Message: "Task exported to clipboard as markdown ✓",
+			IsError: false,
 		}
 	}
 }

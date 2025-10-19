@@ -1,6 +1,9 @@
 package core
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 // Task represents a task in the domain model (UI-agnostic)
 type Task struct {
@@ -107,4 +110,33 @@ func (t *Task) IsDueSoon() bool {
 	sevenDaysFromNow := now.AddDate(0, 0, 7)
 
 	return t.Due.After(now) && t.Due.Before(sevenDaysFromNow)
+}
+
+// ToMarkdown formats the task as a markdown checklist item
+// Format: * [ ] Description (short-uuid)
+// Status markers: [ ] pending, [x] completed, [S] started, [d] deleted
+func (t *Task) ToMarkdown() string {
+	// Determine status marker
+	var statusMarker string
+	switch t.Status {
+	case "completed":
+		statusMarker = "x"
+	case "deleted":
+		statusMarker = "d"
+	default:
+		// pending or waiting - check if started
+		if t.Start != nil {
+			statusMarker = "S"
+		} else {
+			statusMarker = " "
+		}
+	}
+
+	// Get short UUID (first 8 characters)
+	shortUUID := t.UUID
+	if len(shortUUID) > 8 {
+		shortUUID = shortUUID[:8]
+	}
+
+	return fmt.Sprintf("* [%s] %s (%s)", statusMarker, t.Description, shortUUID)
 }

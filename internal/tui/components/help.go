@@ -108,6 +108,7 @@ func defaultKeybindingGroups() []KeybindingGroup {
 				{Keys: []string{"e"}, Description: "Edit task in $EDITOR"},
 				{Keys: []string{"n"}, Description: "Create new task"},
 				{Keys: []string{"m"}, Description: "Modify task (quick edit)"},
+				{Keys: []string{"M"}, Description: "Export task as markdown (to clipboard)"},
 				{Keys: []string{"a"}, Description: "Add annotation"},
 				{Keys: []string{"u"}, Description: "Undo last operation"},
 			},

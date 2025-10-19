@@ -65,6 +65,7 @@ Press `?` for help and keybinding reference.
 - `e` - Edit task in $EDITOR
 - `n` - Create new task
 - `m` - Quick modify (e.g., `due:tomorrow +urgent` or `due:2025-10-20T14:30`)
+- `M` - Export task as markdown to clipboard (format: `* [ ] Description (uuid)`)
 - `a` - Add annotation
 - `u` - Undo last operation
 

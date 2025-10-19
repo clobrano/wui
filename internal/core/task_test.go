@@ -274,6 +274,61 @@ func TestIsDueSoon(t *testing.T) {
 	}
 }
 
+func TestToMarkdown(t *testing.T) {
+	tests := []struct {
+		name     string
+		task     Task
+		expected string
+	}{
+		{
+			name: "pending task",
+			task: Task{
+				Description: "Test task",
+				UUID:        "12345678-abcd-efgh",
+				Status:      "pending",
+			},
+			expected: "* [ ] Test task (12345678)",
+		},
+		{
+			name: "completed task",
+			task: Task{
+				Description: "Completed task",
+				UUID:        "abcd1234",
+				Status:      "completed",
+			},
+			expected: "* [x] Completed task (abcd1234)",
+		},
+		{
+			name: "started task",
+			task: Task{
+				Description: "Active task",
+				UUID:        "xyz123456789",
+				Status:      "pending",
+				Start:       timePtr(time.Now()),
+			},
+			expected: "* [S] Active task (xyz12345)",
+		},
+		{
+			name: "deleted task",
+			task: Task{
+				Description: "Deleted task",
+				UUID:        "delete-me-uuid",
+				Status:      "deleted",
+			},
+			expected: "* [d] Deleted task (delete-m)",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.task.ToMarkdown()
+			if result != tt.expected {
+				t.Errorf("ToMarkdown() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
 // Helper function to create time pointer
 func timePtr(t time.Time) *time.Time {
 	return &t
