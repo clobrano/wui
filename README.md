@@ -100,14 +100,14 @@ tui:
   # Sidebar width (percentage of terminal width, 1-100)
   sidebar_width: 33
 
-  # Display columns (ID, PROJECT, P, DUE, TAGS, DESCRIPTION)
+  # Display columns (max 6, case-insensitive)
+  # Available: id, project, priority, due, tags, description
+  # Example minimal setup:
   columns:
-    - ID
-    - PROJECT
-    - P
-    - DUE
-    - TAGS
-    - DESCRIPTION
+    - id
+    - project
+    - description
+    - due
 
   # Tabs/sections - fully customizable!
   # You can reorder, remove defaults, or add your own

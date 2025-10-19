@@ -52,6 +52,11 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		columns = []string{"id", "project", "priority", "due", "tags", "description"}
 	}
 
+	// Limit to maximum 6 columns
+	if len(columns) > 6 {
+		columns = columns[:6]
+	}
+
 	// Normalize column names to lowercase
 	normalizedColumns := make([]string, len(columns))
 	for i, col := range columns {
@@ -306,15 +311,35 @@ func (t TaskList) renderGroupList() string {
 func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
-	// Build header with exact column widths (same format as task lines)
-	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s %-*s",
-		cols.widths["id"], truncate("ID", cols.widths["id"]),
-		cols.widths["project"], truncate("PROJECT", cols.widths["project"]),
-		"P",
-		cols.widths["due"], truncate("DUE", cols.widths["due"]),
-		cols.widths["tags"], truncate("TAGS", cols.widths["tags"]),
-		cols.widths["description"], truncate("DESCRIPTION", cols.widths["description"]),
-	)
+	// Column name mappings
+	columnNames := map[string]string{
+		"id":          "ID",
+		"project":     "PROJECT",
+		"priority":    "P",
+		"due":         "DUE",
+		"tags":        "TAGS",
+		"description": "DESCRIPTION",
+	}
+
+	// Build header dynamically based on displayColumns
+	parts := []string{"  "} // Start with cursor space
+
+	for _, col := range t.displayColumns {
+		width := cols.widths[col]
+		name := columnNames[col]
+		if name == "" {
+			name = strings.ToUpper(col)
+		}
+
+		// Priority column is single character, others are padded
+		if col == "priority" {
+			parts = append(parts, name+" ")
+		} else {
+			parts = append(parts, fmt.Sprintf("%-*s ", width, truncate(name, width)))
+		}
+	}
+
+	header := strings.Join(parts, "")
 
 	// Truncate header to width if necessary
 	if len(header) > t.width {
@@ -528,16 +553,30 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		description = description[:cols.widths["description"]]
 	}
 
-	// Build line with conditionally styled text
-	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s %-*s",
-		cursor,
-		cols.widths["id"], id,
-		cols.widths["project"], project,
-		priorityText,
-		cols.widths["due"], dueText,
-		cols.widths["tags"], tags,
-		cols.widths["description"], description,
-	)
+	// Build line dynamically based on displayColumns
+	columnValues := map[string]string{
+		"id":          id,
+		"project":     project,
+		"priority":    priorityText,
+		"due":         dueText,
+		"tags":        tags,
+		"description": description,
+	}
+
+	parts := []string{cursor}
+	for _, col := range t.displayColumns {
+		value := columnValues[col]
+		width := cols.widths[col]
+
+		// Priority doesn't need padding, just add with space
+		if col == "priority" {
+			parts = append(parts, value+" ")
+		} else {
+			parts = append(parts, fmt.Sprintf("%-*s ", width, value))
+		}
+	}
+
+	line := strings.Join(parts, "")
 
 	// Apply status-based styling
 	var lineStyle lipgloss.Style
