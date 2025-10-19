@@ -227,6 +227,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.errorMessage = ""
 
+		// Update sidebar with all tasks for dependency lookups
+		m.sidebar.SetAllTasks(m.tasks)
+
 		// If in Projects or Tags view and showing group list, compute groups
 		if m.inGroupView {
 			if m.sections.IsProjectsView() {

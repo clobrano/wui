@@ -30,11 +30,12 @@ type SidebarStyles struct {
 
 // Sidebar displays detailed information about a task
 type Sidebar struct {
-	task   *core.Task
-	width  int
-	height int
-	offset int // Scroll offset for content
-	styles SidebarStyles
+	task     *core.Task
+	allTasks []core.Task // All tasks for dependency lookups
+	width    int
+	height   int
+	offset   int // Scroll offset for content
+	styles   SidebarStyles
 }
 
 // NewSidebar creates a new sidebar component
@@ -52,6 +53,11 @@ func NewSidebar(width, height int, styles SidebarStyles) Sidebar {
 func (s *Sidebar) SetTask(task *core.Task) {
 	s.task = task
 	s.offset = 0 // Reset scroll when task changes
+}
+
+// SetAllTasks updates the list of all tasks for dependency lookups
+func (s *Sidebar) SetAllTasks(tasks []core.Task) {
+	s.allTasks = tasks
 }
 
 // SetSize updates the sidebar dimensions
@@ -426,18 +432,36 @@ func (s Sidebar) renderDependencies() string {
 	if len(s.task.Depends) > 0 {
 		lines = append(lines, "  Blocked by:")
 		for _, uuid := range s.task.Depends {
-			// Show shortened UUID
-			shortUUID := uuid
-			if len(shortUUID) > 8 {
-				shortUUID = shortUUID[:8]
+			// Look up the dependent task
+			depTask := s.findTaskByUUID(uuid)
+
+			if depTask != nil {
+				// Show ID and description
+				lines = append(lines, fmt.Sprintf("    - #%d: %s", depTask.ID, depTask.Description))
+			} else {
+				// Show shortened UUID if task not found
+				shortUUID := uuid
+				if len(shortUUID) > 8 {
+					shortUUID = shortUUID[:8]
+				}
+				lines = append(lines, fmt.Sprintf("    - %s", shortUUID))
 			}
-			lines = append(lines, fmt.Sprintf("    - %s", shortUUID))
 		}
 	} else {
 		lines = append(lines, "  None")
 	}
 
 	return strings.Join(lines, "\n")
+}
+
+// findTaskByUUID finds a task in allTasks by its UUID
+func (s Sidebar) findTaskByUUID(uuid string) *core.Task {
+	for i := range s.allTasks {
+		if s.allTasks[i].UUID == uuid {
+			return &s.allTasks[i]
+		}
+	}
+	return nil
 }
 
 // renderAnnotations renders task annotations

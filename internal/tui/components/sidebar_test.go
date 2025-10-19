@@ -507,3 +507,73 @@ func TestLongDescription(t *testing.T) {
 		t.Error("Expected non-empty view")
 	}
 }
+
+func TestDependencyLookup(t *testing.T) {
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
+
+	// Create all tasks including the dependency
+	allTasks := []core.Task{
+		{
+			ID:          1,
+			UUID:        "dep-uuid-1234",
+			Description: "Dependency task to complete first",
+			Status:      "pending",
+		},
+		{
+			ID:          2,
+			UUID:        "main-uuid-5678",
+			Description: "Main task that depends on task 1",
+			Status:      "pending",
+			Depends:     []string{"dep-uuid-1234"},
+		},
+	}
+
+	// Set all tasks for dependency lookup
+	sb.SetAllTasks(allTasks)
+
+	// Set the main task as the current task
+	sb.SetTask(&allTasks[1])
+
+	// Render the view
+	view := sb.View()
+
+	// Verify the dependency section includes the task ID
+	if !strings.Contains(view, "#1") {
+		t.Error("Expected dependency task ID #1 in view")
+	}
+
+	// Verify the dependency description is shown (may be wrapped)
+	if !strings.Contains(view, "Dependency task") {
+		t.Errorf("Expected dependency description in view")
+	}
+
+	// Verify the "Blocked by" label is present
+	if !strings.Contains(view, "Blocked by:") {
+		t.Error("Expected 'Blocked by:' label in view")
+	}
+}
+
+func TestDependencyNotFound(t *testing.T) {
+	sb := NewSidebar(40, 24, defaultSidebarStyles())
+
+	// Create task with dependency that doesn't exist in allTasks
+	task := &core.Task{
+		ID:          1,
+		UUID:        "main-uuid",
+		Description: "Task with missing dependency",
+		Status:      "pending",
+		Depends:     []string{"nonexistent-uuid"},
+	}
+
+	// Set empty allTasks
+	sb.SetAllTasks([]core.Task{})
+	sb.SetTask(task)
+
+	// Render the view
+	view := sb.View()
+
+	// Should still show the UUID even if task not found
+	if !strings.Contains(view, "nonexist") {
+		t.Error("Expected dependency UUID in view even when task not found")
+	}
+}
