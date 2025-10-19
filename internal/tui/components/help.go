@@ -124,10 +124,10 @@ func defaultKeybindingGroups() []KeybindingGroup {
 		{
 			Title: "Sidebar Scrolling (when sidebar is open)",
 			Bindings: []Keybinding{
-				{Keys: []string{"Ctrl+d"}, Description: "Scroll down half page"},
-				{Keys: []string{"Ctrl+u"}, Description: "Scroll up half page"},
-				{Keys: []string{"Ctrl+f"}, Description: "Scroll down full page"},
-				{Keys: []string{"Ctrl+b"}, Description: "Scroll up full page"},
+				{Keys: []string{"Ctrl+d", "J"}, Description: "Scroll down half page"},
+				{Keys: []string{"Ctrl+u", "K"}, Description: "Scroll up half page"},
+				{Keys: []string{"Ctrl+f", "PgDn"}, Description: "Scroll down full page"},
+				{Keys: []string{"Ctrl+b", "PgUp"}, Description: "Scroll up full page"},
 			},
 		},
 		{

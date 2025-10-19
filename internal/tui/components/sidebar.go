@@ -83,13 +83,13 @@ func (s Sidebar) Update(msg tea.Msg) (Sidebar, tea.Cmd) {
 func (s Sidebar) handleKey(msg tea.KeyMsg) Sidebar {
 	// Only handle scrolling keys when sidebar is active
 	switch msg.String() {
-	case "ctrl+d":
+	case "ctrl+d", "J": // J (shift+j) for half page down
 		s.scrollDown(s.height / 2)
-	case "ctrl+u":
+	case "ctrl+u", "K": // K (shift+k) for half page up
 		s.scrollUp(s.height / 2)
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		s.scrollDown(s.height)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		s.scrollUp(s.height)
 	}
 	return s

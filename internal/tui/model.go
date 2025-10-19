@@ -493,7 +493,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If sidebar is visible, check for sidebar scrolling keys
 	if m.viewMode == ViewModeListWithSidebar {
 		switch msg.String() {
-		case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+		case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "J", "K", "pgdown", "pgup":
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}
