@@ -536,8 +536,11 @@ func (s Sidebar) renderUDAs() string {
 
 // formatDateWithRelative formats a date with relative time
 func formatDateWithRelative(t time.Time) string {
-	// Format: "2006-01-02 (2 days ago)"
-	dateStr := t.Format("2006-01-02 15:04")
+	// Convert to local timezone for display
+	localTime := t.Local()
+
+	// Format: "2006-01-02 15:04 (2 days ago)"
+	dateStr := localTime.Format("2006-01-02 15:04")
 	relativeStr := formatRelativeTime(t)
 
 	if relativeStr != "" {
