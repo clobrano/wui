@@ -58,15 +58,21 @@ Press `?` for help and keybinding reference.
 - `Shift+Tab` / `h` / `←` - Previous section
 - `1-5` - Jump to section by number
 
+### Multi-Select
+- `Space` - Toggle task selection
+- `Esc` - Clear all selections
+
+**Note:** You can select multiple tasks with `Space`, then apply actions (mark done, modify, annotate, delete, etc.) to all selected tasks at once.
+
 ### Task Actions
-- `d` - Mark task done
-- `s` - Start/Stop task
-- `x` - Delete task (with confirmation)
+- `d` - Mark task(s) done
+- `s` - Start/Stop task(s)
+- `x` - Delete task(s) (with confirmation)
 - `e` - Edit task in $EDITOR
 - `n` - Create new task
-- `m` - Quick modify (e.g., `due:tomorrow +urgent` or `due:2025-10-20T14:30`)
-- `M` - Export task as markdown to clipboard (format: `* [ ] Description (uuid)`)
-- `a` - Add annotation
+- `m` - Quick modify task(s) (e.g., `due:tomorrow +urgent` or `due:2025-10-20T14:30`)
+- `M` - Export task(s) as markdown to clipboard (format: `* [ ] Description (uuid)`)
+- `a` - Add annotation to task(s)
 - `u` - Undo last operation
 
 **Note:** Dates with time can be set using `due:YYYY-MM-DDTHH:MM` or `scheduled:YYYY-MM-DDTHH:MM` format. Times are displayed only when not midnight.

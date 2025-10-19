@@ -28,6 +28,7 @@ func TestDefaultKeybindingGroups(t *testing.T) {
 	expectedGroups := []string{
 		"Task Navigation",
 		"Section Navigation",
+		"Multi-Select",
 		"Task Actions",
 		"View Controls",
 		"Sidebar Scrolling (when sidebar is open)",

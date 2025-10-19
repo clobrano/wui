@@ -38,6 +38,7 @@ type TaskList struct {
 	groups         []core.TaskGroup // For displaying groups (Projects/Tags)
 	displayMode    DisplayMode      // What to display: tasks or groups
 	cursor         int              // Selected task/group index
+	selectedUUIDs  map[string]bool  // Multi-select: UUIDs of selected tasks
 	width          int
 	height         int
 	displayColumns []string // Column names to display
@@ -68,6 +69,7 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		groups:         []core.TaskGroup{},
 		displayMode:    DisplayModeTasks,
 		cursor:         0,
+		selectedUUIDs:  make(map[string]bool),
 		width:          width,
 		height:         height,
 		displayColumns: normalizedColumns,
@@ -249,12 +251,13 @@ func (t TaskList) renderTaskList() string {
 	// Render visible tasks
 	for i := t.offset; i < endIdx; i++ {
 		task := t.tasks[i]
-		isSelected := i == t.cursor
+		isCursor := i == t.cursor
+		isMultiSelected := t.IsSelected(task.UUID)
 		quickJump := ""
 		if i-t.offset < 9 {
 			quickJump = fmt.Sprintf("%d", i-t.offset+1)
 		}
-		line := t.renderTaskLine(task, isSelected, quickJump)
+		line := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
 		lines = append(lines, line)
 	}
 
@@ -448,13 +451,18 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 }
 
 // renderTaskLine renders a single task row
-func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump string) string {
+func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected bool, quickJump string) string {
 	cols := t.calculateColumnWidths()
 
-	// First column: cursor (selection marker only, quick-jump is keyboard-only)
+	// First column: cursor and multi-select indicator
+	// Cursor (current line): "■", Multi-selected: "✓", Both: "◆", Neither: " "
 	cursor := " "
-	if isSelected {
-		cursor = "■"
+	if isCursor && isMultiSelected {
+		cursor = "◆" // Both cursor and selected
+	} else if isCursor {
+		cursor = "■" // Just cursor
+	} else if isMultiSelected {
+		cursor = "✓" // Just selected
 	}
 	// Note: quickJump numbers (1-9) are for keyboard shortcuts only, not displayed
 
@@ -483,7 +491,7 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	var priorityText string
 	if task.Priority != "" {
 		priority = string(task.Priority[0])
-		if !isSelected {
+		if !isMultiSelected {
 			// Apply color only when not selected
 			priorityStyle := lipgloss.NewStyle()
 			switch task.Priority {
@@ -510,7 +518,7 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 		if len(due) > cols.widths["due"] {
 			due = due[:cols.widths["due"]]
 		}
-		if !isSelected && task.IsOverdue() {
+		if !isMultiSelected && task.IsOverdue() {
 			// Apply overdue color only when not selected
 			dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
 			dueText = dueStyle.Render(due)
@@ -581,7 +589,7 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	// Apply status-based styling
 	var lineStyle lipgloss.Style
 
-	if isSelected {
+	if isMultiSelected {
 		lineStyle = t.styles.Selection
 	} else {
 		// Apply status styling based on task status
@@ -704,4 +712,56 @@ func (t TaskList) TaskCount() int {
 // Cursor returns the current cursor position (exported for Model access)
 func (t TaskList) Cursor() int {
 	return t.cursor
+}
+
+// ToggleSelection toggles the selection state of the current task
+func (t *TaskList) ToggleSelection() {
+	if t.displayMode != DisplayModeTasks {
+		return // Only works in task mode
+	}
+
+	task := t.SelectedTask()
+	if task != nil {
+		if t.selectedUUIDs[task.UUID] {
+			delete(t.selectedUUIDs, task.UUID)
+		} else {
+			t.selectedUUIDs[task.UUID] = true
+		}
+	}
+}
+
+// ClearSelection clears all selected tasks
+func (t *TaskList) ClearSelection() {
+	t.selectedUUIDs = make(map[string]bool)
+}
+
+// GetSelectedTasks returns all currently selected tasks, or the cursor task if none selected
+func (t TaskList) GetSelectedTasks() []core.Task {
+	if len(t.selectedUUIDs) == 0 {
+		// No multi-selection, return current task if any
+		task := t.SelectedTask()
+		if task != nil {
+			return []core.Task{*task}
+		}
+		return []core.Task{}
+	}
+
+	// Return all selected tasks
+	var selected []core.Task
+	for _, task := range t.tasks {
+		if t.selectedUUIDs[task.UUID] {
+			selected = append(selected, task)
+		}
+	}
+	return selected
+}
+
+// HasSelections returns true if any tasks are selected
+func (t TaskList) HasSelections() bool {
+	return len(t.selectedUUIDs) > 0
+}
+
+// IsSelected returns true if the given task UUID is selected
+func (t TaskList) IsSelected(uuid string) bool {
+	return t.selectedUUIDs[uuid]
 }

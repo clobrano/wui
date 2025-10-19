@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
@@ -331,7 +332,19 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.state = StateHelp
 		return m, nil
 
+	case " ": // Space key
+		// Toggle selection on current task
+		if !m.inGroupView {
+			m.taskList.ToggleSelection()
+		}
+		return m, nil
+
 	case "esc":
+		// Clear selections if any exist
+		if m.taskList.HasSelections() {
+			m.taskList.ClearSelection()
+			return m, nil
+		}
 		// Go back to group list if we drilled into a group
 		if !m.inGroupView && m.selectedGroup != nil && (m.sections.IsProjectsView() || m.sections.IsTagsView()) {
 			m.inGroupView = true
@@ -384,29 +397,27 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "d":
-		// Mark task done
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
-			return m, markTaskDoneCmd(m.service, selectedTask.UUID)
+		// Mark task(s) done
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
+			m.taskList.ClearSelection()
+			return m, markTasksDoneCmd(m.service, selectedTasks)
 		}
 		return m, nil
 
 	case "s":
-		// Toggle start/stop
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
-			// If task is started (has Start field), stop it; otherwise start it
-			if selectedTask.Start != nil {
-				return m, stopTaskCmd(m.service, selectedTask.UUID)
-			}
-			return m, startTaskCmd(m.service, selectedTask.UUID)
+		// Toggle start/stop on task(s)
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
+			m.taskList.ClearSelection()
+			return m, toggleStartStopCmd(m.service, selectedTasks)
 		}
 		return m, nil
 
 	case "x":
-		// Delete task (with confirmation)
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
+		// Delete task(s) (with confirmation)
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
 			m.state = StateConfirm
 			m.confirmAction = "delete"
 			return m, nil
@@ -425,9 +436,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.newTaskInput.Focus()
 
 	case "m":
-		// Modify task
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
+		// Modify task(s)
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
 			m.state = StateModifyInput
 			m.modifyInput.SetValue("")
 			m.updateComponentSizes()
@@ -436,17 +447,18 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "M":
-		// Export task to markdown
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
-			return m, exportMarkdownCmd(*selectedTask)
+		// Export task(s) to markdown
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
+			m.taskList.ClearSelection()
+			return m, exportMarkdownCmd(selectedTasks)
 		}
 		return m, nil
 
 	case "a":
-		// Add annotation
-		selectedTask := m.taskList.SelectedTask()
-		if selectedTask != nil {
+		// Add annotation to task(s)
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
 			m.state = StateAnnotateInput
 			m.annotateInput.SetValue("")
 			m.updateComponentSizes()
@@ -615,11 +627,12 @@ func (m Model) handleConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y", "Y":
 		// Execute the confirmed action
 		m.state = StateNormal
-		selectedTask := m.taskList.SelectedTask()
+		selectedTasks := m.taskList.GetSelectedTasks()
 
-		if m.confirmAction == "delete" && selectedTask != nil {
+		if m.confirmAction == "delete" && len(selectedTasks) > 0 {
 			m.confirmAction = ""
-			return m, deleteTaskCmd(m.service, selectedTask.UUID)
+			m.taskList.ClearSelection()
+			return m, deleteTasksCmd(m.service, selectedTasks)
 		}
 
 		m.confirmAction = ""
@@ -642,13 +655,14 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		// Apply modifications
 		modifications := m.modifyInput.Value()
-		selectedTask := m.taskList.SelectedTask()
+		selectedTasks := m.taskList.GetSelectedTasks()
 		m.state = StateNormal
 		m.modifyInput.Blur()
 		m.updateComponentSizes()
 
-		if selectedTask != nil && modifications != "" {
-			return m, modifyTaskCmd(m.service, selectedTask.UUID, modifications)
+		if len(selectedTasks) > 0 && modifications != "" {
+			m.taskList.ClearSelection()
+			return m, modifyTasksCmd(m.service, selectedTasks, modifications)
 		}
 		return m, nil
 
@@ -673,13 +687,14 @@ func (m Model) handleAnnotateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		// Add annotation
 		text := m.annotateInput.Value()
-		selectedTask := m.taskList.SelectedTask()
+		selectedTasks := m.taskList.GetSelectedTasks()
 		m.state = StateNormal
 		m.annotateInput.Blur()
 		m.updateComponentSizes()
 
-		if selectedTask != nil && text != "" {
-			return m, annotateTaskCmd(m.service, selectedTask.UUID, text)
+		if len(selectedTasks) > 0 && text != "" {
+			m.taskList.ClearSelection()
+			return m, annotateTasksCmd(m.service, selectedTasks, text)
 		}
 		return m, nil
 
@@ -829,10 +844,100 @@ func stopTaskCmd(service core.TaskService, uuid string) tea.Cmd {
 	}
 }
 
-// exportMarkdownCmd exports a task to markdown format and copies to clipboard
-func exportMarkdownCmd(task core.Task) tea.Cmd {
+// markTasksDoneCmd creates a command to mark multiple tasks as done
+func markTasksDoneCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
 	return func() tea.Msg {
-		markdown := task.ToMarkdown()
+		var firstErr error
+		for _, task := range tasks {
+			err := service.Done(task.UUID)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return TaskModifiedMsg{
+			Err: firstErr,
+		}
+	}
+}
+
+// deleteTasksCmd creates a command to delete multiple tasks
+func deleteTasksCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
+	return func() tea.Msg {
+		var firstErr error
+		for _, task := range tasks {
+			err := service.Delete(task.UUID)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return TaskModifiedMsg{
+			Err: firstErr,
+		}
+	}
+}
+
+// modifyTasksCmd creates a command to modify multiple tasks
+func modifyTasksCmd(service core.TaskService, tasks []core.Task, modifications string) tea.Cmd {
+	return func() tea.Msg {
+		var firstErr error
+		for _, task := range tasks {
+			err := service.Modify(task.UUID, modifications)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return TaskModifiedMsg{
+			Err: firstErr,
+		}
+	}
+}
+
+// annotateTasksCmd creates a command to add an annotation to multiple tasks
+func annotateTasksCmd(service core.TaskService, tasks []core.Task, text string) tea.Cmd {
+	return func() tea.Msg {
+		var firstErr error
+		for _, task := range tasks {
+			err := service.Annotate(task.UUID, text)
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return TaskModifiedMsg{
+			Err: firstErr,
+		}
+	}
+}
+
+// toggleStartStopCmd creates a command to toggle start/stop on multiple tasks
+func toggleStartStopCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
+	return func() tea.Msg {
+		var firstErr error
+		for _, task := range tasks {
+			var err error
+			// If task is started (has Start field), stop it; otherwise start it
+			if task.Start != nil {
+				err = service.Stop(task.UUID)
+			} else {
+				err = service.Start(task.UUID)
+			}
+			if err != nil && firstErr == nil {
+				firstErr = err
+			}
+		}
+		return TaskModifiedMsg{
+			Err: firstErr,
+		}
+	}
+}
+
+// exportMarkdownCmd exports task(s) to markdown format and copies to clipboard
+func exportMarkdownCmd(tasks []core.Task) tea.Cmd {
+	return func() tea.Msg {
+		var markdowns []string
+		for _, task := range tasks {
+			markdowns = append(markdowns, task.ToMarkdown())
+		}
+		markdown := strings.Join(markdowns, "\n")
 
 		// Try to copy to clipboard
 		err := clipboard.WriteAll(markdown)
