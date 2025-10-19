@@ -74,32 +74,45 @@ func (s Sidebar) Update(msg tea.Msg) (Sidebar, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		return s.handleKey(msg), nil
+		// Use pointer to modify the sidebar in place
+		s.handleKey(msg)
+		return s, nil
 	}
 	return s, nil
 }
 
 // handleKey processes keyboard input for scrolling
-func (s Sidebar) handleKey(msg tea.KeyMsg) Sidebar {
+func (s *Sidebar) handleKey(msg tea.KeyMsg) {
 	// Only handle scrolling keys when sidebar is active
 	switch msg.String() {
-	case "ctrl+d", "J": // J (shift+j) for half page down
-		s.scrollDown(s.height / 2)
-	case "ctrl+u", "K": // K (shift+k) for half page up
-		s.scrollUp(s.height / 2)
-	case "ctrl+f", "pgdown":
+	case "J": // J (shift+j) for line down
+		s.scrollDown(1)
+	case "K": // K (shift+k) for line up
+		s.scrollUp(1)
+	case "ctrl+d": // Jump to bottom
+		s.scrollToBottom()
+	case "ctrl+u": // Jump to top
+		s.scrollToTop()
+	case "ctrl+f", "pgdown": // Full page down
 		s.scrollDown(s.height)
-	case "ctrl+b", "pgup":
+	case "ctrl+b", "pgup": // Full page up
 		s.scrollUp(s.height)
 	}
-	return s
 }
 
 // scrollDown scrolls the sidebar content down
 func (s *Sidebar) scrollDown(amount int) {
-	// Calculate max content lines
-	contentLines := s.contentLineCount()
-	maxOffset := contentLines - s.height + 2 // Keep some padding
+	// Calculate actual content lines by rendering
+	sections := s.renderContent()
+	lines := strings.Split(sections, "\n")
+	totalLines := len(lines)
+
+	contentHeight := s.height - 6
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	maxOffset := totalLines - contentHeight
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
@@ -116,6 +129,30 @@ func (s *Sidebar) scrollUp(amount int) {
 	if s.offset < 0 {
 		s.offset = 0
 	}
+}
+
+// scrollToBottom scrolls to the bottom of the sidebar content
+func (s *Sidebar) scrollToBottom() {
+	sections := s.renderContent()
+	lines := strings.Split(sections, "\n")
+	totalLines := len(lines)
+
+	contentHeight := s.height - 6
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
+
+	maxOffset := totalLines - contentHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	s.offset = maxOffset
+}
+
+// scrollToTop scrolls to the top of the sidebar content
+func (s *Sidebar) scrollToTop() {
+	s.offset = 0
 }
 
 // contentLineCount estimates the number of content lines
@@ -154,9 +191,9 @@ func (s Sidebar) View() string {
 		s.offset = 0
 	}
 
-	// Account for border (2 lines) + padding (2 lines) = 4 lines total
-	// But Height() setting handles the border, so we only account for content + padding
-	contentHeight := s.height - 6 // border(2) + padding(2) + safety margin(2)
+	// Account for border (2 lines) + padding (2 lines from Padding(1, 2)) = 4 lines total
+	// Add 2 more lines of safety margin to ensure last line is fully visible (lipgloss rendering overhead)
+	contentHeight := s.height - 6
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -173,10 +210,10 @@ func (s Sidebar) View() string {
 
 	content := strings.Join(visibleLines, "\n")
 
-	// Apply sidebar styling with explicit height to ensure border closes at bottom
+	// Apply sidebar styling
+	// Don't constrain height - we've already sized the content correctly
 	return s.styles.Border.
 		Width(s.width - 4).
-		MaxHeight(s.height). // Use MaxHeight instead of Height to prevent overflow
 		Render(content)
 }
 
