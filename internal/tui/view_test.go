@@ -60,11 +60,11 @@ func TestViewHelp(t *testing.T) {
 	model.state = StateHelp
 
 	view := model.View()
-	if !strings.Contains(view, "Help") {
-		t.Error("Expected view to contain help text")
+	if !strings.Contains(view, "Keyboard Shortcuts") {
+		t.Errorf("Expected view to contain help text\nView:\n%s", view)
 	}
-	if !strings.Contains(view, "Navigation") {
-		t.Error("Expected view to contain navigation help")
+	if !strings.Contains(view, "Task Navigation") {
+		t.Errorf("Expected view to contain navigation help\nView:\n%s", view)
 	}
 }
 

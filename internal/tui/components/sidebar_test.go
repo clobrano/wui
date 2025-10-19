@@ -184,7 +184,7 @@ func TestViewWithDates(t *testing.T) {
 
 func TestViewWithAnnotations(t *testing.T) {
 	now := time.Now()
-	sb := NewSidebar(40, 24, defaultSidebarStyles())
+	sb := NewSidebar(40, 100, defaultSidebarStyles()) // Taller height so all content is visible
 	task := &core.Task{
 		ID:          1,
 		Description: "Test task",
@@ -198,13 +198,13 @@ func TestViewWithAnnotations(t *testing.T) {
 	view := sb.View()
 
 	if !strings.Contains(view, "Annotations") {
-		t.Error("Expected 'Annotations' section in view")
+		t.Errorf("Expected 'Annotations' section in view\nView:\n%s", view)
 	}
 	if !strings.Contains(view, "First annotation") {
-		t.Error("Expected first annotation in view")
+		t.Errorf("Expected first annotation in view\nView:\n%s", view)
 	}
 	if !strings.Contains(view, "Second annotation") {
-		t.Error("Expected second annotation in view")
+		t.Errorf("Expected second annotation in view\nView:\n%s", view)
 	}
 }
 
@@ -509,7 +509,7 @@ func TestLongDescription(t *testing.T) {
 }
 
 func TestDependencyLookup(t *testing.T) {
-	sb := NewSidebar(40, 24, defaultSidebarStyles())
+	sb := NewSidebar(40, 100, defaultSidebarStyles()) // Taller height so all content is visible
 
 	// Create all tasks including the dependency
 	allTasks := []core.Task{
@@ -554,7 +554,7 @@ func TestDependencyLookup(t *testing.T) {
 }
 
 func TestDependencyNotFound(t *testing.T) {
-	sb := NewSidebar(40, 24, defaultSidebarStyles())
+	sb := NewSidebar(40, 100, defaultSidebarStyles()) // Taller height so all content is visible
 
 	// Create task with dependency that doesn't exist in allTasks
 	task := &core.Task{
