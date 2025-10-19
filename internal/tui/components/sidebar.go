@@ -107,7 +107,7 @@ func (s *Sidebar) scrollDown(amount int) {
 	lines := strings.Split(sections, "\n")
 	totalLines := len(lines)
 
-	contentHeight := s.height - 6
+	contentHeight := s.height - 10
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -133,21 +133,8 @@ func (s *Sidebar) scrollUp(amount int) {
 
 // scrollToBottom scrolls to the bottom of the sidebar content
 func (s *Sidebar) scrollToBottom() {
-	sections := s.renderContent()
-	lines := strings.Split(sections, "\n")
-	totalLines := len(lines)
-
-	contentHeight := s.height - 6
-	if contentHeight < 1 {
-		contentHeight = 1
-	}
-
-	maxOffset := totalLines - contentHeight
-	if maxOffset < 0 {
-		maxOffset = 0
-	}
-
-	s.offset = maxOffset
+	// Set to a very large number - View() will clamp it
+	s.offset = 9999
 }
 
 // scrollToTop scrolls to the top of the sidebar content
@@ -187,18 +174,29 @@ func (s Sidebar) View() string {
 
 	// Apply scrolling offset
 	lines := strings.Split(sections, "\n")
-	if s.offset >= len(lines) {
-		s.offset = 0
-	}
 
 	// Account for border (2 lines) + padding (2 lines from Padding(1, 2)) = 4 lines total
-	// Add 2 more lines of safety margin to ensure last line is fully visible (lipgloss rendering overhead)
-	contentHeight := s.height - 6
+	// Add extra safety margin to account for lipgloss wrapping long lines
+	contentHeight := s.height - 10
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
 
-	visibleLines := lines[s.offset:]
+	// Clamp offset to ensure we can fill the screen
+	// If offset is too large, show the last contentHeight lines
+	maxOffset := len(lines) - contentHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	offset := s.offset
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	visibleLines := lines[offset:]
 	if len(visibleLines) > contentHeight {
 		visibleLines = visibleLines[:contentHeight]
 	}
@@ -210,10 +208,10 @@ func (s Sidebar) View() string {
 
 	content := strings.Join(visibleLines, "\n")
 
-	// Apply sidebar styling
-	// Don't constrain height - we've already sized the content correctly
+	// Apply sidebar styling with explicit height to ensure border closes at bottom
 	return s.styles.Border.
 		Width(s.width - 4).
+		MaxHeight(s.height).
 		Render(content)
 }
 
@@ -323,7 +321,8 @@ func (s Sidebar) renderField(label, value string) string {
 // renderWrappedField renders a field with wrapped text
 func (s Sidebar) renderWrappedField(label, value string) string {
 	// Wrap text to fit width
-	maxWidth := s.width - 4 // Account for padding
+	// Account for border width (-4) and padding (-4) = -8 total
+	maxWidth := s.width - 8
 	wrapped := wrapText(value, maxWidth)
 
 	return fmt.Sprintf("%s:\n%s", s.styles.Label.Render(label), wrapped)
@@ -511,7 +510,8 @@ func (s Sidebar) renderAnnotations() string {
 		lines = append(lines, fmt.Sprintf("  [%s]", dateStr))
 
 		// Wrap annotation text
-		wrapped := wrapText(ann.Description, s.width-4)
+		// Account for border width (-4) and padding (-4) = -8 total
+		wrapped := wrapText(ann.Description, s.width-8)
 		for _, line := range strings.Split(wrapped, "\n") {
 			lines = append(lines, fmt.Sprintf("  %s", line))
 		}
