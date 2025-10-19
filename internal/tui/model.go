@@ -132,18 +132,18 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 	styles := NewStyles(theme)
 
-	// Get sections with bookmarks from config
+	// Get sections from config tabs
 	var allSections []core.Section
-	if cfg.TUI != nil && len(cfg.TUI.Bookmarks) > 0 {
-		// Convert config.Bookmark to core.Bookmark
-		var coreBookmarks []core.Bookmark
-		for _, b := range cfg.TUI.Bookmarks {
-			coreBookmarks = append(coreBookmarks, core.Bookmark{
-				Name:   b.Name,
-				Filter: b.Filter,
+	if cfg.TUI != nil && len(cfg.TUI.Tabs) > 0 {
+		// Convert config.Tab to core.Tab
+		var coreTabs []core.Tab
+		for _, t := range cfg.TUI.Tabs {
+			coreTabs = append(coreTabs, core.Tab{
+				Name:   t.Name,
+				Filter: t.Filter,
 			})
 		}
-		allSections = core.SectionsWithBookmarks(coreBookmarks)
+		allSections = core.TabsToSections(coreTabs)
 	} else {
 		allSections = core.DefaultSections()
 	}

@@ -90,7 +90,7 @@ func TestLoadConfig_ValidYAML(t *testing.T) {
 taskrc_path: /custom/.taskrc
 tui:
   sidebar_width: 60
-  bookmarks:
+  tabs:
     - name: "Work Tasks"
       filter: "+work status:pending"
     - name: "Urgent"
@@ -116,8 +116,8 @@ tui:
 	if cfg.TUI.SidebarWidth != 60 {
 		t.Errorf("Expected SidebarWidth 60, got %d", cfg.TUI.SidebarWidth)
 	}
-	if len(cfg.TUI.Bookmarks) != 2 {
-		t.Errorf("Expected 2 bookmarks, got %d", len(cfg.TUI.Bookmarks))
+	if len(cfg.TUI.Tabs) != 2 {
+		t.Errorf("Expected 2 tabs, got %d", len(cfg.TUI.Tabs))
 	}
 }
 
@@ -149,7 +149,7 @@ func TestSaveConfig(t *testing.T) {
 		TaskrcPath: "/home/user/.taskrc",
 		TUI: &TUIConfig{
 			SidebarWidth: 45,
-			Bookmarks: []Bookmark{
+			Tabs: []Tab{
 				{Name: "Test", Filter: "status:pending"},
 			},
 		},

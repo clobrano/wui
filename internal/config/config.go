@@ -122,8 +122,8 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 		if loaded.TUI.SidebarWidth > 0 {
 			result.TUI.SidebarWidth = loaded.TUI.SidebarWidth
 		}
-		if len(loaded.TUI.Bookmarks) > 0 {
-			result.TUI.Bookmarks = loaded.TUI.Bookmarks
+		if len(loaded.TUI.Tabs) > 0 {
+			result.TUI.Tabs = loaded.TUI.Tabs
 		}
 		if len(loaded.TUI.Columns) > 0 {
 			result.TUI.Columns = loaded.TUI.Columns

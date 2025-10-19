@@ -3,14 +3,14 @@ package config
 // TUIConfig contains TUI-specific configuration
 type TUIConfig struct {
 	SidebarWidth int                `yaml:"sidebar_width"`
-	Bookmarks    []Bookmark         `yaml:"bookmarks"`
+	Tabs         []Tab              `yaml:"tabs"`
 	Columns      []string           `yaml:"columns"`
 	Keybindings  map[string]string  `yaml:"keybindings"`
 	Theme        *Theme             `yaml:"theme"`
 }
 
-// Bookmark represents a saved filter
-type Bookmark struct {
+// Tab represents a section/tab in the UI
+type Tab struct {
 	Name   string `yaml:"name"`
 	Filter string `yaml:"filter"`
 }

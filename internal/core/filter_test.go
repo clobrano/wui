@@ -70,6 +70,57 @@ func TestDefaultSections(t *testing.T) {
 	}
 }
 
+func TestTabStruct(t *testing.T) {
+	tab := Tab{
+		Name:   "Work Tasks",
+		Filter: "+work due:today",
+	}
+
+	if tab.Name != "Work Tasks" {
+		t.Errorf("Expected Name 'Work Tasks', got %s", tab.Name)
+	}
+	if tab.Filter != "+work due:today" {
+		t.Errorf("Expected Filter '+work due:today', got %s", tab.Filter)
+	}
+}
+
+func TestTabsToSections(t *testing.T) {
+	tabs := []Tab{
+		{Name: "Work", Filter: "+work"},
+		{Name: "Home", Filter: "+home"},
+	}
+
+	sections := TabsToSections(tabs)
+
+	if len(sections) != len(tabs) {
+		t.Errorf("Expected %d sections, got %d", len(tabs), len(sections))
+	}
+
+	// Verify tabs are converted correctly
+	if sections[0].Name != "Work" || sections[0].Filter != "+work" {
+		t.Error("Expected first section to match 'Work' tab")
+	}
+	if sections[1].Name != "Home" || sections[1].Filter != "+home" {
+		t.Error("Expected second section to match 'Home' tab")
+	}
+
+	// Verify description is set
+	for _, s := range sections {
+		if s.Description == "" {
+			t.Errorf("Section '%s' should have a description", s.Name)
+		}
+	}
+}
+
+func TestTabsToSectionsEmpty(t *testing.T) {
+	sections := TabsToSections([]Tab{})
+
+	if len(sections) != 0 {
+		t.Errorf("Expected 0 sections, got %d", len(sections))
+	}
+}
+
+// Legacy tests for backward compatibility
 func TestBookmarkStruct(t *testing.T) {
 	bookmark := Bookmark{
 		Name:   "Work Tasks",

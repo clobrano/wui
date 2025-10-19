@@ -7,7 +7,7 @@ import (
 func TestTUIConfigStruct(t *testing.T) {
 	tui := &TUIConfig{
 		SidebarWidth: 40,
-		Bookmarks: []Bookmark{
+		Tabs: []Tab{
 			{Name: "Work", Filter: "+work"},
 			{Name: "Home", Filter: "+home"},
 		},
@@ -28,8 +28,8 @@ func TestTUIConfigStruct(t *testing.T) {
 	if tui.SidebarWidth != 40 {
 		t.Errorf("Expected SidebarWidth 40, got %d", tui.SidebarWidth)
 	}
-	if len(tui.Bookmarks) != 2 {
-		t.Errorf("Expected 2 bookmarks, got %d", len(tui.Bookmarks))
+	if len(tui.Tabs) != 2 {
+		t.Errorf("Expected 2 tabs, got %d", len(tui.Tabs))
 	}
 	if len(tui.Columns) != 4 {
 		t.Errorf("Expected 4 columns, got %d", len(tui.Columns))
@@ -42,17 +42,17 @@ func TestTUIConfigStruct(t *testing.T) {
 	}
 }
 
-func TestBookmarkStruct(t *testing.T) {
-	bookmark := Bookmark{
+func TestTabStruct(t *testing.T) {
+	tab := Tab{
 		Name:   "Important Tasks",
 		Filter: "priority:H status:pending",
 	}
 
-	if bookmark.Name != "Important Tasks" {
-		t.Errorf("Expected name 'Important Tasks', got %s", bookmark.Name)
+	if tab.Name != "Important Tasks" {
+		t.Errorf("Expected name 'Important Tasks', got %s", tab.Name)
 	}
-	if bookmark.Filter != "priority:H status:pending" {
-		t.Errorf("Expected filter 'priority:H status:pending', got %s", bookmark.Filter)
+	if tab.Filter != "priority:H status:pending" {
+		t.Errorf("Expected filter 'priority:H status:pending', got %s", tab.Filter)
 	}
 }
 

@@ -10,7 +10,7 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
 - **Rich task metadata** - Full support for priorities, dates, dependencies, recurrence, and custom UDAs
-- **Configurable** - Customize keybindings, colors, columns, and create filter bookmarks
+- **Configurable** - Customize keybindings, colors, columns, and fully customize tabs/sections
 - **Respects Taskwarrior config** - Reads your `.taskrc` for UDAs, contexts, and settings
 
 ## Installation
@@ -109,14 +109,19 @@ tui:
     - TAGS
     - DESCRIPTION
 
-  # Filter bookmarks (accessible as custom sections)
-  bookmarks:
-    - name: "Urgent"
-      filter: "+urgent"
+  # Tabs/sections - fully customizable!
+  # You can reorder, remove defaults, or add your own
+  tabs:
+    - name: "Next"
+      filter: "( status:pending or status:active ) -WAITING"
     - name: "Today"
       filter: "due:today"
+    - name: "Urgent"
+      filter: "+urgent"
     - name: "Work"
       filter: "+work -someday"
+    - name: "All"
+      filter: "status:pending or status:active"
 
   # Theme (dark or light)
   theme:
@@ -162,14 +167,14 @@ Press `/` to enter filter mode, then type your filter and press Enter.
 
 ## Sections
 
-Default sections:
-- **Next** - `status:pending` (tasks ready to work on)
+Default tabs (fully customizable via config):
+- **Next** - `( status:pending or status:active ) -WAITING` (tasks ready to work on)
 - **Waiting** - `status:waiting` (blocked or scheduled for later)
 - **Projects** - Grouped view by project
 - **Tags** - Grouped view by tag
-- **All** - All pending tasks
+- **All** - All pending and active tasks
 
-Add custom sections via filter bookmarks in your config.
+Customize tabs in your config file - reorder, remove, or add your own!
 
 ## Development
 
@@ -189,7 +194,7 @@ wui is inspired by [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui
 - Focus on speed and simplicity
 - Better UDA support
 - Grouped views (Projects/Tags)
-- Filter bookmarks
+- Fully customizable tabs
 
 ## License
 

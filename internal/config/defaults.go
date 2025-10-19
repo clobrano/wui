@@ -21,10 +21,36 @@ func DefaultConfig() *Config {
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
 		SidebarWidth: 40,
-		Bookmarks:    []Bookmark{},
+		Tabs:         DefaultTabs(),
 		Columns:      DefaultColumns(),
 		Keybindings:  DefaultKeybindings(),
 		Theme:        DefaultTheme(),
+	}
+}
+
+// DefaultTabs returns the default tab list
+func DefaultTabs() []Tab {
+	return []Tab{
+		{
+			Name:   "Next",
+			Filter: "( status:pending or status:active ) -WAITING",
+		},
+		{
+			Name:   "Waiting",
+			Filter: "status:waiting",
+		},
+		{
+			Name:   "Projects",
+			Filter: "status:pending or status:active",
+		},
+		{
+			Name:   "Tags",
+			Filter: "status:pending or status:active",
+		},
+		{
+			Name:   "All",
+			Filter: "status:pending or status:waiting or status:active",
+		},
 	}
 }
 

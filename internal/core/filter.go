@@ -13,12 +13,35 @@ type Section struct {
 	Description string
 }
 
-// Bookmark represents a saved filter bookmark
+// Tab represents a tab/section configuration
+type Tab struct {
+	Name   string
+	Filter string
+}
+
+// TabsToSections converts Tab configs to Section objects
+func TabsToSections(tabs []Tab) []Section {
+	sections := make([]Section, 0, len(tabs))
+
+	for _, tab := range tabs {
+		sections = append(sections, Section{
+			Name:        tab.Name,
+			Filter:      tab.Filter,
+			Description: tab.Name + " tasks",
+		})
+	}
+
+	return sections
+}
+
+// Deprecated: Use TabsToSections instead
+// Bookmark represents a saved filter bookmark (deprecated, use Tab)
 type Bookmark struct {
 	Name   string
 	Filter string
 }
 
+// Deprecated: Use TabsToSections with config.DefaultTabs() instead
 // DefaultSections returns the default sections for the task list view
 func DefaultSections() []Section {
 	return []Section{
@@ -50,6 +73,7 @@ func DefaultSections() []Section {
 	}
 }
 
+// Deprecated: Use TabsToSections instead
 // SectionsWithBookmarks returns sections including bookmarks
 func SectionsWithBookmarks(bookmarks []Bookmark) []Section {
 	sections := DefaultSections()
