@@ -59,9 +59,9 @@ func DefaultColumns() []string {
 	return []string{
 		"id",
 		"project",
-		"description",
-		"due",
 		"priority",
+		"due",
+		"description",
 	}
 }
 

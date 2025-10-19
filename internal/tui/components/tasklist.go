@@ -49,7 +49,7 @@ type TaskList struct {
 func NewTaskList(width, height int, columns []string, styles TaskListStyles) TaskList {
 	// Default columns if none provided
 	if len(columns) == 0 {
-		columns = []string{"id", "project", "priority", "due", "tags", "description"}
+		columns = []string{"id", "project", "priority", "due", "description"}
 	}
 
 	// Limit to maximum 6 columns

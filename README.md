@@ -102,12 +102,13 @@ tui:
 
   # Display columns (max 6, case-insensitive)
   # Available: id, project, priority, due, tags, description
-  # Example minimal setup:
+  # Default: id, project, priority, due, description
   columns:
     - id
     - project
-    - description
+    - priority
     - due
+    - description
 
   # Tabs/sections - fully customizable!
   # You can reorder, remove defaults, or add your own
