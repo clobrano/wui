@@ -9,7 +9,7 @@ before:
     - go test ./...
 
 builds:
-  - main: ./cmd/wui
+  - main: .
     binary: wui
     env:
       - CGO_ENABLED=0

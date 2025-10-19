@@ -15,7 +15,7 @@ all: build
 ## build: Build the wui binary
 build:
 	@echo "Building $(BINARY_NAME)..."
-	@go build $(LDFLAGS) -o $(BINARY_NAME) cmd/wui/main.go
+	@go build $(LDFLAGS) -o $(BINARY_NAME) .
 	@echo "Build complete: ./$(BINARY_NAME)"
 
 ## test: Run all tests
@@ -32,7 +32,7 @@ coverage: test
 ## install: Install the wui binary to $GOPATH/bin
 install:
 	@echo "Installing $(BINARY_NAME)..."
-	@go install $(LDFLAGS) cmd/wui/main.go
+	@go install $(LDFLAGS) .
 	@echo "Installed to $(shell go env GOPATH)/bin/$(BINARY_NAME)"
 
 ## clean: Remove build artifacts
