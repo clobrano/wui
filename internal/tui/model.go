@@ -162,7 +162,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		inGroupView:    false,
 		statusMessage:  "",
 		errorMessage:   "",
-		taskList:       components.NewTaskList(80, 24, styles.ToTaskListStyles()),      // Initial size, will be updated
+		taskList:       components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles()),      // Initial size, will be updated
 		sidebar:        components.NewSidebar(40, 24, styles.ToSidebarStyles()),       // Initial size, will be updated
 		filter:         components.NewFilter(),
 		modifyInput:    components.NewFilter(),
@@ -526,7 +526,12 @@ func (m *Model) updateComponentSizes() {
 
 	if m.viewMode == ViewModeListWithSidebar {
 		// Split view: task list and sidebar
-		sidebarWidth := m.width / 3
+		// Calculate sidebar width from config percentage (default 33%)
+		sidebarWidthPercent := m.config.TUI.SidebarWidth
+		if sidebarWidthPercent <= 0 || sidebarWidthPercent > 100 {
+			sidebarWidthPercent = 33 // Default to 33% if invalid
+		}
+		sidebarWidth := (m.width * sidebarWidthPercent) / 100
 		if sidebarWidth < 30 {
 			sidebarWidth = 30
 		}

@@ -97,8 +97,8 @@ taskrc_path: ~/.taskrc
 
 # TUI-specific settings
 tui:
-  # Sidebar width (characters)
-  sidebar_width: 40
+  # Sidebar width (percentage of terminal width, 1-100)
+  sidebar_width: 33
 
   # Display columns (ID, PROJECT, P, DUE, TAGS, DESCRIPTION)
   columns:

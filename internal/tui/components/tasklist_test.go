@@ -28,7 +28,7 @@ func defaultTaskListStyles() TaskListStyles {
 }
 
 func TestNewTaskList(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 
 	if tl.width != 80 {
 		t.Errorf("Expected width 80, got %d", tl.width)
@@ -45,7 +45,7 @@ func TestNewTaskList(t *testing.T) {
 }
 
 func TestSetTasks(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tasks := []core.Task{
 		{ID: 1, UUID: "uuid-1", Description: "Task 1"},
 		{ID: 2, UUID: "uuid-2", Description: "Task 2"},
@@ -63,7 +63,7 @@ func TestSetTasks(t *testing.T) {
 }
 
 func TestSetTasksResetsCursor(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tasks := []core.Task{
 		{ID: 1, UUID: "uuid-1", Description: "Task 1"},
 		{ID: 2, UUID: "uuid-2", Description: "Task 2"},
@@ -80,7 +80,7 @@ func TestSetTasksResetsCursor(t *testing.T) {
 }
 
 func TestNavigationDown(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -106,7 +106,7 @@ func TestNavigationDown(t *testing.T) {
 }
 
 func TestNavigationUp(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -134,7 +134,7 @@ func TestNavigationUp(t *testing.T) {
 }
 
 func TestNavigationJumpToStart(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -150,7 +150,7 @@ func TestNavigationJumpToStart(t *testing.T) {
 }
 
 func TestNavigationJumpToEnd(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -165,7 +165,7 @@ func TestNavigationJumpToEnd(t *testing.T) {
 }
 
 func TestKeyboardNavigation(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -198,7 +198,7 @@ func TestKeyboardNavigation(t *testing.T) {
 }
 
 func TestQuickJump(t *testing.T) {
-	tl := NewTaskList(80, 10, defaultTaskListStyles())
+	tl := NewTaskList(80, 10, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tasks := make([]core.Task, 20)
 	for i := 0; i < 20; i++ {
 		tasks[i] = core.Task{ID: i + 1, Description: "Task"}
@@ -219,7 +219,7 @@ func TestQuickJump(t *testing.T) {
 }
 
 func TestScrolling(t *testing.T) {
-	tl := NewTaskList(80, 5, defaultTaskListStyles()) // Small height to test scrolling
+	tl := NewTaskList(80, 5, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles()) // Small height to test scrolling
 	tasks := make([]core.Task, 20)
 	for i := 0; i < 20; i++ {
 		tasks[i] = core.Task{ID: i + 1, Description: "Task"}
@@ -246,7 +246,7 @@ func TestScrolling(t *testing.T) {
 }
 
 func TestSelectedTask(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, UUID: "uuid-1", Description: "Task 1"},
 		{ID: 2, UUID: "uuid-2", Description: "Task 2"},
@@ -268,7 +268,7 @@ func TestSelectedTask(t *testing.T) {
 }
 
 func TestSelectedTaskEmpty(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 
 	task := tl.SelectedTask()
 	if task != nil {
@@ -277,7 +277,7 @@ func TestSelectedTaskEmpty(t *testing.T) {
 }
 
 func TestView(t *testing.T) {
-	tl := NewTaskList(80, 10, defaultTaskListStyles())
+	tl := NewTaskList(80, 10, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Test task 1", Project: "Project1"},
 		{ID: 2, Description: "Test task 2", Project: "Project2"},
@@ -294,7 +294,7 @@ func TestView(t *testing.T) {
 }
 
 func TestViewEmpty(t *testing.T) {
-	tl := NewTaskList(80, 10, defaultTaskListStyles())
+	tl := NewTaskList(80, 10, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 
 	view := tl.View()
 
@@ -304,7 +304,7 @@ func TestViewEmpty(t *testing.T) {
 }
 
 func TestPriorityColorCoding(t *testing.T) {
-	tl := NewTaskList(80, 10, defaultTaskListStyles())
+	tl := NewTaskList(80, 10, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "High priority", Priority: "H"},
 		{ID: 2, Description: "Medium priority", Priority: "M"},
@@ -324,7 +324,7 @@ func TestDueDateColorCoding(t *testing.T) {
 	yesterday := time.Now().Add(-24 * time.Hour)
 	tomorrow := time.Now().Add(24 * time.Hour)
 
-	tl := NewTaskList(80, 10, defaultTaskListStyles())
+	tl := NewTaskList(80, 10, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Overdue task", Due: &yesterday, Status: "pending"},
 		{ID: 2, Description: "Future task", Due: &tomorrow, Status: "pending"},
@@ -339,7 +339,7 @@ func TestDueDateColorCoding(t *testing.T) {
 }
 
 func TestTaskCount(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},
@@ -352,7 +352,7 @@ func TestTaskCount(t *testing.T) {
 }
 
 func TestSelectedIndex(t *testing.T) {
-	tl := NewTaskList(80, 24, defaultTaskListStyles())
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
 	tl.SetTasks([]core.Task{
 		{ID: 1, Description: "Task 1"},
 		{ID: 2, Description: "Task 2"},

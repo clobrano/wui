@@ -20,7 +20,7 @@ func DefaultConfig() *Config {
 // DefaultTUIConfig returns TUI configuration with defaults
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
-		SidebarWidth: 40,
+		SidebarWidth: 33, // Percentage of terminal width (33%)
 		Tabs:         DefaultTabs(),
 		Columns:      DefaultColumns(),
 		Keybindings:  DefaultKeybindings(),

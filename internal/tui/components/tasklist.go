@@ -46,7 +46,18 @@ type TaskList struct {
 }
 
 // NewTaskList creates a new task list component
-func NewTaskList(width, height int, styles TaskListStyles) TaskList {
+func NewTaskList(width, height int, columns []string, styles TaskListStyles) TaskList {
+	// Default columns if none provided
+	if len(columns) == 0 {
+		columns = []string{"id", "project", "priority", "due", "tags", "description"}
+	}
+
+	// Normalize column names to lowercase
+	normalizedColumns := make([]string, len(columns))
+	for i, col := range columns {
+		normalizedColumns[i] = strings.ToLower(col)
+	}
+
 	return TaskList{
 		tasks:          []core.Task{},
 		groups:         []core.TaskGroup{},
@@ -54,7 +65,7 @@ func NewTaskList(width, height int, styles TaskListStyles) TaskList {
 		cursor:         0,
 		width:          width,
 		height:         height,
-		displayColumns: []string{"ID", "PROJECT", "P", "DUE", "TAGS", "DESCRIPTION"},
+		displayColumns: normalizedColumns,
 		offset:         0,
 		styles:         styles,
 	}
@@ -297,12 +308,12 @@ func (t TaskList) renderHeader() string {
 
 	// Build header with exact column widths (same format as task lines)
 	header := fmt.Sprintf("  %-*s %-*s %s %-*s %-*s %-*s",
-		cols.id, truncate("ID", cols.id),
-		cols.project, truncate("PROJECT", cols.project),
+		cols.widths["id"], truncate("ID", cols.widths["id"]),
+		cols.widths["project"], truncate("PROJECT", cols.widths["project"]),
 		"P",
-		cols.due, truncate("DUE", cols.due),
-		cols.tags, truncate("TAGS", cols.tags),
-		cols.description, truncate("DESCRIPTION", cols.description),
+		cols.widths["due"], truncate("DUE", cols.widths["due"]),
+		cols.widths["tags"], truncate("TAGS", cols.widths["tags"]),
+		cols.widths["description"], truncate("DESCRIPTION", cols.widths["description"]),
 	)
 
 	// Truncate header to width if necessary
@@ -336,12 +347,17 @@ func truncate(s string, length int) string {
 
 // columnWidths holds calculated column widths
 type columnWidths struct {
-	id          int
-	project     int
-	priority    int
-	due         int
-	tags        int
-	description int
+	widths map[string]int // Map of column name to width
+}
+
+// hasColumn checks if a column is enabled
+func (t TaskList) hasColumn(name string) bool {
+	for _, col := range t.displayColumns {
+		if col == name {
+			return true
+		}
+	}
+	return false
 }
 
 // calculateColumnWidths determines column widths based on available space
@@ -360,36 +376,50 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + tagsWidth + spacing
 	remainingWidth := t.width - fixedWidth
 
+	widths := make(map[string]int)
+
+	// Set fixed widths for columns that are enabled
+	if t.hasColumn("id") {
+		widths["id"] = idWidth
+	}
+	if t.hasColumn("priority") {
+		widths["priority"] = priorityWidth
+	}
+	if t.hasColumn("due") {
+		widths["due"] = dueWidth
+	}
+	if t.hasColumn("tags") {
+		widths["tags"] = tagsWidth
+	}
+
+	// Calculate remaining space for flexible columns (project and description)
 	if remainingWidth < minProject+minDesc {
-		return columnWidths{
-			id:          idWidth,
-			project:     minProject,
-			priority:    priorityWidth,
-			due:         dueWidth,
-			tags:        tagsWidth,
-			description: minDesc,
+		if t.hasColumn("project") {
+			widths["project"] = minProject
+		}
+		if t.hasColumn("description") {
+			widths["description"] = minDesc
+		}
+	} else {
+		// Allocate 25% to project, 75% to description
+		if t.hasColumn("project") && t.hasColumn("description") {
+			projectWidth := remainingWidth / 4
+			if projectWidth < minProject {
+				projectWidth = minProject
+			}
+			if projectWidth > 20 {
+				projectWidth = 20
+			}
+			widths["project"] = projectWidth
+			widths["description"] = remainingWidth - projectWidth
+		} else if t.hasColumn("project") {
+			widths["project"] = remainingWidth
+		} else if t.hasColumn("description") {
+			widths["description"] = remainingWidth
 		}
 	}
 
-	// Allocate 25% to project, 75% to description
-	projectWidth := remainingWidth / 4
-	if projectWidth < minProject {
-		projectWidth = minProject
-	}
-	if projectWidth > 20 {
-		projectWidth = 20
-	}
-
-	descWidth := remainingWidth - projectWidth
-
-	return columnWidths{
-		id:          idWidth,
-		project:     projectWidth,
-		priority:    priorityWidth,
-		due:         dueWidth,
-		tags:        tagsWidth,
-		description: descWidth,
-	}
+	return columnWidths{widths: widths}
 }
 
 // renderTaskLine renders a single task row
@@ -407,8 +437,8 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	id := fmt.Sprintf("%d", task.ID)
 	if task.ID == 0 {
 		id = task.UUID
-		if len(id) > cols.id {
-			id = id[:cols.id]
+		if len(id) > cols.widths["id"] {
+			id = id[:cols.widths["id"]]
 		}
 	}
 
@@ -417,8 +447,10 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	if project == "" {
 		project = "-"
 	}
-	if len(project) > cols.project {
-		project = project[:cols.project-3] + "..."
+	if len(project) > cols.widths["project"] && cols.widths["project"] > 3 {
+		project = project[:cols.widths["project"]-3] + "..."
+	} else if len(project) > cols.widths["project"] {
+		project = project[:cols.widths["project"]]
 	}
 
 	// Priority - conditionally style based on selection
@@ -450,8 +482,8 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 	var dueText string
 	if task.Due != nil {
 		due = task.FormatDueDate()
-		if len(due) > cols.due {
-			due = due[:cols.due]
+		if len(due) > cols.widths["due"] {
+			due = due[:cols.widths["due"]]
 		}
 		if !isSelected && task.IsOverdue() {
 			// Apply overdue color only when not selected
@@ -472,8 +504,10 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 			tagList = append(tagList, "+"+tag)
 		}
 		tags = strings.Join(tagList, " ")
-		if len(tags) > cols.tags {
-			tags = tags[:cols.tags-3] + "..."
+		if len(tags) > cols.widths["tags"] && cols.widths["tags"] > 3 {
+			tags = tags[:cols.widths["tags"]-3] + "..."
+		} else if len(tags) > cols.widths["tags"] {
+			tags = tags[:cols.widths["tags"]]
 		}
 	}
 
@@ -488,19 +522,21 @@ func (t TaskList) renderTaskLine(task core.Task, isSelected bool, quickJump stri
 
 	// Description - pad to fill remaining width (accounting for status icon)
 	description := statusIcon + task.Description
-	if len(description) > cols.description {
-		description = description[:cols.description-3] + "..."
+	if len(description) > cols.widths["description"] && cols.widths["description"] > 3 {
+		description = description[:cols.widths["description"]-3] + "..."
+	} else if len(description) > cols.widths["description"] {
+		description = description[:cols.widths["description"]]
 	}
 
 	// Build line with conditionally styled text
 	line := fmt.Sprintf("%s %-*s %-*s %s %-*s %-*s %-*s",
 		cursor,
-		cols.id, id,
-		cols.project, project,
+		cols.widths["id"], id,
+		cols.widths["project"], project,
 		priorityText,
-		cols.due, dueText,
-		cols.tags, tags,
-		cols.description, description,
+		cols.widths["due"], dueText,
+		cols.widths["tags"], tags,
+		cols.widths["description"], description,
 	)
 
 	// Apply status-based styling
@@ -566,8 +602,13 @@ func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJu
 	// Group name - truncate if too long
 	groupName := group.Name
 	maxNameWidth := t.width - 20 // Leave space for cursor and count
-	if len(groupName) > maxNameWidth {
+	if maxNameWidth < 1 {
+		maxNameWidth = 1
+	}
+	if len(groupName) > maxNameWidth && maxNameWidth > 3 {
 		groupName = groupName[:maxNameWidth-3] + "..."
+	} else if len(groupName) > maxNameWidth {
+		groupName = groupName[:maxNameWidth]
 	}
 
 	// Task count
