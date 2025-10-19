@@ -64,9 +64,11 @@ Press `?` for help and keybinding reference.
 - `x` - Delete task (with confirmation)
 - `e` - Edit task in $EDITOR
 - `n` - Create new task
-- `m` - Quick modify (e.g., `due:tomorrow +urgent`)
+- `m` - Quick modify (e.g., `due:tomorrow +urgent` or `due:2025-10-20T14:30`)
 - `a` - Add annotation
 - `u` - Undo last operation
+
+**Note:** Dates with time can be set using `due:YYYY-MM-DDTHH:MM` or `scheduled:YYYY-MM-DDTHH:MM` format. Times are displayed only when not midnight.
 
 ### View Controls
 - `Enter` - Toggle task details sidebar / Drill into group

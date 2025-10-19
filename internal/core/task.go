@@ -50,13 +50,17 @@ func (t *Task) GetUDA(key string) string {
 	return t.UDAs[key]
 }
 
-// FormatDueDate returns the due date formatted as YYYY-MM-DD
-// Returns empty string if due date is not set
+// FormatDueDate returns the due date formatted as YYYY-MM-DD or YYYY-MM-DD HH:MM
+// Shows time only if it's not midnight. Returns empty string if due date is not set.
 func (t *Task) FormatDueDate() string {
 	if t.Due == nil {
 		return ""
 	}
-	return t.Due.Format("2006-01-02")
+	// Show time if it's not midnight (00:00:00)
+	if t.Due.Hour() == 0 && t.Due.Minute() == 0 && t.Due.Second() == 0 {
+		return t.Due.Format("2006-01-02")
+	}
+	return t.Due.Format("2006-01-02 15:04")
 }
 
 // IsOverdue returns true if the task is overdue

@@ -149,8 +149,13 @@ func TestFormatDueDate(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "has due date",
+			name:     "has due date with time",
 			due:      timePtr(time.Date(2025, 10, 20, 14, 30, 0, 0, time.UTC)),
+			expected: "2025-10-20 14:30",
+		},
+		{
+			name:     "has due date at midnight",
+			due:      timePtr(time.Date(2025, 10, 20, 0, 0, 0, 0, time.UTC)),
 			expected: "2025-10-20",
 		},
 	}
