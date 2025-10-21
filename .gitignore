@@ -39,3 +39,4 @@ tmp/
 # Config files (may contain sensitive data)
 config.yaml
 !config.example.yaml
+tasks/

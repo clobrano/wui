@@ -123,25 +123,52 @@ func (m Model) renderInputPrompt() string {
 	switch m.state {
 	case StateFilterInput:
 		prompt = "Filter: "
-		hint = " (Enter to apply, Esc to cancel)"
+		hint = "(Enter to apply, Esc to cancel)"
 		inputView = m.filter.View()
 	case StateModifyInput:
 		prompt = "Modify: "
-		hint = " (Enter to apply, Esc to cancel)"
+		hint = "(Enter to apply, Esc to cancel)"
 		inputView = m.modifyInput.View()
 	case StateAnnotateInput:
 		prompt = "Annotate: "
-		hint = " (Enter to apply, Esc to cancel)"
+		hint = "(Enter to apply, Esc to cancel)"
 		inputView = m.annotateInput.View()
 	case StateNewTaskInput:
 		prompt = "New Task: "
-		hint = " (Enter to create, Esc to cancel)"
+		hint = "(Enter to create, Esc to cancel)"
 		inputView = m.newTaskInput.View()
 	default:
 		return ""
 	}
 
-	content := m.styles.InputPrompt.Render(prompt) + inputView + m.styles.InputHint.Render(hint)
+	// Calculate widths to prevent overlap
+	// Available width = terminal width - padding (2 for left/right)
+	availableWidth := m.width - 2
+	promptWidth := lipgloss.Width(prompt)
+	hintWidth := lipgloss.Width(hint)
+
+	// Input should take remaining space, leaving room for prompt and hint
+	// Add some spacing between input and hint
+	spacing := 2
+	inputWidth := availableWidth - promptWidth - hintWidth - spacing
+	if inputWidth < 20 {
+		// Minimum width for input
+		inputWidth = 20
+	}
+
+	// Render components
+	promptRendered := m.styles.InputPrompt.Render(prompt)
+	hintRendered := m.styles.InputHint.Render(hint)
+
+	// Build the content line with proper spacing
+	// The hint should appear at the right edge
+	remainingSpace := availableWidth - promptWidth - lipgloss.Width(inputView) - hintWidth
+	if remainingSpace < 1 {
+		remainingSpace = 1
+	}
+	spacer := strings.Repeat(" ", remainingSpace)
+
+	content := promptRendered + inputView + spacer + hintRendered
 
 	// Add a separator line above the input
 	separator := m.styles.Separator.Width(m.width).Render(strings.Repeat("─", m.width))

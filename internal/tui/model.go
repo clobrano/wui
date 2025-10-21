@@ -363,7 +363,12 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		// Activate filter input
 		m.state = StateFilterInput
-		m.filter.SetValue(m.activeFilter)
+		// Add trailing space to make it easier to extend the filter
+		filterValue := m.activeFilter
+		if filterValue != "" {
+			filterValue += " "
+		}
+		m.filter.SetValue(filterValue)
 		m.updateComponentSizes()
 		return m, m.filter.Focus()
 
@@ -563,6 +568,27 @@ func (m *Model) updateComponentSizes() {
 	} else {
 		// Full width task list
 		m.taskList.SetSize(m.width, availableHeight)
+	}
+
+	// Update input component widths if in input mode
+	if m.state == StateFilterInput || m.state == StateModifyInput ||
+	   m.state == StateAnnotateInput || m.state == StateNewTaskInput {
+		// Calculate input width: available width - padding - prompt width - hint width - spacing
+		availableWidth := m.width - 2 // Account for padding
+		promptWidth := 12 // Approximate max prompt width ("New Task: " is longest)
+		hintWidth := 35   // Approximate hint width "(Enter to apply, Esc to cancel)"
+		spacing := 2
+
+		inputWidth := availableWidth - promptWidth - hintWidth - spacing
+		if inputWidth < 20 {
+			inputWidth = 20 // Minimum width
+		}
+
+		// Set width for all input components
+		m.filter.SetWidth(inputWidth)
+		m.modifyInput.SetWidth(inputWidth)
+		m.annotateInput.SetWidth(inputWidth)
+		m.newTaskInput.SetWidth(inputWidth)
 	}
 }
 

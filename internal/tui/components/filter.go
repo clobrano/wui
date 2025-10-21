@@ -42,6 +42,11 @@ func (f *Filter) SetValue(value string) {
 	f.textInput.SetValue(value)
 }
 
+// SetWidth sets the width of the filter input
+func (f *Filter) SetWidth(width int) {
+	f.textInput.Width = width
+}
+
 // Update handles messages for the filter input
 func (f Filter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	var cmd tea.Cmd
