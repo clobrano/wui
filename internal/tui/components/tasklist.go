@@ -44,6 +44,7 @@ type TaskList struct {
 	displayColumns []string // Column names to display
 	offset         int      // Scroll offset for viewport
 	styles         TaskListStyles
+	emptyMessage   string   // Custom message to show when list is empty
 }
 
 // NewTaskList creates a new task list component
@@ -105,6 +106,11 @@ func (t *TaskList) SetSize(width, height int) {
 	t.width = width
 	t.height = height
 	t.updateScroll()
+}
+
+// SetEmptyMessage sets a custom message to display when the list is empty
+func (t *TaskList) SetEmptyMessage(message string) {
+	t.emptyMessage = message
 }
 
 // Update handles messages for the task list
@@ -230,9 +236,13 @@ func (t TaskList) View() string {
 // renderTaskList renders the task list
 func (t TaskList) renderTaskList() string {
 	if len(t.tasks) == 0 {
+		message := "No tasks found."
+		if t.emptyMessage != "" {
+			message = t.emptyMessage
+		}
 		return lipgloss.NewStyle().
 			Padding(2, 4).
-			Render("No tasks found.")
+			Render(message)
 	}
 
 	var lines []string

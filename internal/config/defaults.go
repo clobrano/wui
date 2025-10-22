@@ -29,6 +29,7 @@ func DefaultTUIConfig() *TUIConfig {
 }
 
 // DefaultTabs returns the default tab list
+// Note: The Search tab is always automatically prepended and should not be included here
 func DefaultTabs() []Tab {
 	return []Tab{
 		{

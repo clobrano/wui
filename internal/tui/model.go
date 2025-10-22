@@ -100,6 +100,9 @@ type Model struct {
 	// Current filter
 	activeFilter string
 
+	// Search tab filter (persists for the session)
+	searchTabFilter string
+
 	// Status and error messages
 	statusMessage string
 	errorMessage  string
@@ -136,41 +139,64 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 
 	// Get sections from config tabs
 	var allSections []core.Section
+
+	// Always prepend the special Search section (non-configurable)
+	searchSection := core.Section{
+		Name:        "Search",
+		Filter:      "",
+		Description: "Search across all tasks",
+	}
+	allSections = append(allSections, searchSection)
+
+	// Add user-configured or default sections
 	if cfg.TUI != nil && len(cfg.TUI.Tabs) > 0 {
 		// Convert config.Tab to core.Tab
 		var coreTabs []core.Tab
 		for _, t := range cfg.TUI.Tabs {
+			// Skip if user tries to add a Search tab (it's always first)
+			if t.Name == "Search" {
+				continue
+			}
 			coreTabs = append(coreTabs, core.Tab{
 				Name:   t.Name,
 				Filter: t.Filter,
 			})
 		}
-		allSections = core.TabsToSections(coreTabs)
+		allSections = append(allSections, core.TabsToSections(coreTabs)...)
 	} else {
-		allSections = core.DefaultSections()
+		allSections = append(allSections, core.DefaultSections()...)
+	}
+
+	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles())
+
+	// Start with the "Next" tab (index 1), not the Search tab (index 0)
+	initialSectionIndex := 1
+	if len(allSections) <= 1 {
+		initialSectionIndex = 0 // Fallback to first section if only Search exists
 	}
 
 	return Model{
-		service:        service,
-		config:         cfg,
-		styles:         styles,
-		tasks:          []core.Task{},
-		viewMode:       ViewModeList,
-		state:          StateNormal,
-		currentSection: &allSections[0], // Start with first section (Next)
-		activeFilter:   allSections[0].Filter,
-		groups:         []core.TaskGroup{},
-		selectedGroup:  nil,
-		inGroupView:    false,
-		statusMessage:  "",
-		errorMessage:   "",
-		taskList:       components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles()),      // Initial size, will be updated
+		service:         service,
+		config:          cfg,
+		styles:          styles,
+		tasks:           []core.Task{},
+		viewMode:        ViewModeList,
+		state:           StateNormal,
+		currentSection:  &allSections[initialSectionIndex], // Start with Next tab (second tab)
+		activeFilter:    allSections[initialSectionIndex].Filter,
+		searchTabFilter: "", // Initially empty
+		groups:          []core.TaskGroup{},
+		selectedGroup:   nil,
+		inGroupView:     false,
+		statusMessage:   "",
+		errorMessage:    "",
+		taskList:       taskList,
 		sidebar:        components.NewSidebar(40, 24, styles.ToSidebarStyles()),       // Initial size, will be updated
 		filter:         components.NewFilter(),
 		modifyInput:    components.NewFilter(),
 		annotateInput:  components.NewFilter(),
 		newTaskInput:   components.NewFilter(),
-		sections:       components.NewSections(allSections, 80, styles.ToSectionsStyles()), // Initial size, will be updated
+		sections:       components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
 		help:           components.NewHelp(80, 24, components.DefaultHelpStyles()),         // Initial size, will be updated
 		confirmAction:  "",
 	}
@@ -180,7 +206,8 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 func (m Model) Init() tea.Cmd {
 	// Set loading state and load tasks with the current section's filter
 	m.isLoading = true
-	return loadTasksCmd(m.service, m.activeFilter)
+	isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
+	return loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 }
 
 // Update handles messages and updates the model
@@ -197,7 +224,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case components.SectionChangedMsg:
 		// Section changed - load tasks with new filter
 		m.currentSection = &msg.Section
-		m.activeFilter = msg.Section.Filter
 		m.errorMessage = ""
 		m.statusMessage = ""
 		m.isLoading = true
@@ -213,7 +239,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.inGroupView = false
 		}
 
-		return m, loadTasksCmd(m.service, m.activeFilter)
+		// Set custom empty message for Search tab
+		isSearchTab := msg.Section.Name == "Search"
+		if isSearchTab {
+			// Restore the saved Search tab filter (if any)
+			m.activeFilter = m.searchTabFilter
+			m.taskList.SetEmptyMessage("Search across all tasks\n\nPress / to enter a search filter\n\nExamples:\n  • bug                    - search for 'bug' in all tasks\n  • project:home           - tasks in 'home' project\n  • status:completed       - completed tasks only\n  • +urgent due.before:eom - urgent tasks due before end of month")
+		} else {
+			// Use the section's default filter
+			m.activeFilter = msg.Section.Filter
+			m.taskList.SetEmptyMessage("") // Reset to default message
+		}
+
+		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
 	case TasksLoadedMsg:
 		m.isLoading = false
@@ -267,14 +305,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "Task updated successfully"
 		m.isLoading = true
 		// Refresh tasks
-		return m, loadTasksCmd(m.service, m.activeFilter)
+		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
+		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
 	case ErrorMsg:
 		m.errorMessage = msg.Err.Error()
 		return m, nil
 
 	case RefreshMsg:
-		return m, loadTasksCmd(m.service, m.activeFilter)
+		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
+		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
 	case StatusMsg:
 		if msg.IsError {
@@ -374,7 +414,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "r":
 		m.isLoading = true
-		return m, loadTasksCmd(m.service, m.activeFilter)
+		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
+		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
 	case "enter":
 		// If in group view, drill into selected group
@@ -618,8 +659,16 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.isLoading = true
 		m.updateComponentSizes()
 
+		// Check if we're in the Search tab
+		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
+
+		// Save the filter if we're in the Search tab (for session persistence)
+		if isSearchTab {
+			m.searchTabFilter = filterText
+		}
+
 		// Load tasks with new filter
-		return m, loadTasksCmd(m.service, filterText)
+		return m, loadTasksCmd(m.service, filterText, isSearchTab)
 
 	default:
 		// Delegate to filter component for text input
@@ -762,9 +811,35 @@ func (m Model) handleNewTaskKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // loadTasksCmd creates a command to load tasks asynchronously
-func loadTasksCmd(service core.TaskService, filter string) tea.Cmd {
+func loadTasksCmd(service core.TaskService, filter string, isSearchTab bool) tea.Cmd {
 	return func() tea.Msg {
-		tasks, err := service.Export(filter)
+		// If filter is empty, return empty task list
+		// This shows nothing until user enters a search query
+		if filter == "" {
+			return TasksLoadedMsg{
+				Tasks: []core.Task{},
+				Err:   nil,
+			}
+		}
+
+		// In Search tab, we want to search ALL tasks in the database by default
+		// unless the user explicitly filters by status
+		actualFilter := filter
+		if isSearchTab {
+			// Check if user already specified a status filter
+			// Common patterns: "status:", "status.not:", "status.is:"
+			hasStatusFilter := strings.Contains(filter, "status:")
+
+			// If no status filter specified, search across ALL tasks
+			// By using "status.any:" we tell taskwarrior to search all statuses
+			if !hasStatusFilter {
+				// Prepend status.any: to search all tasks regardless of status
+				// This searches pending, completed, deleted, waiting, and recurring tasks
+				actualFilter = "status.any: " + filter
+			}
+		}
+
+		tasks, err := service.Export(actualFilter)
 		return TasksLoadedMsg{
 			Tasks: tasks,
 			Err:   err,

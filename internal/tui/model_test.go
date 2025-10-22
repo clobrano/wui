@@ -178,7 +178,7 @@ func TestLoadTasksCmd(t *testing.T) {
 		},
 	}
 
-	cmd := loadTasksCmd(service, "status:pending")
+	cmd := loadTasksCmd(service, "status:pending", false)
 	if cmd == nil {
 		t.Fatal("Expected loadTasksCmd to return a command")
 	}
@@ -210,7 +210,7 @@ func TestLoadTasksCmdWithError(t *testing.T) {
 		},
 	}
 
-	cmd := loadTasksCmd(service, "status:pending")
+	cmd := loadTasksCmd(service, "status:pending", false)
 	msg := cmd()
 
 	loadedMsg, ok := msg.(TasksLoadedMsg)

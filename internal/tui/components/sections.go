@@ -32,9 +32,19 @@ type SectionChangedMsg struct {
 
 // NewSections creates a new Sections component
 func NewSections(sections []core.Section, width int, styles SectionsStyles) Sections {
+	return NewSectionsWithIndex(sections, width, styles, 0)
+}
+
+// NewSectionsWithIndex creates a new Sections component with a specific active index
+func NewSectionsWithIndex(sections []core.Section, width int, styles SectionsStyles, activeIndex int) Sections {
+	// Validate activeIndex
+	if activeIndex < 0 || activeIndex >= len(sections) {
+		activeIndex = 0
+	}
+
 	return Sections{
 		Items:       sections,
-		ActiveIndex: 0,
+		ActiveIndex: activeIndex,
 		TaskCount:   0,
 		Width:       width,
 		styles:      styles,
@@ -145,7 +155,13 @@ func (s Sections) View() string {
 			style = s.styles.Inactive
 		}
 
-		tabs = append(tabs, style.Render(section.Name))
+		// Display only search icon for Search section
+		displayName := section.Name
+		if section.Name == "Search" {
+			displayName = "⌕"
+		}
+
+		tabs = append(tabs, style.Render(displayName))
 	}
 
 	tabsLine := strings.Join(tabs, " ")
