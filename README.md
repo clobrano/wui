@@ -121,6 +121,14 @@ tui:
 
   # Tabs/sections - fully customizable!
   # You can reorder, remove defaults, or add your own
+  #
+  # SPECIAL TAB NAMES:
+  # - "Search" - Reserved, always auto-prepended as first tab (⌕)
+  # - "Projects" - Shows grouped view by project (not a flat task list)
+  # - "Tags" - Shows grouped view by tag (not a flat task list)
+  #
+  # Note: Renaming "Projects" or "Tags" will change their behavior to show
+  # a regular flat task list instead of the grouped view.
   tabs:
     - name: "Next"
       filter: "( status:pending or status:active ) -WAITING"
@@ -130,6 +138,10 @@ tui:
       filter: "+urgent"
     - name: "Work"
       filter: "+work -someday"
+    - name: "Projects"
+      filter: "status:pending or status:active"
+    - name: "Tags"
+      filter: "status:pending or status:active"
     - name: "All"
       filter: "status:pending or status:active"
 
@@ -144,13 +156,24 @@ tui:
   --config string      Config file path (default: ~/.config/wui/config.yaml)
   --taskrc string      Taskrc file path (default: ~/.taskrc)
   --task-bin string    Task binary path (default: /usr/local/bin/task)
+  --search string      Open in Search tab with the specified filter
   --log-level string   Log level: debug, info, warn, error (default: error)
   --log-format string  Log format: text, json (default: text)
 ```
 
-Example:
+Examples:
 ```bash
+# Open with custom taskrc and debug logging
 wui --taskrc ~/work/.taskrc --log-level debug
+
+# Open in Search tab with a pre-applied filter (useful in pipelines)
+wui --search "project:Home +urgent"
+
+# Search for tasks due today
+wui --search "due:today"
+
+# Search for completed tasks
+wui --search "status:completed"
 ```
 
 Logs are written to `/tmp/wui.log` by default (or `$WUI_LOG_FILE`).
@@ -168,23 +191,44 @@ status:pending priority:H   # High priority pending tasks
 
 Press `/` to enter filter mode, then type your filter and press Enter.
 
-## Projects and Tags Views
+## Special Tabs
 
-- **Projects**: Press `Tab` to navigate to Projects section, shows tasks grouped by project
-- **Tags**: Navigate to Tags section to see tasks grouped by tag
+### Search Tab (⌕)
+The Search tab is a special, non-configurable tab that:
+- Always appears first (cannot be removed or reordered)
+- Shows nothing initially - press `/` to enter a search filter
+- Searches across **all tasks** in your database (pending, completed, deleted, etc.) by default
+- Remembers your search filter for the session (persists when switching tabs)
+- Uses `status.any:` automatically unless you specify a status filter
+
+Examples:
+```
+bug                    # Search for 'bug' in all tasks
+project:home           # Home project tasks (all statuses)
+status:completed       # Only completed tasks
++urgent due.before:eom # Urgent tasks due before end of month
+```
+
+### Projects and Tags Views
+**Projects** and **Tags** are special tab names that trigger grouped views:
+- **Projects tab**: Shows tasks grouped by project (with task counts)
+- **Tags tab**: Shows tasks grouped by tag (with task counts)
 - Press `Enter` on a group to drill into it and see the tasks
 - Press `Esc` to go back to the group list
 
-## Sections
+**Important**: If you rename these tabs (e.g., "Projects" → "My Projects"), they will behave like regular tabs and show a flat task list instead of the grouped view. The exact names "Projects" and "Tags" are required for the special grouping behavior.
 
-Default tabs (fully customizable via config):
+## Default Tabs
+
+wui comes with these default tabs (all customizable except Search):
+- **⌕ Search** - Special search tab (auto-prepended, non-configurable)
 - **Next** - `( status:pending or status:active ) -WAITING` (tasks ready to work on)
 - **Waiting** - `status:waiting` (blocked or scheduled for later)
-- **Projects** - Grouped view by project
-- **Tags** - Grouped view by tag
+- **Projects** - Grouped view by project (special name - see above)
+- **Tags** - Grouped view by tag (special name - see above)
 - **All** - All pending and active tasks
 
-Customize tabs in your config file - reorder, remove, or add your own!
+Customize tabs in your config file - reorder, remove, or add your own (except Search)!
 
 ## Development
 

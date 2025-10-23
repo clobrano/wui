@@ -11,9 +11,10 @@ import (
 
 // Config represents the wui configuration
 type Config struct {
-	TaskBin    string     `yaml:"task_bin"`
-	TaskrcPath string     `yaml:"taskrc_path"`
-	TUI        *TUIConfig `yaml:"tui"`
+	TaskBin           string     `yaml:"task_bin"`
+	TaskrcPath        string     `yaml:"taskrc_path"`
+	TUI               *TUIConfig `yaml:"tui"`
+	InitialSearchFilter string   `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
 
 // LoadConfig loads configuration from a YAML file

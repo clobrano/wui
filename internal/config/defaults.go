@@ -29,7 +29,13 @@ func DefaultTUIConfig() *TUIConfig {
 }
 
 // DefaultTabs returns the default tab list
+//
 // Note: The Search tab is always automatically prepended and should not be included here
+//
+// Special tab names:
+//   - "Search" - Reserved, always auto-prepended as first tab (cannot be configured)
+//   - "Projects" - Triggers grouped view by project (renaming breaks grouping behavior)
+//   - "Tags" - Triggers grouped view by tag (renaming breaks grouping behavior)
 func DefaultTabs() []Tab {
 	return []Tab{
 		{

@@ -15,11 +15,12 @@ import (
 
 var (
 	// CLI flags
-	configPath  string
-	taskrcPath  string
-	taskBinPath string
-	logLevel    string
-	logFormat   string
+	configPath   string
+	taskrcPath   string
+	taskBinPath  string
+	logLevel     string
+	logFormat    string
+	searchFilter string
 )
 
 var rootCmd = &cobra.Command{
@@ -53,6 +54,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&taskBinPath, "task-bin", "", "task binary path (default: /usr/local/bin/task)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "error", "log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (text, json)")
+	rootCmd.PersistentFlags().StringVar(&searchFilter, "search", "", "open in Search tab with the specified filter")
 }
 
 func main() {
@@ -88,6 +90,10 @@ func runTUI() error {
 	if taskrcPath != "" {
 		slog.Debug("Overriding taskrc path", "path", taskrcPath)
 		cfg.TaskrcPath = taskrcPath
+	}
+	if searchFilter != "" {
+		slog.Debug("Setting initial search filter", "filter", searchFilter)
+		cfg.InitialSearchFilter = searchFilter
 	}
 
 	slog.Info("Configuration loaded",

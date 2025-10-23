@@ -225,3 +225,107 @@ func TestLoadTasksCmdWithError(t *testing.T) {
 		t.Errorf("Expected 0 tasks on error, got %d", len(loadedMsg.Tasks))
 	}
 }
+
+func TestNewModelWithSearchFilter(t *testing.T) {
+	service := &core.MockTaskService{}
+	cfg := config.DefaultConfig()
+	cfg.InitialSearchFilter = "project:Home +urgent"
+
+	model := NewModel(service, cfg)
+
+	// Should start in Search tab (index 0)
+	if model.currentSection == nil || model.currentSection.Name != "Search" {
+		t.Errorf("Expected to start in Search tab, got %v", model.currentSection)
+	}
+
+	// Should have the filter saved in searchTabFilter
+	if model.searchTabFilter != "project:Home +urgent" {
+		t.Errorf("Expected searchTabFilter to be 'project:Home +urgent', got %s", model.searchTabFilter)
+	}
+}
+
+func TestNewModelWithoutSearchFilter(t *testing.T) {
+	service := &core.MockTaskService{}
+	cfg := config.DefaultConfig()
+	// No InitialSearchFilter set
+
+	model := NewModel(service, cfg)
+
+	// Should NOT start in Search tab (should start in "Next" tab, index 1)
+	if model.currentSection == nil || model.currentSection.Name == "Search" {
+		t.Errorf("Expected NOT to start in Search tab, got %v", model.currentSection)
+	}
+
+	// searchTabFilter should be empty
+	if model.searchTabFilter != "" {
+		t.Errorf("Expected searchTabFilter to be empty, got %s", model.searchTabFilter)
+	}
+}
+
+func TestInitWithSearchFilter(t *testing.T) {
+	filterCalled := ""
+	service := &core.MockTaskService{
+		ExportFunc: func(filter string) ([]core.Task, error) {
+			filterCalled = filter
+			return []core.Task{
+				{UUID: "task-1", Description: "Test task"},
+			}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+	cfg.InitialSearchFilter = "due:today"
+
+	model := NewModel(service, cfg)
+	cmd := model.Init()
+
+	if cmd == nil {
+		t.Fatal("Expected Init to return a command")
+	}
+
+	// Execute the command
+	msg := cmd()
+
+	// Check it's a TasksLoadedMsg
+	if _, ok := msg.(TasksLoadedMsg); !ok {
+		t.Errorf("Expected TasksLoadedMsg, got %T", msg)
+	}
+
+	// Verify the filter was used (note: Search tab prepends "status.any:" automatically)
+	if filterCalled != "status.any: due:today" {
+		t.Errorf("Expected filter 'status.any: due:today' to be used, got '%s'", filterCalled)
+	}
+}
+
+func TestInitWithSearchFilterWithStatus(t *testing.T) {
+	filterCalled := ""
+	service := &core.MockTaskService{
+		ExportFunc: func(filter string) ([]core.Task, error) {
+			filterCalled = filter
+			return []core.Task{
+				{UUID: "task-1", Description: "Test task"},
+			}, nil
+		},
+	}
+	cfg := config.DefaultConfig()
+	cfg.InitialSearchFilter = "status:completed due:today"
+
+	model := NewModel(service, cfg)
+	cmd := model.Init()
+
+	if cmd == nil {
+		t.Fatal("Expected Init to return a command")
+	}
+
+	// Execute the command
+	msg := cmd()
+
+	// Check it's a TasksLoadedMsg
+	if _, ok := msg.(TasksLoadedMsg); !ok {
+		t.Errorf("Expected TasksLoadedMsg, got %T", msg)
+	}
+
+	// Verify the filter was used (note: status.any: should NOT be prepended when status: is already present)
+	if filterCalled != "status:completed due:today" {
+		t.Errorf("Expected filter 'status:completed due:today' to be used, got '%s'", filterCalled)
+	}
+}

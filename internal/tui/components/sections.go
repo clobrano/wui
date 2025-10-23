@@ -195,12 +195,14 @@ func (s *Sections) SetSize(width int) {
 }
 
 // IsProjectsView returns true if the active section is the Projects view
+// Note: The exact name "Projects" is required - renaming will disable grouped view
 func (s Sections) IsProjectsView() bool {
 	activeSection := s.GetActiveSection()
 	return activeSection.Name == "Projects"
 }
 
 // IsTagsView returns true if the active section is the Tags view
+// Note: The exact name "Tags" is required - renaming will disable grouped view
 func (s Sections) IsTagsView() bool {
 	activeSection := s.GetActiveSection()
 	return activeSection.Name == "Tags"

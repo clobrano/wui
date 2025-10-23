@@ -169,22 +169,28 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 
 	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles())
 
-	// Start with the "Next" tab (index 1), not the Search tab (index 0)
-	initialSectionIndex := 1
-	if len(allSections) <= 1 {
+	// Determine initial section: Search tab if --search flag provided, otherwise "Next" tab
+	initialSectionIndex := 1 // Default to "Next" tab (index 1)
+	initialSearchFilter := ""
+
+	if cfg.InitialSearchFilter != "" {
+		// Open in Search tab with the provided filter
+		initialSectionIndex = 0
+		initialSearchFilter = cfg.InitialSearchFilter
+	} else if len(allSections) <= 1 {
 		initialSectionIndex = 0 // Fallback to first section if only Search exists
 	}
 
-	return Model{
+	m := Model{
 		service:         service,
 		config:          cfg,
 		styles:          styles,
 		tasks:           []core.Task{},
 		viewMode:        ViewModeList,
 		state:           StateNormal,
-		currentSection:  &allSections[initialSectionIndex], // Start with Next tab (second tab)
+		currentSection:  &allSections[initialSectionIndex],
 		activeFilter:    allSections[initialSectionIndex].Filter,
-		searchTabFilter: "", // Initially empty
+		searchTabFilter: initialSearchFilter, // Set from --search flag if provided
 		groups:          []core.TaskGroup{},
 		selectedGroup:   nil,
 		inGroupView:     false,
@@ -200,6 +206,13 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		help:           components.NewHelp(80, 24, components.DefaultHelpStyles()),         // Initial size, will be updated
 		confirmAction:  "",
 	}
+
+	// Set custom empty message for Search tab if starting there
+	if initialSectionIndex == 0 {
+		m.taskList.SetEmptyMessage("Search across all tasks\n\nPress / to enter a search filter\n\nExamples:\n  • bug                    - search for 'bug' in all tasks\n  • project:home           - tasks in 'home' project\n  • status:completed       - completed tasks only\n  • +urgent due.before:eom - urgent tasks due before end of month")
+	}
+
+	return m
 }
 
 // Init initializes the model and returns the initial command
@@ -207,7 +220,14 @@ func (m Model) Init() tea.Cmd {
 	// Set loading state and load tasks with the current section's filter
 	m.isLoading = true
 	isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
-	return loadTasksCmd(m.service, m.activeFilter, isSearchTab)
+
+	// If starting in Search tab with a filter, use the search filter
+	filterToUse := m.activeFilter
+	if isSearchTab && m.searchTabFilter != "" {
+		filterToUse = m.searchTabFilter
+	}
+
+	return loadTasksCmd(m.service, filterToUse, isSearchTab)
 }
 
 // Update handles messages and updates the model
