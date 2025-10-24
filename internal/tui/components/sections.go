@@ -155,11 +155,8 @@ func (s Sections) View() string {
 			style = s.styles.Inactive
 		}
 
-		// Display only search icon for Search section
+		// Display section name as-is
 		displayName := section.Name
-		if section.Name == "Search" {
-			displayName = "⌕"
-		}
 
 		tabs = append(tabs, style.Render(displayName))
 	}
