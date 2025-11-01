@@ -78,6 +78,22 @@ func NewHelp(width, height int, styles HelpStyles) Help {
 	}
 }
 
+// NewHelpWithKeybindings creates a new help component with custom keybindings from config
+func NewHelpWithKeybindings(width, height int, styles HelpStyles, keybindings map[string]string) Help {
+	groups := keybindingGroupsFromConfig(keybindings)
+
+	vp := viewport.New(width-4, height-4) // Account for border padding
+	vp.SetContent(renderHelpContent(groups, styles))
+
+	return Help{
+		viewport: vp,
+		groups:   groups,
+		width:    width,
+		height:   height,
+		styles:   styles,
+	}
+}
+
 // defaultKeybindingGroups returns the default keybinding groups
 func defaultKeybindingGroups() []KeybindingGroup {
 	return []KeybindingGroup{
@@ -145,6 +161,89 @@ func defaultKeybindingGroups() []KeybindingGroup {
 			Bindings: []Keybinding{
 				{Keys: []string{"?"}, Description: "Toggle this help screen"},
 				{Keys: []string{"q"}, Description: "Quit wui"},
+				{Keys: []string{"Ctrl+c"}, Description: "Force quit"},
+			},
+		},
+	}
+}
+
+// keybindingGroupsFromConfig generates keybinding groups from the config map
+func keybindingGroupsFromConfig(keybindings map[string]string) []KeybindingGroup {
+	// Helper to get key or default
+	getKey := func(action, defaultKey string) string {
+		if key, exists := keybindings[action]; exists {
+			return key
+		}
+		return defaultKey
+	}
+
+	return []KeybindingGroup{
+		{
+			Title: "Task Navigation",
+			Bindings: []Keybinding{
+				{Keys: []string{getKey("down", "j"), "↓"}, Description: "Move down"},
+				{Keys: []string{getKey("up", "k"), "↑"}, Description: "Move up"},
+				{Keys: []string{getKey("first", "g")}, Description: "Jump to first task"},
+				{Keys: []string{getKey("last", "G")}, Description: "Jump to last task"},
+				{Keys: []string{getKey("page_down", "ctrl+d")}, Description: "Page down"},
+				{Keys: []string{getKey("page_up", "ctrl+u")}, Description: "Page up"},
+				{Keys: []string{"1-9"}, Description: "Quick jump to task"},
+			},
+		},
+		{
+			Title: "Section Navigation",
+			Bindings: []Keybinding{
+				{Keys: []string{"Tab", "l", "→"}, Description: "Next section"},
+				{Keys: []string{"Shift+Tab", "h", "←"}, Description: "Previous section"},
+				{Keys: []string{"1-5"}, Description: "Jump to section"},
+			},
+		},
+		{
+			Title: "Multi-Select",
+			Bindings: []Keybinding{
+				{Keys: []string{"Space"}, Description: "Toggle task selection"},
+				{Keys: []string{"Esc"}, Description: "Clear all selections"},
+			},
+		},
+		{
+			Title: "Task Actions",
+			Bindings: []Keybinding{
+				{Keys: []string{getKey("done", "d")}, Description: "Mark task(s) done"},
+				{Keys: []string{"s"}, Description: "Start/Stop task(s)"},
+				{Keys: []string{getKey("delete", "x")}, Description: "Delete task(s)"},
+				{Keys: []string{getKey("edit", "e")}, Description: "Edit task in $EDITOR"},
+				{Keys: []string{getKey("new", "n")}, Description: "Create new task"},
+				{Keys: []string{getKey("modify", "m")}, Description: "Modify task(s) (quick edit)"},
+				{Keys: []string{"M"}, Description: "Export task(s) as markdown (to clipboard)"},
+				{Keys: []string{getKey("annotate", "a")}, Description: "Add annotation to task(s)"},
+				{Keys: []string{getKey("undo", "u")}, Description: "Undo last operation"},
+			},
+		},
+		{
+			Title: "View Controls",
+			Bindings: []Keybinding{
+				{Keys: []string{"Enter"}, Description: "Toggle sidebar / Drill into group"},
+				{Keys: []string{"Esc"}, Description: "Close sidebar / Back to group list"},
+				{Keys: []string{getKey("filter", "/")}, Description: "Filter tasks"},
+				{Keys: []string{getKey("refresh", "r")}, Description: "Refresh task list"},
+			},
+		},
+		{
+			Title: "Sidebar Scrolling (when sidebar is open)",
+			Bindings: []Keybinding{
+				{Keys: []string{"J"}, Description: "Scroll down one line"},
+				{Keys: []string{"K"}, Description: "Scroll up one line"},
+				{Keys: []string{"Ctrl+d"}, Description: "Jump to bottom"},
+				{Keys: []string{"Ctrl+u"}, Description: "Jump to top"},
+				{Keys: []string{"Ctrl+f", "PgDn"}, Description: "Scroll down full page"},
+				{Keys: []string{"Ctrl+b", "PgUp"}, Description: "Scroll up full page"},
+			},
+		},
+		{
+			Title: "Other",
+			Bindings: []Keybinding{
+				{Keys: []string{getKey("help", "?")}, Description: "Toggle this help screen"},
+				{Keys: []string{getKey("quit", "q")}, Description: "Quit wui"},
 				{Keys: []string{"Ctrl+c"}, Description: "Force quit"},
 			},
 		},
