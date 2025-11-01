@@ -181,6 +181,14 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		initialSectionIndex = 0 // Fallback to first section if only Search exists
 	}
 
+	// Create help component with keybindings from config
+	var helpComponent components.Help
+	if cfg.TUI != nil && cfg.TUI.Keybindings != nil {
+		helpComponent = components.NewHelpWithKeybindings(80, 24, components.DefaultHelpStyles(), cfg.TUI.Keybindings)
+	} else {
+		helpComponent = components.NewHelp(80, 24, components.DefaultHelpStyles())
+	}
+
 	m := Model{
 		service:         service,
 		config:          cfg,
@@ -203,7 +211,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		annotateInput:  components.NewFilter(),
 		newTaskInput:   components.NewFilter(),
 		sections:       components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
-		help:           components.NewHelp(80, 24, components.DefaultHelpStyles()),         // Initial size, will be updated
+		help:           helpComponent,         // Initial size, will be updated
 		confirmAction:  "",
 	}
 
@@ -380,26 +388,41 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// keyMatches checks if the pressed key matches the configured keybinding for the given action
+func (m Model) keyMatches(keyPressed string, action string) bool {
+	if m.config == nil || m.config.TUI == nil || m.config.TUI.Keybindings == nil {
+		return false
+	}
+	configuredKey, exists := m.config.TUI.Keybindings[action]
+	return exists && configuredKey == keyPressed
+}
+
 // handleNormalKeys handles keys in normal state
 func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	keyPressed := msg.String()
 
-	switch msg.String() {
-	case "q":
+	// Check configured keybindings
+	if m.keyMatches(keyPressed, "quit") {
 		return m, tea.Quit
+	}
 
-	case "?":
+	if m.keyMatches(keyPressed, "help") {
 		m.state = StateHelp
 		return m, nil
+	}
 
-	case " ": // Space key
+	// Space key for multi-select (not configurable)
+	if keyPressed == " " {
 		// Toggle selection on current task
 		if !m.inGroupView {
 			m.taskList.ToggleSelection()
 		}
 		return m, nil
+	}
 
-	case "esc":
+	// Escape key for clearing selections/going back (not configurable)
+	if keyPressed == "esc" {
 		// Clear selections if any exist
 		if m.taskList.HasSelections() {
 			m.taskList.ClearSelection()
@@ -419,8 +442,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+	}
 
-	case "/":
+	if m.keyMatches(keyPressed, "filter") {
 		// Activate filter input
 		m.state = StateFilterInput
 		// Add trailing space to make it easier to extend the filter
@@ -431,13 +455,16 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filter.SetValue(filterValue)
 		m.updateComponentSizes()
 		return m, m.filter.Focus()
+	}
 
-	case "r":
+	if m.keyMatches(keyPressed, "refresh") {
 		m.isLoading = true
 		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
 		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
+	}
 
-	case "enter":
+	// Enter key for sidebar toggle/group drill-down (not configurable)
+	if keyPressed == "enter" {
 		// If in group view, drill into selected group
 		if m.inGroupView && len(m.groups) > 0 {
 			// Get the selected group index from task list cursor
@@ -461,8 +488,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.updateComponentSizes()
 		m.updateSidebar()
 		return m, nil
+	}
 
-	case "d":
+	if m.keyMatches(keyPressed, "done") {
 		// Mark task(s) done
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -470,8 +498,10 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, markTasksDoneCmd(m.service, selectedTasks)
 		}
 		return m, nil
+	}
 
-	case "s":
+	// Start/stop task (not in default config, but 's' is commonly used)
+	if keyPressed == "s" {
 		// Toggle start/stop on task(s)
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -479,8 +509,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, toggleStartStopCmd(m.service, selectedTasks)
 		}
 		return m, nil
+	}
 
-	case "x":
+	if m.keyMatches(keyPressed, "delete") {
 		// Delete task(s) (with confirmation)
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -489,19 +520,22 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m, nil
+	}
 
-	case "u":
+	if m.keyMatches(keyPressed, "undo") {
 		// Undo last operation
 		return m, undoCmd(m.service)
+	}
 
-	case "n":
+	if m.keyMatches(keyPressed, "new") {
 		// New task
 		m.state = StateNewTaskInput
 		m.newTaskInput.SetValue("")
 		m.updateComponentSizes()
 		return m, m.newTaskInput.Focus()
+	}
 
-	case "m":
+	if m.keyMatches(keyPressed, "modify") {
 		// Modify task(s)
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -511,8 +545,10 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.modifyInput.Focus()
 		}
 		return m, nil
+	}
 
-	case "M":
+	// Export to markdown (not in default config, but 'M' is commonly used)
+	if keyPressed == "M" {
 		// Export task(s) to markdown
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -520,8 +556,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, exportMarkdownCmd(selectedTasks)
 		}
 		return m, nil
+	}
 
-	case "a":
+	if m.keyMatches(keyPressed, "annotate") {
 		// Add annotation to task(s)
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
@@ -531,28 +568,33 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.annotateInput.Focus()
 		}
 		return m, nil
+	}
 
-	case "e":
+	if m.keyMatches(keyPressed, "edit") {
 		// Edit task (suspend TUI)
 		selectedTask := m.taskList.SelectedTask()
 		if selectedTask != nil {
 			return m, editTaskCmd(m.config.TaskBin, m.config.TaskrcPath, selectedTask.UUID)
 		}
 		return m, nil
+	}
 
-	case "tab", "shift+tab", "h", "l", "left", "right":
+	// Section navigation (not configurable - uses tab, h/l, arrows, and number keys)
+	if keyPressed == "tab" || keyPressed == "shift+tab" || keyPressed == "h" || keyPressed == "l" ||
+	   keyPressed == "left" || keyPressed == "right" {
 		// Delegate section navigation to sections component
-		// h/l are vim-like keybindings (h=left, l=right)
 		m.sections, cmd = m.sections.Update(msg)
 		return m, cmd
+	}
 
-	case "1", "2", "3", "4", "5":
+	// Number keys for quick navigation (1-5 for sections, 1-9 for tasks)
+	if keyPressed == "1" || keyPressed == "2" || keyPressed == "3" || keyPressed == "4" || keyPressed == "5" {
 		// Check if it's a section navigation (1-5 for sections)
 		// or task navigation (1-9 for tasks)
 		// Section navigation takes priority if there are sections
 		sectionCount := len(m.sections.Items)
 		if sectionCount > 0 {
-			key := msg.String()[0] - '0'
+			key := keyPressed[0] - '0'
 			if int(key) <= sectionCount {
 				// It's a section navigation
 				m.sections, cmd = m.sections.Update(msg)
@@ -563,24 +605,31 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.taskList, cmd = m.taskList.Update(msg)
 		m.updateSidebar()
 		return m, cmd
+	}
 
-	case "6", "7", "8", "9":
-		// These are only for task list navigation
+	// Number keys 6-9 are only for task navigation
+	if keyPressed == "6" || keyPressed == "7" || keyPressed == "8" || keyPressed == "9" {
 		m.taskList, cmd = m.taskList.Update(msg)
 		m.updateSidebar()
 		return m, cmd
+	}
 
-	case "j", "down", "k", "up", "g", "G":
+	// Navigation keys - check both configured keys and arrow keys
+	if m.keyMatches(keyPressed, "up") || m.keyMatches(keyPressed, "down") ||
+	   m.keyMatches(keyPressed, "first") || m.keyMatches(keyPressed, "last") ||
+	   m.keyMatches(keyPressed, "page_up") || m.keyMatches(keyPressed, "page_down") ||
+	   keyPressed == "up" || keyPressed == "down" {
 		// Delegate navigation to task list component
 		m.taskList, cmd = m.taskList.Update(msg)
 		m.updateSidebar()
 		return m, cmd
 	}
 
-	// If sidebar is visible, check for sidebar scrolling keys
+	// If sidebar is visible, check for sidebar scrolling keys (not configurable)
 	if m.viewMode == ViewModeListWithSidebar {
-		switch msg.String() {
-		case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "J", "K", "pgdown", "pgup":
+		if keyPressed == "ctrl+d" || keyPressed == "ctrl+u" || keyPressed == "ctrl+f" ||
+		   keyPressed == "ctrl+b" || keyPressed == "J" || keyPressed == "K" ||
+		   keyPressed == "pgdown" || keyPressed == "pgup" {
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}

@@ -145,6 +145,29 @@ tui:
     - name: "All"
       filter: "status:pending or status:active"
 
+  # Keybindings - customize keyboard shortcuts
+  # All keybindings are optional; omitted keys use defaults
+  # Available actions: quit, help, up, down, first, last, page_up, page_down,
+  #                    done, delete, edit, modify, annotate, new, undo, filter, refresh
+  keybindings:
+    quit: q
+    help: "?"
+    up: k
+    down: j
+    first: g
+    last: G
+    page_up: ctrl+u
+    page_down: ctrl+d
+    done: d
+    delete: x
+    edit: e
+    modify: m
+    annotate: a
+    new: n
+    undo: u
+    filter: "/"
+    refresh: r
+
   # Theme (dark or light)
   theme:
     name: dark
