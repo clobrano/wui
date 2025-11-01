@@ -335,45 +335,98 @@ func ThemeFromConfig(cfgTheme *config.Theme) Theme {
 		return DefaultDarkTheme()
 	}
 
-	// Check for built-in theme names
+	// Start with a base theme based on the name
+	var base Theme
 	switch cfgTheme.Name {
 	case "light":
-		return DefaultLightTheme()
+		base = DefaultLightTheme()
 	case "dark", "":
-		return DefaultDarkTheme()
+		base = DefaultDarkTheme()
+	default:
+		// For custom theme names, start with dark as base
+		base = DefaultDarkTheme()
+		base.Name = cfgTheme.Name
 	}
 
-	// Custom theme - convert config colors to lipgloss colors
-	return Theme{
-		Name: cfgTheme.Name,
-		Colors: ColorScheme{
-			PriorityHigh:      lipgloss.Color(cfgTheme.PriorityHigh),
-			PriorityMedium:    lipgloss.Color(cfgTheme.PriorityMedium),
-			PriorityLow:       lipgloss.Color(cfgTheme.PriorityLow),
-			DueOverdue:        lipgloss.Color(cfgTheme.DueOverdue),
-			DueToday:          lipgloss.Color(cfgTheme.DueToday),
-			DueSoon:           lipgloss.Color(cfgTheme.DueSoon),
-			StatusActive:      lipgloss.Color(cfgTheme.StatusActive),
-			StatusWaiting:     lipgloss.Color(cfgTheme.StatusWaiting),
-			StatusCompleted:   lipgloss.Color(cfgTheme.StatusCompleted),
-			HeaderFg:          lipgloss.Color(cfgTheme.HeaderFg),
-			FooterFg:          lipgloss.Color(cfgTheme.FooterFg),
-			SeparatorFg:       lipgloss.Color(cfgTheme.SeparatorFg),
-			SelectionBg:       lipgloss.Color(cfgTheme.SelectionBg),
-			SelectionFg:       lipgloss.Color(cfgTheme.SelectionFg),
-			SidebarBorder:     lipgloss.Color(cfgTheme.SidebarBorder),
-			SidebarTitle:      lipgloss.Color(cfgTheme.SidebarTitle),
-			LabelFg:           lipgloss.Color(cfgTheme.LabelFg),
-			ValueFg:           lipgloss.Color(cfgTheme.ValueFg),
-			DimFg:             lipgloss.Color(cfgTheme.DimFg),
-			ErrorFg:           lipgloss.Color(cfgTheme.ErrorFg),
-			SuccessFg:         lipgloss.Color(cfgTheme.SuccessFg),
-			TagFg:             lipgloss.Color(cfgTheme.TagFg),
-			SectionActiveFg:   lipgloss.Color(cfgTheme.SectionActiveFg),
-			SectionActiveBg:   lipgloss.Color(cfgTheme.SectionActiveBg),
-			SectionInactiveFg: lipgloss.Color(cfgTheme.SectionInactiveFg),
-		},
+	// Apply color overrides from config
+	// Only override if the config value is non-empty
+	if cfgTheme.PriorityHigh != "" {
+		base.Colors.PriorityHigh = lipgloss.Color(cfgTheme.PriorityHigh)
 	}
+	if cfgTheme.PriorityMedium != "" {
+		base.Colors.PriorityMedium = lipgloss.Color(cfgTheme.PriorityMedium)
+	}
+	if cfgTheme.PriorityLow != "" {
+		base.Colors.PriorityLow = lipgloss.Color(cfgTheme.PriorityLow)
+	}
+	if cfgTheme.DueOverdue != "" {
+		base.Colors.DueOverdue = lipgloss.Color(cfgTheme.DueOverdue)
+	}
+	if cfgTheme.DueToday != "" {
+		base.Colors.DueToday = lipgloss.Color(cfgTheme.DueToday)
+	}
+	if cfgTheme.DueSoon != "" {
+		base.Colors.DueSoon = lipgloss.Color(cfgTheme.DueSoon)
+	}
+	if cfgTheme.StatusActive != "" {
+		base.Colors.StatusActive = lipgloss.Color(cfgTheme.StatusActive)
+	}
+	if cfgTheme.StatusWaiting != "" {
+		base.Colors.StatusWaiting = lipgloss.Color(cfgTheme.StatusWaiting)
+	}
+	if cfgTheme.StatusCompleted != "" {
+		base.Colors.StatusCompleted = lipgloss.Color(cfgTheme.StatusCompleted)
+	}
+	if cfgTheme.HeaderFg != "" {
+		base.Colors.HeaderFg = lipgloss.Color(cfgTheme.HeaderFg)
+	}
+	if cfgTheme.FooterFg != "" {
+		base.Colors.FooterFg = lipgloss.Color(cfgTheme.FooterFg)
+	}
+	if cfgTheme.SeparatorFg != "" {
+		base.Colors.SeparatorFg = lipgloss.Color(cfgTheme.SeparatorFg)
+	}
+	if cfgTheme.SelectionBg != "" {
+		base.Colors.SelectionBg = lipgloss.Color(cfgTheme.SelectionBg)
+	}
+	if cfgTheme.SelectionFg != "" {
+		base.Colors.SelectionFg = lipgloss.Color(cfgTheme.SelectionFg)
+	}
+	if cfgTheme.SidebarBorder != "" {
+		base.Colors.SidebarBorder = lipgloss.Color(cfgTheme.SidebarBorder)
+	}
+	if cfgTheme.SidebarTitle != "" {
+		base.Colors.SidebarTitle = lipgloss.Color(cfgTheme.SidebarTitle)
+	}
+	if cfgTheme.LabelFg != "" {
+		base.Colors.LabelFg = lipgloss.Color(cfgTheme.LabelFg)
+	}
+	if cfgTheme.ValueFg != "" {
+		base.Colors.ValueFg = lipgloss.Color(cfgTheme.ValueFg)
+	}
+	if cfgTheme.DimFg != "" {
+		base.Colors.DimFg = lipgloss.Color(cfgTheme.DimFg)
+	}
+	if cfgTheme.ErrorFg != "" {
+		base.Colors.ErrorFg = lipgloss.Color(cfgTheme.ErrorFg)
+	}
+	if cfgTheme.SuccessFg != "" {
+		base.Colors.SuccessFg = lipgloss.Color(cfgTheme.SuccessFg)
+	}
+	if cfgTheme.TagFg != "" {
+		base.Colors.TagFg = lipgloss.Color(cfgTheme.TagFg)
+	}
+	if cfgTheme.SectionActiveFg != "" {
+		base.Colors.SectionActiveFg = lipgloss.Color(cfgTheme.SectionActiveFg)
+	}
+	if cfgTheme.SectionActiveBg != "" {
+		base.Colors.SectionActiveBg = lipgloss.Color(cfgTheme.SectionActiveBg)
+	}
+	if cfgTheme.SectionInactiveFg != "" {
+		base.Colors.SectionInactiveFg = lipgloss.Color(cfgTheme.SectionInactiveFg)
+	}
+
+	return base
 }
 
 // ToTaskListStyles converts Styles to component-specific TaskListStyles
