@@ -4,16 +4,17 @@ import "errors"
 
 // MockTaskService is a mock implementation of TaskService for testing
 type MockTaskService struct {
-	ExportFunc   func(filter string) ([]Task, error)
-	ModifyFunc   func(uuid, modifications string) error
-	AnnotateFunc func(uuid, text string) error
-	DoneFunc     func(uuid string) error
-	DeleteFunc   func(uuid string) error
-	AddFunc      func(description string) (string, error)
-	UndoFunc     func() error
-	EditFunc     func(uuid string) error
-	StartFunc    func(uuid string) error
-	StopFunc     func(uuid string) error
+	ExportFunc           func(filter string) ([]Task, error)
+	ModifyFunc           func(uuid, modifications string) error
+	AnnotateFunc         func(uuid, text string) error
+	DoneFunc             func(uuid string) error
+	DeleteFunc           func(uuid string) error
+	AddFunc              func(description string) (string, error)
+	UndoFunc             func() error
+	EditFunc             func(uuid string) error
+	StartFunc            func(uuid string) error
+	StopFunc             func(uuid string) error
+	GetProjectSummaryFunc func() ([]ProjectSummary, error)
 }
 
 func (m *MockTaskService) Export(filter string) ([]Task, error) {
@@ -84,4 +85,11 @@ func (m *MockTaskService) Stop(uuid string) error {
 		return m.StopFunc(uuid)
 	}
 	return errors.New("not implemented")
+}
+
+func (m *MockTaskService) GetProjectSummary() ([]ProjectSummary, error) {
+	if m.GetProjectSummaryFunc != nil {
+		return m.GetProjectSummaryFunc()
+	}
+	return nil, errors.New("not implemented")
 }

@@ -27,3 +27,9 @@ type StatusMsg struct {
 	Message string
 	IsError bool
 }
+
+// ProjectSummaryLoadedMsg is sent when project summaries have been loaded
+type ProjectSummaryLoadedMsg struct {
+	Summaries []core.ProjectSummary
+	Err       error
+}

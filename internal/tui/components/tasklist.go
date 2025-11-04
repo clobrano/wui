@@ -638,7 +638,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 
 // renderGroupHeader renders the header for group list view
 func (t TaskList) renderGroupHeader() string {
-	header := "  GROUP NAME                                        TASK COUNT"
+	header := "  PROJECT                                           TASK COUNT"
 
 	styledHeader := t.styles.Header.Width(t.width).Render(header)
 	separator := strings.Repeat("─", t.width)
@@ -656,29 +656,54 @@ func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJu
 		cursor = quickJump
 	}
 
-	// Group name - truncate if too long
-	groupName := group.Name
+	// Format percentage if available
+	percentStr := ""
+	if group.Percentage >= 0 {
+		// Format as [XX%] with padding for consistent width (e.g., [ 75%])
+		percentStr = fmt.Sprintf("[%3d%%] ", group.Percentage)
+	}
+
+	// Add indentation based on depth level
+	// Depth 0: no indentation
+	// Depth 1: "- "
+	// Depth 2: "  - "
+	// Depth 3: "    - "
+	indent := ""
+	if group.Depth > 0 {
+		// Add 2 spaces per depth level (after depth 1)
+		spaces := strings.Repeat("  ", group.Depth-1)
+		indent = spaces + "- "
+	}
+
+	// Construct name with percentage and indentation (use full project name)
+	nameWithPrefix := percentStr + indent + group.Name
+
+	// Calculate available width for the name
 	maxNameWidth := t.width - 20 // Leave space for cursor and count
 	if maxNameWidth < 1 {
 		maxNameWidth = 1
 	}
-	if len(groupName) > maxNameWidth && maxNameWidth > 3 {
-		groupName = groupName[:maxNameWidth-3] + "..."
-	} else if len(groupName) > maxNameWidth {
-		groupName = groupName[:maxNameWidth]
+
+	// Truncate if too long
+	if len(nameWithPrefix) > maxNameWidth && maxNameWidth > 3 {
+		nameWithPrefix = nameWithPrefix[:maxNameWidth-3] + "..."
+	} else if len(nameWithPrefix) > maxNameWidth {
+		nameWithPrefix = nameWithPrefix[:maxNameWidth]
 	}
 
-	// Task count
-	countStr := fmt.Sprintf("%d", group.Count)
-	if group.Count == 1 {
-		countStr += " task"
-	} else {
-		countStr += " tasks"
+	// Task count (optional, can be removed if not needed)
+	countStr := ""
+	if group.Count > 0 {
+		if group.Count == 1 {
+			countStr = fmt.Sprintf("%d task", group.Count)
+		} else {
+			countStr = fmt.Sprintf("%d tasks", group.Count)
+		}
 	}
 
 	line := fmt.Sprintf("%s %-*s %s",
 		cursor,
-		maxNameWidth, groupName,
+		maxNameWidth, nameWithPrefix,
 		countStr,
 	)
 

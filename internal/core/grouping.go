@@ -5,11 +5,20 @@ import (
 	"strings"
 )
 
+// ProjectSummary represents project completion data from task summary
+type ProjectSummary struct {
+	Name       string // Full project name (e.g., "Home.Cleaning")
+	Percentage int    // Completion percentage (0-100)
+}
+
 // TaskGroup represents a group of tasks (by project or tag)
 type TaskGroup struct {
-	Name  string
-	Count int
-	Tasks []Task
+	Name       string
+	Count      int
+	Tasks      []Task
+	Percentage int  // Completion percentage (0-100), -1 if not applicable
+	IsSubitem  bool // True if this is a subproject (indented)
+	Depth      int  // Nesting depth (0 = main project, 1 = first level sub, etc.)
 }
 
 // ExtractMainProject extracts the main project from a nested project name
@@ -25,6 +34,49 @@ func ExtractMainProject(project string) string {
 	}
 
 	return parts[0]
+}
+
+// GroupProjectsByHierarchy creates a hierarchical project list from summary data
+// Shows all projects at all nesting levels with proper indentation
+func GroupProjectsByHierarchy(summaries []ProjectSummary, tasks []Task) []TaskGroup {
+	if len(summaries) == 0 {
+		return []TaskGroup{}
+	}
+
+	// Build a map of project name to tasks for counting
+	taskMap := make(map[string][]Task)
+	for _, task := range tasks {
+		if task.Project != "" {
+			taskMap[task.Project] = append(taskMap[task.Project], task)
+		}
+	}
+
+	// Create groups with hierarchy information
+	var groups []TaskGroup
+
+	for _, summary := range summaries {
+		// Calculate depth based on number of dots
+		depth := strings.Count(summary.Name, ".")
+		isSubproject := depth > 0
+
+		// Get tasks for this exact project
+		projectTasks := taskMap[summary.Name]
+		count := len(projectTasks)
+
+		groups = append(groups, TaskGroup{
+			Name:       summary.Name,
+			Count:      count,
+			Tasks:      projectTasks,
+			Percentage: summary.Percentage,
+			IsSubitem:  isSubproject,
+			Depth:      depth,
+		})
+	}
+
+	// Sort hierarchically: maintain parent-child relationships
+	// This is a stable sort that keeps the order from task summary output
+	// which already has the correct hierarchical structure
+	return groups
 }
 
 // GroupByProject groups tasks by their main project

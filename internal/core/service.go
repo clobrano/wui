@@ -47,4 +47,8 @@ type TaskService interface {
 	// Stop marks a task as stopped (pending)
 	// Returns an error if the task is not found or not started
 	Stop(uuid string) error
+
+	// GetProjectSummary retrieves project completion data from task summary
+	// Returns a slice of ProjectSummary or an error if the operation fails
+	GetProjectSummary() ([]ProjectSummary, error)
 }

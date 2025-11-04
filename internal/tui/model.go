@@ -85,8 +85,9 @@ type Model struct {
 	styles  *Styles // Centralized styling
 
 	// Task data
-	tasks          []core.Task
-	currentSection *core.Section
+	tasks           []core.Task
+	currentSection  *core.Section
+	projectSummaries []core.ProjectSummary // Project summaries for Projects tab
 
 	// Grouping state (for Projects/Tags sections)
 	groups        []core.TaskGroup // Current groups (when in group list view)
@@ -301,12 +302,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// If in Projects or Tags view and showing group list, compute groups
 		if m.inGroupView {
 			if m.sections.IsProjectsView() {
-				m.groups = core.GroupByProject(m.tasks)
+				// For Projects view, load summaries to get completion percentages
+				// We'll build groups when summaries arrive
+				m.isLoading = true
+				return m, loadProjectSummaryCmd(m.service)
 			} else if m.sections.IsTagsView() {
 				m.groups = core.GroupByTag(m.tasks)
+				// Show group list in the task list component
+				m.taskList.SetGroups(m.groups)
 			}
-			// Show group list in the task list component
-			m.taskList.SetGroups(m.groups)
 		} else {
 			// Normal view or drilling into a group
 			// Update task list component with actual tasks
@@ -320,6 +324,23 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if !m.inGroupView {
 			m.updateSidebar()
 		}
+
+		return m, nil
+
+	case ProjectSummaryLoadedMsg:
+		m.isLoading = false
+		if msg.Err != nil {
+			m.errorMessage = "Failed to load project summary: " + msg.Err.Error()
+			return m, nil
+		}
+
+		m.projectSummaries = msg.Summaries
+
+		// Build project groups using hierarchy with percentages
+		m.groups = core.GroupProjectsByHierarchy(m.projectSummaries, m.tasks)
+
+		// Show group list in the task list component
+		m.taskList.SetGroups(m.groups)
 
 		return m, nil
 
@@ -912,6 +933,17 @@ func loadTasksCmd(service core.TaskService, filter string, isSearchTab bool) tea
 		return TasksLoadedMsg{
 			Tasks: tasks,
 			Err:   err,
+		}
+	}
+}
+
+// loadProjectSummaryCmd creates a command to load project summaries asynchronously
+func loadProjectSummaryCmd(service core.TaskService) tea.Cmd {
+	return func() tea.Msg {
+		summaries, err := service.GetProjectSummary()
+		return ProjectSummaryLoadedMsg{
+			Summaries: summaries,
+			Err:       err,
 		}
 	}
 }

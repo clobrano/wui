@@ -242,3 +242,55 @@ func TestTaskGroupType(t *testing.T) {
 		t.Errorf("Expected 1 task, got %d", len(group.Tasks))
 	}
 }
+
+func TestGroupProjectsByHierarchy(t *testing.T) {
+	// Test data with various hierarchy levels
+	summaries := []ProjectSummary{
+		{Name: "M8s", Percentage: 51},
+		{Name: "M8s.helm", Percentage: 0},
+		{Name: "M8s.SNR", Percentage: 47},
+		{Name: "M8s.SNR.RHWA12", Percentage: 0}, // Should now be included with depth 2
+		{Name: "WUI", Percentage: 0},
+		{Name: "dty", Percentage: 87},
+		{Name: "dty.condominio", Percentage: 87},
+	}
+
+	groups := GroupProjectsByHierarchy(summaries, []Task{})
+
+	// Should include ALL projects regardless of depth
+	expected := map[string]struct {
+		percentage int
+		isSubitem  bool
+		depth      int
+	}{
+		"M8s":            {51, false, 0},
+		"M8s.helm":       {0, true, 1},
+		"M8s.SNR":        {47, true, 1},
+		"M8s.SNR.RHWA12": {0, true, 2}, // Now included with depth 2
+		"WUI":            {0, false, 0},
+		"dty":            {87, false, 0},
+		"dty.condominio": {87, true, 1},
+	}
+
+	if len(groups) != len(expected) {
+		t.Errorf("Expected %d groups, got %d", len(expected), len(groups))
+	}
+
+	// Verify each group
+	for _, group := range groups {
+		exp, found := expected[group.Name]
+		if !found {
+			t.Errorf("Unexpected group: %s", group.Name)
+			continue
+		}
+		if group.Percentage != exp.percentage {
+			t.Errorf("Group %s: expected %d%%, got %d%%", group.Name, exp.percentage, group.Percentage)
+		}
+		if group.IsSubitem != exp.isSubitem {
+			t.Errorf("Group %s: expected IsSubitem=%v, got %v", group.Name, exp.isSubitem, group.IsSubitem)
+		}
+		if group.Depth != exp.depth {
+			t.Errorf("Group %s: expected Depth=%d, got %d", group.Name, exp.depth, group.Depth)
+		}
+	}
+}
