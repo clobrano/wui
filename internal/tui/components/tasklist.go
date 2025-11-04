@@ -663,23 +663,14 @@ func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJu
 		percentStr = fmt.Sprintf("[%3d%%] ", group.Percentage)
 	}
 
-	// Extract display name for subprojects (show only the last part after dot)
-	displayName := group.Name
-	if group.IsSubitem {
-		parts := strings.Split(group.Name, ".")
-		if len(parts) > 1 {
-			displayName = parts[len(parts)-1]
-		}
-	}
-
 	// Add indentation prefix for subitems
 	indent := ""
 	if group.IsSubitem {
 		indent = "- "
 	}
 
-	// Construct name with percentage and indentation
-	nameWithPrefix := percentStr + indent + displayName
+	// Construct name with percentage and indentation (use full project name)
+	nameWithPrefix := percentStr + indent + group.Name
 
 	// Calculate available width for the name
 	maxNameWidth := t.width - 20 // Leave space for cursor and count
