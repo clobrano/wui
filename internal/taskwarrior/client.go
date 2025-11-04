@@ -256,6 +256,29 @@ func (c *Client) runCommand(args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// GetProjectSummary retrieves project completion data from task summary
+func (c *Client) GetProjectSummary() ([]core.ProjectSummary, error) {
+	args := c.buildArgs("summary")
+
+	slog.Debug("Getting project summary")
+
+	output, err := c.runCommand(args...)
+	if err != nil {
+		slog.Error("Failed to get project summary", "error", err)
+		return nil, fmt.Errorf("failed to get project summary: %w", err)
+	}
+
+	// Parse the summary output
+	summaries, err := ParseSummaryOutput(output)
+	if err != nil {
+		slog.Error("Failed to parse summary output", "error", err)
+		return nil, fmt.Errorf("failed to parse summary output: %w", err)
+	}
+
+	slog.Info("Successfully retrieved project summary", "count", len(summaries))
+	return summaries, nil
+}
+
 // min returns the minimum of two integers
 func min(a, b int) int {
 	if a < b {
