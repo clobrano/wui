@@ -663,10 +663,16 @@ func (t TaskList) renderGroupLine(group core.TaskGroup, isSelected bool, quickJu
 		percentStr = fmt.Sprintf("[%3d%%] ", group.Percentage)
 	}
 
-	// Add indentation prefix for subitems
+	// Add indentation based on depth level
+	// Depth 0: no indentation
+	// Depth 1: "- "
+	// Depth 2: "  - "
+	// Depth 3: "    - "
 	indent := ""
-	if group.IsSubitem {
-		indent = "- "
+	if group.Depth > 0 {
+		// Add 2 spaces per depth level (after depth 1)
+		spaces := strings.Repeat("  ", group.Depth-1)
+		indent = spaces + "- "
 	}
 
 	// Construct name with percentage and indentation (use full project name)

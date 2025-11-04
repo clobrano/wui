@@ -249,7 +249,7 @@ func TestGroupProjectsByHierarchy(t *testing.T) {
 		{Name: "M8s", Percentage: 51},
 		{Name: "M8s.helm", Percentage: 0},
 		{Name: "M8s.SNR", Percentage: 47},
-		{Name: "M8s.SNR.RHWA12", Percentage: 0}, // Should be filtered out (2 dots)
+		{Name: "M8s.SNR.RHWA12", Percentage: 0}, // Should now be included with depth 2
 		{Name: "WUI", Percentage: 0},
 		{Name: "dty", Percentage: 87},
 		{Name: "dty.condominio", Percentage: 87},
@@ -257,17 +257,19 @@ func TestGroupProjectsByHierarchy(t *testing.T) {
 
 	groups := GroupProjectsByHierarchy(summaries, []Task{})
 
-	// Should only include projects with 0 or 1 dot
+	// Should include ALL projects regardless of depth
 	expected := map[string]struct {
 		percentage int
 		isSubitem  bool
+		depth      int
 	}{
-		"M8s":            {51, false},
-		"M8s.helm":       {0, true},
-		"M8s.SNR":        {47, true},
-		"WUI":            {0, false},
-		"dty":            {87, false},
-		"dty.condominio": {87, true},
+		"M8s":            {51, false, 0},
+		"M8s.helm":       {0, true, 1},
+		"M8s.SNR":        {47, true, 1},
+		"M8s.SNR.RHWA12": {0, true, 2}, // Now included with depth 2
+		"WUI":            {0, false, 0},
+		"dty":            {87, false, 0},
+		"dty.condominio": {87, true, 1},
 	}
 
 	if len(groups) != len(expected) {
@@ -287,12 +289,8 @@ func TestGroupProjectsByHierarchy(t *testing.T) {
 		if group.IsSubitem != exp.isSubitem {
 			t.Errorf("Group %s: expected IsSubitem=%v, got %v", group.Name, exp.isSubitem, group.IsSubitem)
 		}
-	}
-
-	// Verify "M8s.SNR.RHWA12" was filtered out
-	for _, group := range groups {
-		if group.Name == "M8s.SNR.RHWA12" {
-			t.Errorf("Expected M8s.SNR.RHWA12 to be filtered out, but it was included")
+		if group.Depth != exp.depth {
+			t.Errorf("Group %s: expected Depth=%d, got %d", group.Name, exp.depth, group.Depth)
 		}
 	}
 }
