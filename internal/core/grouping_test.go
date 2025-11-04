@@ -242,3 +242,57 @@ func TestTaskGroupType(t *testing.T) {
 		t.Errorf("Expected 1 task, got %d", len(group.Tasks))
 	}
 }
+
+func TestGroupProjectsByHierarchy(t *testing.T) {
+	// Test data with various hierarchy levels
+	summaries := []ProjectSummary{
+		{Name: "M8s", Percentage: 51},
+		{Name: "M8s.helm", Percentage: 0},
+		{Name: "M8s.SNR", Percentage: 47},
+		{Name: "M8s.SNR.RHWA12", Percentage: 0}, // Should be filtered out (2 dots)
+		{Name: "WUI", Percentage: 0},
+		{Name: "dty", Percentage: 87},
+		{Name: "dty.condominio", Percentage: 87},
+	}
+
+	groups := GroupProjectsByHierarchy(summaries, []Task{})
+
+	// Should only include projects with 0 or 1 dot
+	expected := map[string]struct {
+		percentage int
+		isSubitem  bool
+	}{
+		"M8s":            {51, false},
+		"M8s.helm":       {0, true},
+		"M8s.SNR":        {47, true},
+		"WUI":            {0, false},
+		"dty":            {87, false},
+		"dty.condominio": {87, true},
+	}
+
+	if len(groups) != len(expected) {
+		t.Errorf("Expected %d groups, got %d", len(expected), len(groups))
+	}
+
+	// Verify each group
+	for _, group := range groups {
+		exp, found := expected[group.Name]
+		if !found {
+			t.Errorf("Unexpected group: %s", group.Name)
+			continue
+		}
+		if group.Percentage != exp.percentage {
+			t.Errorf("Group %s: expected %d%%, got %d%%", group.Name, exp.percentage, group.Percentage)
+		}
+		if group.IsSubitem != exp.isSubitem {
+			t.Errorf("Group %s: expected IsSubitem=%v, got %v", group.Name, exp.isSubitem, group.IsSubitem)
+		}
+	}
+
+	// Verify "M8s.SNR.RHWA12" was filtered out
+	for _, group := range groups {
+		if group.Name == "M8s.SNR.RHWA12" {
+			t.Errorf("Expected M8s.SNR.RHWA12 to be filtered out, but it was included")
+		}
+	}
+}

@@ -13,10 +13,12 @@ import (
 )
 
 // ParseSummaryOutput parses the output of "task summary" command
-// Expected format:
+// Expected format with indentation-based hierarchy:
 // Project      Remaining  Avg age  Complete  0%                        100%
-// Project1            10  30 days       75%  =====================
-// Project1.Sub1        5  15 days       90%  ==========================
+// M8s                60     12w       51%  ===============
+//   helm              2    1.0y        0%
+//   SNR              11     3mo       47%  ==============
+//     RHWA12          2     6mo        0%
 func ParseSummaryOutput(output []byte) ([]core.ProjectSummary, error) {
 	var summaries []core.ProjectSummary
 
@@ -28,6 +30,10 @@ func ParseSummaryOutput(output []byte) ([]core.ProjectSummary, error) {
 
 	// Regex to extract percentage (handles various formats like "75%", " 75%", "100%")
 	percentRegex := regexp.MustCompile(`\s+(\d+)%`)
+
+	// Stack to track parent projects at each indentation level
+	// Index represents indentation level (0 = no indent, 1 = 2 spaces, 2 = 4 spaces, etc.)
+	parentStack := make([]string, 0)
 
 	for scanner.Scan() {
 		lineNum++
@@ -51,49 +57,89 @@ func ParseSummaryOutput(output []byte) ([]core.ProjectSummary, error) {
 		}
 
 		// Skip separator lines (dashes, equals, etc.)
-		if strings.HasPrefix(strings.TrimSpace(line), "---") ||
-		   strings.HasPrefix(strings.TrimSpace(line), "===") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "---") || strings.HasPrefix(trimmed, "===") {
 			continue
 		}
 
-		// Parse data line
-		// Expected format: "ProjectName      <numbers>  <age>  XX%  <bar>"
-		// We need to extract ProjectName and XX%
+		// Skip summary line at the end (e.g., "30 projects")
+		if strings.HasSuffix(trimmed, "projects") || strings.HasSuffix(trimmed, "project") {
+			continue
+		}
 
+		// Calculate indentation level (2 spaces per level)
+		indentLevel := 0
+		for i := 0; i < len(line) && line[i] == ' '; i += 2 {
+			indentLevel++
+		}
+
+		// Parse data line
 		// Split by whitespace to get fields
 		fields := strings.Fields(line)
-		if len(fields) < 4 {
+		if len(fields) < 1 {
 			// Not enough fields, skip
 			slog.Debug("Skipping line with insufficient fields", "line", line, "fields", len(fields))
 			continue
 		}
 
-		// First field is project name
-		projectName := fields[0]
+		// First field is project name (just the segment, not full path)
+		projectSegment := fields[0]
+
+		// Skip "(none)" entries
+		if projectSegment == "(none)" {
+			continue
+		}
 
 		// Find the percentage in the line using regex
 		matches := percentRegex.FindStringSubmatch(line)
-		if len(matches) < 2 {
-			slog.Debug("No percentage found in line", "line", line)
-			continue
+		percentage := 0
+		if len(matches) >= 2 {
+			percentStr := matches[1]
+			p, err := strconv.Atoi(percentStr)
+			if err == nil {
+				percentage = p
+			}
 		}
 
-		percentStr := matches[1]
-		percentage, err := strconv.Atoi(percentStr)
-		if err != nil {
-			slog.Debug("Failed to parse percentage", "value", percentStr, "error", err)
-			continue
+		// Reconstruct full project name from parent stack
+		// Adjust parent stack to current indentation level
+		if indentLevel < len(parentStack) {
+			// Going back up in hierarchy, trim the stack
+			parentStack = parentStack[:indentLevel]
 		}
 
+		// Build full project name
+		var fullProjectName string
+		if len(parentStack) == 0 {
+			// Top-level project
+			fullProjectName = projectSegment
+		} else {
+			// Nested project: join parent stack with current segment
+			fullProjectName = strings.Join(append(parentStack, projectSegment), ".")
+		}
+
+		// Add to summaries
 		summaries = append(summaries, core.ProjectSummary{
-			Name:       projectName,
+			Name:       fullProjectName,
 			Percentage: percentage,
 		})
 
 		slog.Debug("Parsed project summary",
-			"project", projectName,
+			"project", fullProjectName,
+			"segment", projectSegment,
+			"indentLevel", indentLevel,
 			"percentage", percentage,
 			"line", lineNum)
+
+		// Update parent stack for next iteration
+		// If we're at this level, we become the parent for the next deeper level
+		if indentLevel >= len(parentStack) {
+			parentStack = append(parentStack, projectSegment)
+		} else {
+			// Replace the segment at this level
+			parentStack = parentStack[:indentLevel]
+			parentStack = append(parentStack, projectSegment)
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
