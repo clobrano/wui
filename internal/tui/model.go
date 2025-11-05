@@ -832,12 +832,18 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.state = StateNormal
 		m.modifyInput.Blur()
+		m.modifyInput.ResetHistoryNavigation()
 		m.updateComponentSizes()
 		return m, nil
 
 	case "enter":
 		// Apply modifications
 		modifications := m.modifyInput.Value()
+
+		// Add to history before clearing
+		m.modifyInput.AddToHistory(modifications)
+		m.modifyInput.ResetHistoryNavigation()
+
 		selectedTasks := m.taskList.GetSelectedTasks()
 		m.state = StateNormal
 		m.modifyInput.Blur()
@@ -849,7 +855,19 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "up":
+		// Navigate to previous command in history
+		m.modifyInput.NavigateHistoryUp()
+		return m, nil
+
+	case "down":
+		// Navigate to next command in history
+		m.modifyInput.NavigateHistoryDown()
+		return m, nil
+
 	default:
+		// When user types, reset history navigation
+		m.modifyInput.ResetHistoryNavigation()
 		// Delegate to input component for text input
 		m.modifyInput, cmd = m.modifyInput.Update(msg)
 		return m, cmd
