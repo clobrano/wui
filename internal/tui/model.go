@@ -737,12 +737,18 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.state = StateNormal
 		m.filter.Blur()
+		m.filter.ResetHistoryNavigation()
 		m.updateComponentSizes()
 		return m, nil
 
 	case "enter":
 		// Apply the filter
 		filterText := m.filter.Value()
+
+		// Add to history before clearing
+		m.filter.AddToHistory(filterText)
+		m.filter.ResetHistoryNavigation()
+
 		m.state = StateNormal
 		m.filter.Blur()
 		m.activeFilter = filterText
@@ -760,7 +766,19 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Load tasks with new filter
 		return m, loadTasksCmd(m.service, filterText, isSearchTab)
 
+	case "up":
+		// Navigate to previous command in history
+		m.filter.NavigateHistoryUp()
+		return m, nil
+
+	case "down":
+		// Navigate to next command in history
+		m.filter.NavigateHistoryDown()
+		return m, nil
+
 	default:
+		// When user types, reset history navigation
+		m.filter.ResetHistoryNavigation()
 		// Delegate to filter component for text input
 		m.filter, cmd = m.filter.Update(msg)
 		return m, cmd
