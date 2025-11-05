@@ -93,6 +93,14 @@ func (f *Filter) NavigateHistoryUp() {
 	// Move up in history (towards older entries)
 	if f.historyIndex > 0 {
 		f.historyIndex--
+
+		// If this entry matches the current input, skip it and go to the previous one
+		if f.historyIndex == len(f.history)-1 && f.history[f.historyIndex] == f.currentInput {
+			if f.historyIndex > 0 {
+				f.historyIndex--
+			}
+		}
+
 		f.textInput.SetValue(f.history[f.historyIndex])
 		// Move cursor to end of text
 		f.textInput.SetCursor(len(f.history[f.historyIndex]))
