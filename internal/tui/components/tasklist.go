@@ -54,9 +54,9 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		columns = []string{"id", "project", "priority", "due", "description"}
 	}
 
-	// Limit to maximum 6 columns
-	if len(columns) > 6 {
-		columns = columns[:6]
+	// Limit to maximum 7 columns
+	if len(columns) > 7 {
+		columns = columns[:7]
 	}
 
 	// Normalize column names to lowercase
@@ -331,6 +331,7 @@ func (t TaskList) renderHeader() string {
 		"priority":    "P",
 		"due":         "DUE",
 		"tags":        "TAGS",
+		"annotation":  "A",
 		"description": "DESCRIPTION",
 	}
 
@@ -344,8 +345,8 @@ func (t TaskList) renderHeader() string {
 			name = strings.ToUpper(col)
 		}
 
-		// Priority column is single character, others are padded
-		if col == "priority" {
+		// Priority and annotation columns are single character, others are padded
+		if col == "priority" || col == "annotation" {
 			parts = append(parts, name+" ")
 		} else {
 			parts = append(parts, fmt.Sprintf("%-*s ", width, truncate(name, width)))
@@ -401,14 +402,15 @@ func (t TaskList) hasColumn(name string) bool {
 // calculateColumnWidths determines column widths based on available space
 func (t TaskList) calculateColumnWidths() columnWidths {
 	const (
-		cursorWidth   = 2  // "■ " or "1 "
-		idWidth       = 4  // Sequential ID
-		priorityWidth = 1  // H/M/L
-		dueWidth      = 10 // Date format
-		tagsWidth     = 15 // Tags column
-		minProject    = 10
-		minDesc       = 20
-		spacing       = 7
+		cursorWidth      = 2  // "■ " or "1 "
+		idWidth          = 4  // Sequential ID
+		priorityWidth    = 1  // H/M/L
+		dueWidth         = 10 // Date format
+		tagsWidth        = 15 // Tags column
+		annotationWidth  = 1  // * or nothing
+		minProject       = 10
+		minDesc          = 20
+		spacing          = 7
 	)
 
 	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + tagsWidth + spacing
@@ -428,6 +430,9 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 	}
 	if t.hasColumn("tags") {
 		widths["tags"] = tagsWidth
+	}
+	if t.hasColumn("annotation") {
+		widths["annotation"] = annotationWidth
 	}
 
 	// Calculate remaining space for flexible columns (project and description)
@@ -571,6 +576,12 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		description = description[:cols.widths["description"]]
 	}
 
+	// Annotation indicator - show "*" if task has annotations
+	annotation := "-"
+	if len(task.Annotations) > 0 {
+		annotation = "*"
+	}
+
 	// Build line dynamically based on displayColumns
 	columnValues := map[string]string{
 		"id":          id,
@@ -578,6 +589,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		"priority":    priorityText,
 		"due":         dueText,
 		"tags":        tags,
+		"annotation":  annotation,
 		"description": description,
 	}
 
@@ -586,8 +598,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		value := columnValues[col]
 		width := cols.widths[col]
 
-		// Priority doesn't need padding, just add with space
-		if col == "priority" {
+		// Priority and annotation don't need padding, just add with space
+		if col == "priority" || col == "annotation" {
 			parts = append(parts, value+" ")
 		} else {
 			parts = append(parts, fmt.Sprintf("%-*s ", width, value))
