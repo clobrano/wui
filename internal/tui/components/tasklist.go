@@ -593,7 +593,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		"description": description,
 	}
 
-	parts := []string{cursor}
+	parts := []string{cursor + " "}
 	for _, col := range t.displayColumns {
 		value := columnValues[col]
 		width := cols.widths[col]
