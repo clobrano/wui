@@ -68,6 +68,7 @@ func DefaultColumns() []string {
 		"project",
 		"priority",
 		"due",
+		"dependency",
 		"description",
 	}
 }
