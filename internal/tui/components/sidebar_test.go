@@ -577,3 +577,54 @@ func TestDependencyNotFound(t *testing.T) {
 		t.Error("Expected dependency UUID in view even when task not found")
 	}
 }
+
+func TestCompletedDependencyDisplay(t *testing.T) {
+	sb := NewSidebar(40, 100, defaultSidebarStyles()) // Taller height so all content is visible
+
+	// Create all tasks including completed and pending dependencies
+	allTasks := []core.Task{
+		{
+			ID:          1,
+			UUID:        "completed-dep-uuid",
+			Description: "Completed dependency task",
+			Status:      "completed",
+		},
+		{
+			ID:          2,
+			UUID:        "pending-dep-uuid",
+			Description: "Pending dependency task",
+			Status:      "pending",
+		},
+		{
+			ID:          3,
+			UUID:        "main-uuid",
+			Description: "Main task with dependencies",
+			Status:      "pending",
+			Depends:     []string{"completed-dep-uuid", "pending-dep-uuid"},
+		},
+	}
+
+	// Set all tasks for dependency lookup
+	sb.SetAllTasks(allTasks)
+
+	// Set the main task as the current task
+	sb.SetTask(&allTasks[2])
+
+	// Render the view
+	view := sb.View()
+
+	// Verify completed dependency shows with "x" prefix (no ID)
+	if !strings.Contains(view, "x Completed dependency task") {
+		t.Error("Expected completed dependency to show with 'x' prefix")
+	}
+
+	// Verify pending dependency shows with ID
+	if !strings.Contains(view, "#2: Pending dependency task") {
+		t.Error("Expected pending dependency to show with ID")
+	}
+
+	// Verify the "Blocked by" label is present
+	if !strings.Contains(view, "Blocked by:") {
+		t.Error("Expected 'Blocked by:' label in view")
+	}
+}

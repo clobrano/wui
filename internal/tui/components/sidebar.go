@@ -472,8 +472,14 @@ func (s Sidebar) renderDependencies() string {
 			depTask := s.findTaskByUUID(uuid)
 
 			if depTask != nil {
-				// Show ID and description
-				lines = append(lines, fmt.Sprintf("    - #%d: %s", depTask.ID, depTask.Description))
+				// Check if task is completed
+				if depTask.Status == "completed" {
+					// Show with "x" prefix for completed tasks
+					lines = append(lines, fmt.Sprintf("    - x %s", depTask.Description))
+				} else {
+					// Show ID and description for non-completed tasks
+					lines = append(lines, fmt.Sprintf("    - #%d: %s", depTask.ID, depTask.Description))
+				}
 			} else {
 				// Show shortened UUID if task not found
 				shortUUID := uuid
