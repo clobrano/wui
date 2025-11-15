@@ -54,9 +54,9 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		columns = []string{"id", "project", "priority", "due", "description"}
 	}
 
-	// Limit to maximum 7 columns
-	if len(columns) > 7 {
-		columns = columns[:7]
+	// Limit to maximum 8 columns
+	if len(columns) > 8 {
+		columns = columns[:8]
 	}
 
 	// Normalize column names to lowercase
@@ -332,6 +332,7 @@ func (t TaskList) renderHeader() string {
 		"due":         "DUE",
 		"tags":        "TAGS",
 		"annotation":  "A",
+		"dependency":  "D",
 		"description": "DESCRIPTION",
 	}
 
@@ -345,8 +346,8 @@ func (t TaskList) renderHeader() string {
 			name = strings.ToUpper(col)
 		}
 
-		// Priority and annotation columns are single character, others are padded
-		if col == "priority" || col == "annotation" {
+		// Priority, annotation, and dependency columns are single character, others are padded
+		if col == "priority" || col == "annotation" || col == "dependency" {
 			parts = append(parts, name+" ")
 		} else {
 			parts = append(parts, fmt.Sprintf("%-*s ", width, truncate(name, width)))
@@ -408,6 +409,7 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 		dueWidth         = 10 // Date format
 		tagsWidth        = 15 // Tags column
 		annotationWidth  = 1  // * or nothing
+		dependencyWidth  = 1  // * or nothing
 		minProject       = 10
 		minDesc          = 20
 		spacing          = 7
@@ -433,6 +435,9 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 	}
 	if t.hasColumn("annotation") {
 		widths["annotation"] = annotationWidth
+	}
+	if t.hasColumn("dependency") {
+		widths["dependency"] = dependencyWidth
 	}
 
 	// Calculate remaining space for flexible columns (project and description)
@@ -582,6 +587,12 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		annotation = "*"
 	}
 
+	// Dependency indicator - show "*" if task has dependencies
+	dependency := "-"
+	if len(task.Depends) > 0 {
+		dependency = "*"
+	}
+
 	// Build line dynamically based on displayColumns
 	columnValues := map[string]string{
 		"id":          id,
@@ -590,6 +601,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		"due":         dueText,
 		"tags":        tags,
 		"annotation":  annotation,
+		"dependency":  dependency,
 		"description": description,
 	}
 
@@ -598,8 +610,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		value := columnValues[col]
 		width := cols.widths[col]
 
-		// Priority and annotation don't need padding, just add with space
-		if col == "priority" || col == "annotation" {
+		// Priority, annotation, and dependency don't need padding, just add with space
+		if col == "priority" || col == "annotation" || col == "dependency" {
 			parts = append(parts, value+" ")
 		} else {
 			parts = append(parts, fmt.Sprintf("%-*s ", width, value))
