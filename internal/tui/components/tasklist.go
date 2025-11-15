@@ -54,9 +54,9 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		columns = []string{"id", "project", "priority", "due", "description"}
 	}
 
-	// Limit to maximum 7 columns
-	if len(columns) > 7 {
-		columns = columns[:7]
+	// Limit to maximum 8 columns
+	if len(columns) > 8 {
+		columns = columns[:8]
 	}
 
 	// Normalize column names to lowercase
