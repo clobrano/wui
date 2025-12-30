@@ -216,6 +216,7 @@ wui can synchronize your Taskwarrior tasks to Google Calendar. This feature allo
 2. **Download Credentials**:
    - In Google Cloud Console, go to APIs & Services > Credentials
    - Create OAuth 2.0 credentials (Desktop app)
+   - Add `http://localhost:8080` as an authorized redirect URI
    - Download the credentials file as `credentials.json`
    - Place it in `~/.config/wui/credentials.json`
 

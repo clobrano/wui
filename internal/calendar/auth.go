@@ -5,8 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -64,22 +68,102 @@ func getTokenFromFile(path string) (*oauth2.Token, error) {
 }
 
 // getTokenFromWeb uses Config to request a token from the web
+// It starts a local HTTP server to receive the OAuth callback
 func getTokenFromWeb(config *oauth2.Config) (*oauth2.Token, error) {
-	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
-	fmt.Printf("Go to the following link in your browser:\n%v\n\n", authURL)
-	fmt.Print("Enter authorization code: ")
+	// Use a local server to receive the callback
+	// This is more user-friendly than copy-pasting codes
+	codeCh := make(chan string)
+	errCh := make(chan error)
 
+	// Create a local HTTP server to handle the OAuth callback
+	server := &http.Server{Addr: ":8080"}
+
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			errCh <- fmt.Errorf("no code in callback")
+			fmt.Fprintf(w, "Error: No authorization code received")
+			return
+		}
+
+		// Send success message to browser
+		fmt.Fprintf(w, `
+			<html>
+			<head><title>Authorization Successful</title></head>
+			<body style="font-family: sans-serif; text-align: center; padding: 50px;">
+				<h1>✓ Authorization Successful</h1>
+				<p>You can close this window and return to the terminal.</p>
+			</body>
+			</html>
+		`)
+
+		// Send the code through the channel
+		codeCh <- code
+	})
+
+	// Start server in background
+	go func() {
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			errCh <- fmt.Errorf("failed to start local server: %w", err)
+		}
+	}()
+
+	// Give the server a moment to start
+	time.Sleep(100 * time.Millisecond)
+
+	// Update config to use localhost redirect
+	config.RedirectURL = "http://localhost:8080"
+
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("\n=== Google Calendar Authorization ===\n")
+	fmt.Printf("Opening browser for authorization...\n")
+	fmt.Printf("If the browser doesn't open automatically, visit this URL:\n\n%s\n\n", authURL)
+
+	// Try to open the browser automatically
+	openBrowser(authURL)
+
+	// Wait for either the code or an error
 	var authCode string
-	if _, err := fmt.Scan(&authCode); err != nil {
-		return nil, fmt.Errorf("unable to read authorization code: %w", err)
+	select {
+	case authCode = <-codeCh:
+		// Success - received the code
+	case err := <-errCh:
+		server.Shutdown(context.Background())
+		return nil, err
+	case <-time.After(5 * time.Minute):
+		server.Shutdown(context.Background())
+		return nil, fmt.Errorf("timeout waiting for authorization")
 	}
 
+	// Shutdown the server
+	server.Shutdown(context.Background())
+
+	// Exchange the code for a token
 	token, err := config.Exchange(context.Background(), authCode)
 	if err != nil {
 		return nil, fmt.Errorf("unable to retrieve token from web: %w", err)
 	}
 
+	fmt.Printf("✓ Authorization successful!\n\n")
 	return token, nil
+}
+
+// openBrowser attempts to open the URL in the default browser
+func openBrowser(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	default:
+		return fmt.Errorf("unsupported platform")
+	}
+
+	return cmd.Start()
 }
 
 // saveToken saves a token to a file path
