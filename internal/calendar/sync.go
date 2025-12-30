@@ -174,8 +174,14 @@ func (s *SyncClient) updateEvent(ctx context.Context, calendarID string, task co
 
 // taskToEvent converts a Taskwarrior task to a Google Calendar event
 func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
+	// Add checkmark for completed tasks
+	summary := task.Description
+	if task.Status == "completed" {
+		summary = "✓ " + summary
+	}
+
 	event := &calendar.Event{
-		Summary: task.Description,
+		Summary: summary,
 		Description: fmt.Sprintf("Taskwarrior UUID: %s\n\nProject: %s\nTags: %s\nStatus: %s",
 			task.UUID,
 			task.Project,
@@ -203,10 +209,8 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		Date: eventTime.Format("2006-01-02"),
 	}
 
-	// Add color based on priority or status
-	if task.Status == "completed" {
-		event.ColorId = "8" // Gray for completed
-	} else if task.Priority == "H" {
+	// Add color based on priority
+	if task.Priority == "H" {
 		event.ColorId = "11" // Red for high priority
 	} else if task.Priority == "M" {
 		event.ColorId = "5" // Yellow for medium priority
@@ -217,8 +221,14 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 
 // shouldUpdateEvent checks if an event needs to be updated
 func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bool {
+	// Build expected summary (with checkmark if completed)
+	expectedSummary := task.Description
+	if task.Status == "completed" {
+		expectedSummary = "✓ " + expectedSummary
+	}
+
 	// Check if summary (description) changed
-	if event.Summary != task.Description {
+	if event.Summary != expectedSummary {
 		return true
 	}
 
@@ -256,9 +266,7 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if priority changed (affects color coding)
 	expectedColorId := ""
-	if task.Status == "completed" {
-		expectedColorId = "8" // Gray for completed
-	} else if task.Priority == "H" {
+	if task.Priority == "H" {
 		expectedColorId = "11" // Red for high priority
 	} else if task.Priority == "M" {
 		expectedColorId = "5" // Yellow for medium priority

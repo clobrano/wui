@@ -230,7 +230,7 @@ calendar_sync:
   token_path: ~/.config/wui/token.json
 ```
 
-**Note**: Including `status:completed` in the filter allows completed tasks to be updated in the calendar (they'll turn gray). You can customize this filter as needed.
+**Note**: Including `status:completed` in the filter allows completed tasks to be updated in the calendar (they'll show a ✓ checkmark). You can customize this filter as needed.
 
 ### Usage
 
@@ -259,7 +259,8 @@ wui sync --calendar "Urgent" --filter "+urgent priority:H"
 - Tasks are synced as all-day events in Google Calendar
 - Each event includes the task UUID, project, tags, and status in its description
 - Event dates are based on the task's due date, or scheduled date if no due date is set
-- Events are color-coded based on priority (red for high, yellow for medium) and status (gray for completed)
+- Completed tasks are marked with a ✓ checkmark in the title
+- Events are color-coded based on priority (red for high, yellow for medium)
 - Existing events are updated if the task changes
 - The sync is one-way: Taskwarrior → Google Calendar
 
