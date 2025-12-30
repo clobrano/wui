@@ -231,15 +231,22 @@ calendar_sync:
 
 ### Usage
 
+Once configured in `config.yaml`, simply run:
 ```bash
-# Sync tasks to Google Calendar
-wui sync --calendar "Tasks" --filter "status:pending"
+# Sync using config.yaml settings
+wui sync
+```
 
-# Sync only high-priority tasks
-wui sync --calendar "Important Tasks" --filter "+urgent priority:H"
+You can also override config settings with command-line flags:
+```bash
+# Override calendar name from config
+wui sync --calendar "Important Tasks"
 
-# Sync work tasks due this week
+# Override both calendar and filter
 wui sync --calendar "Work" --filter "+work due.before:eow"
+
+# Sync high-priority tasks to a different calendar
+wui sync --calendar "Urgent" --filter "+urgent priority:H"
 ```
 
 **Note**: On first run, you'll be prompted to authorize the app in your browser. The authorization token will be saved to `~/.config/wui/token.json`.

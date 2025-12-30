@@ -56,16 +56,23 @@ var syncCmd = &cobra.Command{
 	Short: "Sync Taskwarrior tasks to Google Calendar",
 	Long: `Synchronize Taskwarrior tasks to Google Calendar.
 
-This command syncs tasks from Taskwarrior to a specified Google Calendar.
-You must configure the calendar name and task filter in your config file
-(~/.config/wui/config.yaml) or provide them via command-line flags.
+This command syncs tasks from Taskwarrior to a specified Google Calendar using
+settings from your config file (~/.config/wui/config.yaml). You can override
+these settings with command-line flags.
 
 Before syncing, you need to:
 1. Create a Google Cloud project and enable the Google Calendar API
 2. Download the credentials.json file from Google Cloud Console
 3. Place it in ~/.config/wui/credentials.json
+4. Configure calendar_name and task_filter in config.yaml
 
-On first run, you'll be prompted to authorize the app in your browser.`,
+On first run, you'll be prompted to authorize the app in your browser.
+
+Examples:
+  wui sync                                    # Use config.yaml settings
+  wui sync --calendar "Work"                  # Override calendar
+  wui sync --filter "+urgent"                 # Override filter
+  wui sync --calendar "Tasks" --filter "due:today"  # Override both`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runSync(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -79,11 +86,9 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(syncCmd)
 
-	// Sync command flags
-	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (required)")
-	syncCmd.Flags().StringVar(&syncTaskFilter, "filter", "", "Taskwarrior filter for tasks to sync (required)")
-	syncCmd.MarkFlagRequired("calendar")
-	syncCmd.MarkFlagRequired("filter")
+	// Sync command flags (optional - override config file values)
+	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
+	syncCmd.Flags().StringVar(&syncTaskFilter, "filter", "", "Taskwarrior filter for tasks to sync (overrides config)")
 
 	// Persistent flags available to all commands
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file path (default: ~/.config/wui/config.yaml)")
@@ -254,9 +259,24 @@ func runSync() error {
 		cfg.TaskrcPath = taskrcPath
 	}
 
-	// Use flags for calendar name and filter (required)
-	calendarName := syncCalendarName
-	taskFilter := syncTaskFilter
+	// Get calendar name and filter from config, allow flags to override
+	calendarName := cfg.CalendarSync.CalendarName
+	taskFilter := cfg.CalendarSync.TaskFilter
+
+	if syncCalendarName != "" {
+		calendarName = syncCalendarName
+	}
+	if syncTaskFilter != "" {
+		taskFilter = syncTaskFilter
+	}
+
+	// Validate required fields
+	if calendarName == "" {
+		return fmt.Errorf("calendar name is required (set in config.yaml or use --calendar flag)")
+	}
+	if taskFilter == "" {
+		return fmt.Errorf("task filter is required (set in config.yaml or use --filter flag)")
+	}
 
 	slog.Info("Sync configuration",
 		"calendar", calendarName,
