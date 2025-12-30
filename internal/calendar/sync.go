@@ -95,8 +95,8 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "created", created, "updated", updated)
-	fmt.Printf("Sync completed: %d created, %d updated\n", created, updated)
+	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated)
+	fmt.Printf("Sync completed: %d tasks, %d created, %d updated\n", len(tasks), created, updated)
 
 	return nil
 }
