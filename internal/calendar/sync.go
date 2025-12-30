@@ -236,6 +236,38 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 		return true
 	}
 
+	// Check if status changed by examining the event description
+	if event.Description != "" {
+		// Extract status from description
+		statusPrefix := "\nStatus: "
+		if idx := strings.Index(event.Description, statusPrefix); idx >= 0 {
+			start := idx + len(statusPrefix)
+			end := len(event.Description)
+			// Find the end of the status line
+			if newlineIdx := strings.Index(event.Description[start:], "\n"); newlineIdx >= 0 {
+				end = start + newlineIdx
+			}
+			eventStatus := strings.TrimSpace(event.Description[start:end])
+			if eventStatus != task.Status {
+				return true
+			}
+		}
+	}
+
+	// Check if priority changed (affects color coding)
+	expectedColorId := ""
+	if task.Status == "completed" {
+		expectedColorId = "8" // Gray for completed
+	} else if task.Priority == "H" {
+		expectedColorId = "11" // Red for high priority
+	} else if task.Priority == "M" {
+		expectedColorId = "5" // Yellow for medium priority
+	}
+
+	if expectedColorId != "" && event.ColorId != expectedColorId {
+		return true
+	}
+
 	return false
 }
 

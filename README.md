@@ -224,11 +224,13 @@ wui can synchronize your Taskwarrior tasks to Google Calendar. This feature allo
 ```yaml
 calendar_sync:
   enabled: true
-  calendar_name: "Tasks"           # Name of your Google Calendar (required)
-  task_filter: "status:pending"    # Taskwarrior filter (required)
+  calendar_name: "Tasks"                      # Name of your Google Calendar (required)
+  task_filter: "status:pending or status:completed"  # Taskwarrior filter (required)
   credentials_path: ~/.config/wui/credentials.json
   token_path: ~/.config/wui/token.json
 ```
+
+**Note**: Including `status:completed` in the filter allows completed tasks to be updated in the calendar (they'll turn gray). You can customize this filter as needed.
 
 ### Usage
 

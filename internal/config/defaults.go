@@ -26,7 +26,7 @@ func DefaultCalendarSync() *CalendarSync {
 	return &CalendarSync{
 		Enabled:         false,
 		CalendarName:    "",
-		TaskFilter:      "status:pending",
+		TaskFilter:      "status:pending or status:completed",
 		CredentialsPath: filepath.Join(configDir, "credentials.json"),
 		TokenPath:       filepath.Join(configDir, "token.json"),
 	}
