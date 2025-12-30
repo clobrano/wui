@@ -49,7 +49,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	slog.Info("Found calendar", "id", calendarID, "name", s.calendarName)
 
 	// Get tasks from Taskwarrior
-	tasks, err := s.taskClient.GetTasks(s.taskFilter)
+	tasks, err := s.taskClient.Export(s.taskFilter)
 	if err != nil {
 		return fmt.Errorf("failed to get tasks: %w", err)
 	}
@@ -186,10 +186,10 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 
 	// Set event time based on due date or scheduled date
 	var eventTime time.Time
-	if !task.Due.IsZero() {
-		eventTime = task.Due
-	} else if !task.Scheduled.IsZero() {
-		eventTime = task.Scheduled
+	if task.Due != nil && !task.Due.IsZero() {
+		eventTime = *task.Due
+	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
+		eventTime = *task.Scheduled
 	} else {
 		// If no date is set, use today
 		eventTime = time.Now()
@@ -224,9 +224,9 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if the date changed
 	var taskDate string
-	if !task.Due.IsZero() {
+	if task.Due != nil && !task.Due.IsZero() {
 		taskDate = task.Due.Format("2006-01-02")
-	} else if !task.Scheduled.IsZero() {
+	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
 		taskDate = task.Scheduled.Format("2006-01-02")
 	} else {
 		taskDate = time.Now().Format("2006-01-02")
