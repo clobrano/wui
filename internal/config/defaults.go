@@ -11,9 +11,24 @@ func DefaultConfig() *Config {
 	taskrcPath := filepath.Join(homeDir, ".taskrc")
 
 	return &Config{
-		TaskBin:    "task", // Assumes task is in PATH
-		TaskrcPath: taskrcPath,
-		TUI:        DefaultTUIConfig(),
+		TaskBin:      "task", // Assumes task is in PATH
+		TaskrcPath:   taskrcPath,
+		TUI:          DefaultTUIConfig(),
+		CalendarSync: DefaultCalendarSync(),
+	}
+}
+
+// DefaultCalendarSync returns default Google Calendar sync configuration
+func DefaultCalendarSync() *CalendarSync {
+	homeDir, _ := os.UserHomeDir()
+	configDir := filepath.Join(homeDir, ".config", "wui")
+
+	return &CalendarSync{
+		Enabled:         false,
+		CalendarName:    "",
+		TaskFilter:      "status:pending",
+		CredentialsPath: filepath.Join(configDir, "credentials.json"),
+		TokenPath:       filepath.Join(configDir, "token.json"),
 	}
 }
 

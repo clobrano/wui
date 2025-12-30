@@ -10,6 +10,7 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
 - **Rich task metadata** - Full support for priorities, dates, dependencies, recurrence, and custom UDAs
+- **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
 - **Configurable** - Customize keybindings, colors, columns, and fully customize tabs/sections
 - **Respects Taskwarrior config** - Reads your `.taskrc` for UDAs, contexts, and settings
 
@@ -200,6 +201,57 @@ wui --search "status:completed"
 ```
 
 Logs are written to `/tmp/wui.log` by default (or `$WUI_LOG_FILE`).
+
+## Google Calendar Sync
+
+wui can synchronize your Taskwarrior tasks to Google Calendar. This feature allows you to visualize your tasks in a calendar view and integrate with your existing workflow.
+
+### Setup
+
+1. **Create a Google Cloud Project**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com)
+   - Create a new project or select an existing one
+   - Enable the Google Calendar API
+
+2. **Download Credentials**:
+   - In Google Cloud Console, go to APIs & Services > Credentials
+   - Create OAuth 2.0 credentials (Desktop app)
+   - Download the credentials file as `credentials.json`
+   - Place it in `~/.config/wui/credentials.json`
+
+3. **Configure sync** in `~/.config/wui/config.yaml`:
+```yaml
+calendar_sync:
+  enabled: true
+  calendar_name: "Tasks"           # Name of your Google Calendar (required)
+  task_filter: "status:pending"    # Taskwarrior filter (required)
+  credentials_path: ~/.config/wui/credentials.json
+  token_path: ~/.config/wui/token.json
+```
+
+### Usage
+
+```bash
+# Sync tasks to Google Calendar
+wui sync --calendar "Tasks" --filter "status:pending"
+
+# Sync only high-priority tasks
+wui sync --calendar "Important Tasks" --filter "+urgent priority:H"
+
+# Sync work tasks due this week
+wui sync --calendar "Work" --filter "+work due.before:eow"
+```
+
+**Note**: On first run, you'll be prompted to authorize the app in your browser. The authorization token will be saved to `~/.config/wui/token.json`.
+
+### How it works
+
+- Tasks are synced as all-day events in Google Calendar
+- Each event includes the task UUID, project, tags, and status in its description
+- Event dates are based on the task's due date, or scheduled date if no due date is set
+- Events are color-coded based on priority (red for high, yellow for medium) and status (gray for completed)
+- Existing events are updated if the task changes
+- The sync is one-way: Taskwarrior → Google Calendar
 
 ## Filtering
 
