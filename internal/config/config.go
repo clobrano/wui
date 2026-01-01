@@ -9,12 +9,22 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// CalendarSync represents Google Calendar sync configuration
+type CalendarSync struct {
+	Enabled        bool   `yaml:"enabled"`
+	CalendarName   string `yaml:"calendar_name"`
+	TaskFilter     string `yaml:"task_filter"`
+	CredentialsPath string `yaml:"credentials_path"`
+	TokenPath      string `yaml:"token_path"`
+}
+
 // Config represents the wui configuration
 type Config struct {
-	TaskBin           string     `yaml:"task_bin"`
-	TaskrcPath        string     `yaml:"taskrc_path"`
-	TUI               *TUIConfig `yaml:"tui"`
-	InitialSearchFilter string   `yaml:"-"` // Not persisted to config file, set via CLI flag
+	TaskBin           string        `yaml:"task_bin"`
+	TaskrcPath        string        `yaml:"taskrc_path"`
+	TUI               *TUIConfig    `yaml:"tui"`
+	CalendarSync      *CalendarSync `yaml:"calendar_sync,omitempty"`
+	InitialSearchFilter string      `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
 
 // LoadConfig loads configuration from a YAML file
@@ -138,6 +148,11 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 		if loaded.TUI.Theme != nil {
 			result.TUI.Theme = mergeThem(result.TUI.Theme, loaded.TUI.Theme)
 		}
+	}
+
+	// Merge CalendarSync config
+	if loaded.CalendarSync != nil {
+		result.CalendarSync = loaded.CalendarSync
 	}
 
 	return result

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"os/exec"
 
+	"github.com/clobrano/wui/internal/calendar"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/taskwarrior"
 	"github.com/clobrano/wui/internal/tui"
@@ -44,9 +46,49 @@ var versionCmd = &cobra.Command{
 	},
 }
 
+var (
+	syncCalendarName string
+	syncTaskFilter   string
+)
+
+var syncCmd = &cobra.Command{
+	Use:   "sync",
+	Short: "Sync Taskwarrior tasks to Google Calendar",
+	Long: `Synchronize Taskwarrior tasks to Google Calendar.
+
+This command syncs tasks from Taskwarrior to a specified Google Calendar using
+settings from your config file (~/.config/wui/config.yaml). You can override
+these settings with command-line flags.
+
+Before syncing, you need to:
+1. Create a Google Cloud project and enable the Google Calendar API
+2. Download the credentials.json file from Google Cloud Console
+3. Place it in ~/.config/wui/credentials.json
+4. Configure calendar_name and task_filter in config.yaml
+
+On first run, you'll be prompted to authorize the app in your browser.
+
+Examples:
+  wui sync                                    # Use config.yaml settings
+  wui sync --calendar "Work"                  # Override calendar
+  wui sync --filter "+urgent"                 # Override filter
+  wui sync --calendar "Tasks" --filter "due:today"  # Override both`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := runSync(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(syncCmd)
+
+	// Sync command flags (optional - override config file values)
+	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
+	syncCmd.Flags().StringVar(&syncTaskFilter, "filter", "", "Taskwarrior filter for tasks to sync (overrides config)")
 
 	// Persistent flags available to all commands
 	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file path (default: ~/.config/wui/config.yaml)")
@@ -188,5 +230,92 @@ Visit https://taskwarrior.org for more information.`, err)
 	}
 
 	slog.Debug("Task binary found", "path", path)
+	return nil
+}
+
+// runSync performs the Google Calendar sync operation
+func runSync() error {
+	// Initialize logging
+	initLogging()
+
+	slog.Info("Starting Google Calendar sync", "version", version.GetVersion())
+
+	// Resolve config path
+	cfgPath := config.ResolveConfigPath(configPath)
+	slog.Debug("Using config path", "path", cfgPath)
+
+	// Load configuration
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		slog.Error("Failed to load config", "error", err, "path", cfgPath)
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Override with CLI flags if provided
+	if taskBinPath != "" {
+		cfg.TaskBin = taskBinPath
+	}
+	if taskrcPath != "" {
+		cfg.TaskrcPath = taskrcPath
+	}
+
+	// Get calendar name and filter from config, allow flags to override
+	calendarName := cfg.CalendarSync.CalendarName
+	taskFilter := cfg.CalendarSync.TaskFilter
+
+	if syncCalendarName != "" {
+		calendarName = syncCalendarName
+	}
+	if syncTaskFilter != "" {
+		taskFilter = syncTaskFilter
+	}
+
+	// Validate required fields
+	if calendarName == "" {
+		return fmt.Errorf("calendar name is required (set in config.yaml or use --calendar flag)")
+	}
+	if taskFilter == "" {
+		return fmt.Errorf("task filter is required (set in config.yaml or use --filter flag)")
+	}
+
+	slog.Info("Sync configuration",
+		"calendar", calendarName,
+		"filter", taskFilter,
+		"task_bin", cfg.TaskBin,
+		"taskrc_path", cfg.TaskrcPath)
+
+	// Check if task binary exists
+	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		return err
+	}
+
+	// Create Taskwarrior client
+	taskClient, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
+	if err != nil {
+		slog.Error("Failed to create taskwarrior client", "error", err)
+		return fmt.Errorf("failed to create taskwarrior client: %w", err)
+	}
+
+	// Get credentials and token paths from config
+	credentialsPath := cfg.CalendarSync.CredentialsPath
+	tokenPath := cfg.CalendarSync.TokenPath
+
+	slog.Info("Using credentials", "path", credentialsPath, "token_path", tokenPath)
+
+	// Create sync client
+	ctx := context.Background()
+	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+	if err != nil {
+		slog.Error("Failed to create sync client", "error", err)
+		return fmt.Errorf("failed to create sync client: %w", err)
+	}
+
+	// Perform sync
+	if err := syncClient.Sync(ctx); err != nil {
+		slog.Error("Sync failed", "error", err)
+		return fmt.Errorf("sync failed: %w", err)
+	}
+
+	slog.Info("Sync completed successfully")
 	return nil
 }
