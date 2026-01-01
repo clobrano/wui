@@ -219,12 +219,24 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		eventTime = *task.Scheduled
 	}
 
-	// Create all-day event
-	event.Start = &calendar.EventDateTime{
-		Date: eventTime.Format("2006-01-02"),
-	}
-	event.End = &calendar.EventDateTime{
-		Date: eventTime.Format("2006-01-02"),
+	// Check if the time has specific hour/minute (not just midnight)
+	// If it's exactly midnight (00:00:00), treat it as an all-day event
+	if eventTime.Hour() == 0 && eventTime.Minute() == 0 && eventTime.Second() == 0 {
+		// Create all-day event
+		event.Start = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
+		event.End = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
+	} else {
+		// Create timed event
+		event.Start = &calendar.EventDateTime{
+			DateTime: eventTime.Format(time.RFC3339),
+		}
+		event.End = &calendar.EventDateTime{
+			DateTime: eventTime.Format(time.RFC3339),
+		}
 	}
 
 	// Add color based on priority
