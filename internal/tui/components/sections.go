@@ -142,6 +142,9 @@ func (s Sections) View() string {
 		return ""
 	}
 
+	// Use abbreviated names on small screens
+	isSmallScreen := s.Width < 80
+
 	var tabs []string
 
 	for i, section := range s.Items {
@@ -155,8 +158,11 @@ func (s Sections) View() string {
 			style = s.styles.Inactive
 		}
 
-		// Display section name as-is
+		// Use abbreviated or full name based on screen size
 		displayName := section.Name
+		if isSmallScreen {
+			displayName = abbreviateSectionName(section.Name)
+		}
 
 		tabs = append(tabs, style.Render(displayName))
 	}
@@ -171,6 +177,25 @@ func (s Sections) View() string {
 
 	// Ensure the line spans the full width and add newline for proper vertical spacing
 	return lipgloss.NewStyle().Width(s.Width).Render(tabsLine)
+}
+
+// abbreviateSectionName returns abbreviated section names for small screens
+func abbreviateSectionName(name string) string {
+	abbrev := map[string]string{
+		"Search":   "S",
+		"Next":     "N",
+		"Waiting":  "W",
+		"Projects": "P",
+		"Tags":     "T",
+	}
+	if v, ok := abbrev[name]; ok {
+		return v
+	}
+	// For custom sections, use first letter
+	if len(name) > 0 {
+		return string(name[0])
+	}
+	return name
 }
 
 // GetActiveSection returns the currently active section

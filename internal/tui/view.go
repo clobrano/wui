@@ -101,8 +101,11 @@ func (m Model) renderTaskListWithComponents() string {
 		taskListView := m.taskList.View()
 		sidebarView := m.sidebar.View()
 		content = lipgloss.JoinHorizontal(lipgloss.Top, taskListView, sidebarView)
+	} else if m.viewMode == ViewModeSmallTaskDetail {
+		// Render full-screen task detail view (for small screens)
+		content = m.sidebar.View()
 	} else {
-		// Render just the task list
+		// Render just the task list (ViewModeList or ViewModeSmall)
 		content = m.taskList.View()
 	}
 
