@@ -230,9 +230,9 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 			Date: eventTime.Format("2006-01-02"),
 		}
 	} else {
-		// Create timed event with 1-hour duration
+		// Create timed event with 15-minute duration
 		// (Google Calendar requires end time != start time for timed events)
-		endTime := eventTime.Add(time.Hour)
+		endTime := eventTime.Add(15 * time.Minute)
 		event.Start = &calendar.EventDateTime{
 			DateTime: eventTime.Format(time.RFC3339),
 		}
