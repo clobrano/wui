@@ -372,22 +372,23 @@ func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string,
 		taskDesc = fmt.Sprintf("%s +%s", taskDesc, tag)
 	}
 
-	// Extract date from event
+	// Extract date/time from event
 	var dueDate string
 	if event.Start != nil {
 		if event.Start.Date != "" {
-			// All-day event
+			// All-day event - use date only
 			dueDate = event.Start.Date
 		} else if event.Start.DateTime != "" {
-			// Timed event - parse and format as date
+			// Timed event - preserve time information
 			t, err := time.Parse(time.RFC3339, event.Start.DateTime)
 			if err == nil {
-				dueDate = t.Format("2006-01-02")
+				// Format as ISO 8601 datetime for Taskwarrior
+				dueDate = t.Format("2006-01-02T15:04:05")
 			}
 		}
 	}
 
-	// Add due date if available
+	// Add due date/time if available
 	if dueDate != "" {
 		taskDesc = fmt.Sprintf("%s due:%s", taskDesc, dueDate)
 	}
