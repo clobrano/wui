@@ -80,6 +80,14 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// First, create tasks from manual calendar events
 	tasksCreatedFromEvents := 0
 	for _, event := range manualEvents {
+		// Double-check that this event truly has no UUID (safety check)
+		if existingUUID := extractUUIDFromEvent(event); existingUUID != "" {
+			slog.Warn("Event was categorized as manual but has UUID", "eventId", event.Id, "uuid", existingUUID, "summary", event.Summary)
+			// This shouldn't happen, but if it does, add it to eventMap
+			eventMap[existingUUID] = event
+			continue
+		}
+
 		uuid, err := s.createTaskFromEvent(ctx, calendarID, event)
 		if err != nil {
 			slog.Error("Failed to create task from event", "eventId", event.Id, "summary", event.Summary, "error", err)
@@ -87,6 +95,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 		if uuid != "" {
 			// Add the updated event to eventMap to prevent duplicate creation
+			slog.Info("Created task from manual event, adding to eventMap", "uuid", uuid, "eventId", event.Id, "summary", event.Summary)
 			eventMap[uuid] = event
 			tasksCreatedFromEvents++
 		}
@@ -107,14 +116,18 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		if existingEvent, exists := eventMap[task.UUID]; exists {
 			// Update existing event
 			if s.shouldUpdateEvent(task, existingEvent) {
+				slog.Debug("Updating event for task", "uuid", task.UUID, "description", task.Description, "eventId", existingEvent.Id)
 				if err := s.updateEvent(ctx, calendarID, task, existingEvent); err != nil {
 					slog.Error("Failed to update event", "uuid", task.UUID, "error", err)
 					continue
 				}
 				updated++
+			} else {
+				slog.Debug("Event up to date, skipping", "uuid", task.UUID, "description", task.Description)
 			}
 		} else {
 			// Create new event
+			slog.Info("Task has no existing event, creating new one", "uuid", task.UUID, "description", task.Description, "due", task.Due)
 			if err := s.createEvent(ctx, calendarID, task); err != nil {
 				slog.Error("Failed to create event", "uuid", task.UUID, "error", err)
 				continue
@@ -282,9 +295,21 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 				return true
 			}
 		} else {
-			// Should be timed event
-			expectedDateTime := taskTime.Format(time.RFC3339)
-			if event.Start.DateTime != expectedDateTime {
+			// Should be timed event - compare actual time values, not strings
+			// Parse the event's datetime
+			if event.Start.DateTime != "" {
+				eventTime, err := time.Parse(time.RFC3339, event.Start.DateTime)
+				if err != nil {
+					// If we can't parse the event time, assume it needs updating
+					slog.Warn("Failed to parse event datetime", "datetime", event.Start.DateTime, "error", err)
+					return true
+				}
+				// Compare times using Unix timestamps to avoid timezone string differences
+				if eventTime.Unix() != taskTime.Unix() {
+					return true
+				}
+			} else {
+				// Event should have DateTime but doesn't - needs updating
 				return true
 			}
 		}
