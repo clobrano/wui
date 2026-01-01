@@ -19,17 +19,17 @@ const (
 
 // TaskListStyles holds the styles needed for rendering the task list
 type TaskListStyles struct {
-	Header           lipgloss.Style
-	Separator        lipgloss.Style
-	Selection        lipgloss.Style
-	PriorityHigh     lipgloss.Color
-	PriorityMedium   lipgloss.Color
-	PriorityLow      lipgloss.Color
-	DueOverdue       lipgloss.Color
-	TagColor         lipgloss.Color
-	StatusCompleted  lipgloss.Color
-	StatusWaiting    lipgloss.Color
-	StatusActive     lipgloss.Color
+	Header          lipgloss.Style
+	Separator       lipgloss.Style
+	Selection       lipgloss.Style
+	PriorityHigh    lipgloss.Color
+	PriorityMedium  lipgloss.Color
+	PriorityLow     lipgloss.Color
+	DueOverdue      lipgloss.Color
+	TagColor        lipgloss.Color
+	StatusCompleted lipgloss.Color
+	StatusWaiting   lipgloss.Color
+	StatusActive    lipgloss.Color
 }
 
 // TaskList is a component for displaying and navigating a list of tasks or groups
@@ -44,7 +44,7 @@ type TaskList struct {
 	displayColumns []string // Column names to display
 	offset         int      // Scroll offset for viewport
 	styles         TaskListStyles
-	emptyMessage   string   // Custom message to show when list is empty
+	emptyMessage   string // Custom message to show when list is empty
 }
 
 // NewTaskList creates a new task list component
@@ -245,17 +245,39 @@ func (t TaskList) renderTaskList() string {
 			Render(message)
 	}
 
+	// Check if we're in small screen mode
+	isSmallScreen := t.width < 80
+
 	var lines []string
 
 	// Render column headers (returns 2 lines: header + separator)
-	headerLines := strings.Split(t.renderHeader(), "\n")
-	lines = append(lines, headerLines...)
+	// Skip headers in small screen mode to save space
+	if !isSmallScreen {
+		headerLines := strings.Split(t.renderHeader(), "\n")
+		lines = append(lines, headerLines...)
+	}
 
 	// Calculate visible range
-	visibleHeight := t.height - 2 // Subtract 2 for header rows
-	endIdx := t.offset + visibleHeight
-	if endIdx > len(t.tasks) {
-		endIdx = len(t.tasks)
+	headerHeight := 0
+	if !isSmallScreen {
+		headerHeight = 2 // header + separator
+	}
+
+	visibleHeight := t.height - headerHeight
+
+	// In small screen mode, each task takes 2 lines
+	var endIdx int
+	if isSmallScreen {
+		maxVisibleTasks := visibleHeight / 2
+		endIdx = t.offset + maxVisibleTasks
+		if endIdx > len(t.tasks) {
+			endIdx = len(t.tasks)
+		}
+	} else {
+		endIdx = t.offset + visibleHeight
+		if endIdx > len(t.tasks) {
+			endIdx = len(t.tasks)
+		}
 	}
 
 	// Render visible tasks
@@ -263,12 +285,20 @@ func (t TaskList) renderTaskList() string {
 		task := t.tasks[i]
 		isCursor := i == t.cursor
 		isMultiSelected := t.IsSelected(task.UUID)
-		quickJump := ""
-		if i-t.offset < 9 {
-			quickJump = fmt.Sprintf("%d", i-t.offset+1)
+
+		if isSmallScreen {
+			// Small screen: render 2 lines per task
+			taskLines := t.renderSmallScreenTaskLines(task, isCursor, isMultiSelected)
+			lines = append(lines, taskLines...)
+		} else {
+			// Normal screen: render 1 line per task
+			quickJump := ""
+			if i-t.offset < 9 {
+				quickJump = fmt.Sprintf("%d", i-t.offset+1)
+			}
+			line := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
+			lines = append(lines, line)
 		}
-		line := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
-		lines = append(lines, line)
 	}
 
 	// Fill remaining space
@@ -403,16 +433,16 @@ func (t TaskList) hasColumn(name string) bool {
 // calculateColumnWidths determines column widths based on available space
 func (t TaskList) calculateColumnWidths() columnWidths {
 	const (
-		cursorWidth      = 2  // "■ " or "1 "
-		idWidth          = 4  // Sequential ID
-		priorityWidth    = 1  // H/M/L
-		dueWidth         = 10 // Date format
-		tagsWidth        = 15 // Tags column
-		annotationWidth  = 1  // * or nothing
-		dependencyWidth  = 1  // * or nothing
-		minProject       = 10
-		minDesc          = 20
-		spacing          = 7
+		cursorWidth     = 2  // "■ " or "1 "
+		idWidth         = 4  // Sequential ID
+		priorityWidth   = 1  // H/M/L
+		dueWidth        = 10 // Date format
+		tagsWidth       = 15 // Tags column
+		annotationWidth = 1  // * or nothing
+		dependencyWidth = 1  // * or nothing
+		minProject      = 10
+		minDesc         = 20
+		spacing         = 7
 	)
 
 	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + tagsWidth + spacing
@@ -658,6 +688,87 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	}
 
 	return lineStyle.Width(t.width).Render(line)
+}
+
+// renderSmallScreenTaskLines renders a task as 2 lines for small screens
+// Line 1: ID + Description
+// Line 2: Due date (indented)
+func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMultiSelected bool) []string {
+	// Cursor indicator
+	cursor := " "
+	if isCursor && isMultiSelected {
+		cursor = "◆" // Both cursor and selected
+	} else if isCursor {
+		cursor = "■" // Just cursor
+	} else if isMultiSelected {
+		cursor = "✓" // Just selected
+	}
+
+	// ID
+	id := fmt.Sprintf("%d", task.ID)
+	if task.ID == 0 {
+		id = task.UUID
+		if len(id) > 4 {
+			id = id[:4]
+		}
+	}
+
+	// Status icon prefix for description
+	statusIcon := ""
+	if task.Start != nil {
+		statusIcon = "▶ "
+	} else if task.Status == "waiting" {
+		statusIcon = "⏸ "
+	}
+
+	// Line 1: ID + Description
+	// Format: "■ 1 Description text here..."
+	availableWidth := t.width - 7 // cursor(2) + id(4) + space(1)
+	description := statusIcon + task.Description
+	if len(description) > availableWidth && availableWidth > 3 {
+		description = description[:availableWidth-3] + "..."
+	} else if len(description) > availableWidth {
+		description = description[:availableWidth]
+	}
+	line1 := fmt.Sprintf("%s %-4s %s", cursor, id, description)
+
+	// Line 2: Due date (indented)
+	// Format: "    Due: 2025-01-05" or "    Due: -" if no due date
+	dueText := "-"
+	var dueLine string
+	if task.Due != nil {
+		dueText = task.FormatDueDate()
+		// Add overdue indicator
+		if task.IsOverdue() {
+			dueText += " ⚠"
+		}
+	}
+	dueLine = fmt.Sprintf("    Due: %s", dueText)
+
+	// Apply status-based styling to both lines
+	var lineStyle lipgloss.Style
+	if isMultiSelected {
+		lineStyle = t.styles.Selection
+	} else {
+		lineStyle = lipgloss.NewStyle()
+		if task.Start != nil {
+			lineStyle = lineStyle.Foreground(t.styles.StatusActive).Bold(true)
+		} else {
+			switch task.Status {
+			case "completed":
+				lineStyle = lineStyle.Foreground(t.styles.StatusCompleted).Strikethrough(true)
+			case "waiting":
+				lineStyle = lineStyle.Foreground(t.styles.StatusWaiting).Italic(true)
+			case "deleted":
+				lineStyle = lineStyle.Foreground(t.styles.StatusCompleted).Strikethrough(true)
+			}
+		}
+	}
+
+	styledLine1 := lineStyle.Width(t.width).Render(line1)
+	styledLine2 := lineStyle.Width(t.width).Render(dueLine)
+
+	return []string{styledLine1, styledLine2}
 }
 
 // renderGroupHeader renders the header for group list view

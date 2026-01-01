@@ -21,6 +21,10 @@ const (
 	ViewModeList ViewMode = iota
 	// ViewModeListWithSidebar shows task list with detail sidebar
 	ViewModeListWithSidebar
+	// ViewModeSmall shows task list optimized for small screens (2 lines per task)
+	ViewModeSmall
+	// ViewModeSmallTaskDetail shows full-screen task details on small screens
+	ViewModeSmallTaskDetail
 )
 
 // String returns the string representation of ViewMode
@@ -30,6 +34,10 @@ func (v ViewMode) String() string {
 		return "list"
 	case ViewModeListWithSidebar:
 		return "list_with_sidebar"
+	case ViewModeSmall:
+		return "small"
+	case ViewModeSmallTaskDetail:
+		return "small_task_detail"
 	default:
 		return "unknown"
 	}
@@ -85,14 +93,14 @@ type Model struct {
 	styles  *Styles // Centralized styling
 
 	// Task data
-	tasks           []core.Task
-	currentSection  *core.Section
+	tasks            []core.Task
+	currentSection   *core.Section
 	projectSummaries []core.ProjectSummary // Project summaries for Projects tab
 
 	// Grouping state (for Projects/Tags sections)
 	groups        []core.TaskGroup // Current groups (when in group list view)
-	selectedGroup *core.TaskGroup   // Selected group (when drilling into a group)
-	inGroupView   bool              // true = showing group list, false = showing tasks
+	selectedGroup *core.TaskGroup  // Selected group (when drilling into a group)
+	inGroupView   bool             // true = showing group list, false = showing tasks
 
 	// UI state
 	viewMode ViewMode
@@ -205,15 +213,15 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		inGroupView:     false,
 		statusMessage:   "",
 		errorMessage:    "",
-		taskList:       taskList,
-		sidebar:        components.NewSidebar(40, 24, styles.ToSidebarStyles()),       // Initial size, will be updated
-		filter:         components.NewFilter(),
-		modifyInput:    components.NewFilter(),
-		annotateInput:  components.NewFilter(),
-		newTaskInput:   components.NewFilter(),
-		sections:       components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
-		help:           helpComponent,         // Initial size, will be updated
-		confirmAction:  "",
+		taskList:        taskList,
+		sidebar:         components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
+		filter:          components.NewFilter(),
+		modifyInput:     components.NewFilter(),
+		annotateInput:   components.NewFilter(),
+		newTaskInput:    components.NewFilter(),
+		sections:        components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
+		help:            helpComponent,                                                                                    // Initial size, will be updated
+		confirmAction:   "",
 	}
 
 	// Set custom empty message for Search tab if starting there
@@ -444,6 +452,12 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Escape key for clearing selections/going back (not configurable)
 	if keyPressed == "esc" {
+		// If in small screen task detail view, go back to task list
+		if m.viewMode == ViewModeSmallTaskDetail {
+			m.viewMode = ViewModeSmall
+			m.updateComponentSizes()
+			return m, nil
+		}
 		// Clear selections if any exist
 		if m.taskList.HasSelections() {
 			m.taskList.ClearSelection()
@@ -500,10 +514,18 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Otherwise toggle sidebar
+		// In small screen mode, Enter shows full-screen task details
+		if m.viewMode == ViewModeSmall {
+			m.viewMode = ViewModeSmallTaskDetail
+			m.updateComponentSizes()
+			m.updateSidebar()
+			return m, nil
+		}
+
+		// Otherwise toggle sidebar (for normal screens)
 		if m.viewMode == ViewModeList {
 			m.viewMode = ViewModeListWithSidebar
-		} else {
+		} else if m.viewMode == ViewModeListWithSidebar {
 			m.viewMode = ViewModeList
 		}
 		m.updateComponentSizes()
@@ -602,7 +624,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Section navigation (not configurable - uses tab, h/l, arrows, and number keys)
 	if keyPressed == "tab" || keyPressed == "shift+tab" || keyPressed == "h" || keyPressed == "l" ||
-	   keyPressed == "left" || keyPressed == "right" {
+		keyPressed == "left" || keyPressed == "right" {
 		// Delegate section navigation to sections component
 		m.sections, cmd = m.sections.Update(msg)
 		return m, cmd
@@ -637,9 +659,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Navigation keys - check both configured keys and arrow keys
 	if m.keyMatches(keyPressed, "up") || m.keyMatches(keyPressed, "down") ||
-	   m.keyMatches(keyPressed, "first") || m.keyMatches(keyPressed, "last") ||
-	   m.keyMatches(keyPressed, "page_up") || m.keyMatches(keyPressed, "page_down") ||
-	   keyPressed == "up" || keyPressed == "down" {
+		m.keyMatches(keyPressed, "first") || m.keyMatches(keyPressed, "last") ||
+		m.keyMatches(keyPressed, "page_up") || m.keyMatches(keyPressed, "page_down") ||
+		keyPressed == "up" || keyPressed == "down" {
 		// Delegate navigation to task list component
 		m.taskList, cmd = m.taskList.Update(msg)
 		m.updateSidebar()
@@ -649,8 +671,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If sidebar is visible, check for sidebar scrolling keys (not configurable)
 	if m.viewMode == ViewModeListWithSidebar {
 		if keyPressed == "ctrl+d" || keyPressed == "ctrl+u" || keyPressed == "ctrl+f" ||
-		   keyPressed == "ctrl+b" || keyPressed == "J" || keyPressed == "K" ||
-		   keyPressed == "pgdown" || keyPressed == "pgup" {
+			keyPressed == "ctrl+b" || keyPressed == "J" || keyPressed == "K" ||
+			keyPressed == "pgdown" || keyPressed == "pgup" {
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}
@@ -665,6 +687,22 @@ func (m *Model) updateComponentSizes() {
 		return
 	}
 
+	// Detect small screen and auto-switch layout mode
+	// Don't auto-switch if we're in task detail view
+	if m.width < 80 {
+		if m.viewMode != ViewModeSmallTaskDetail {
+			m.viewMode = ViewModeSmall
+		}
+	} else {
+		// Switch back to normal mode if we were in small screen mode
+		if m.viewMode == ViewModeSmall {
+			m.viewMode = ViewModeList
+		} else if m.viewMode == ViewModeSmallTaskDetail {
+			// If we're in task detail on small screen but screen got bigger, go back to list
+			m.viewMode = ViewModeList
+		}
+	}
+
 	// Update sections component width
 	m.sections.SetSize(m.width)
 
@@ -677,7 +715,7 @@ func (m *Model) updateComponentSizes() {
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
-	   m.state == StateAnnotateInput || m.state == StateNewTaskInput {
+		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
 		availableHeight -= 2
 	}
 
@@ -696,18 +734,21 @@ func (m *Model) updateComponentSizes() {
 
 		m.taskList.SetSize(taskListWidth, availableHeight)
 		m.sidebar.SetSize(sidebarWidth, availableHeight)
+	} else if m.viewMode == ViewModeSmallTaskDetail {
+		// Full screen task detail view (using sidebar component)
+		m.sidebar.SetSize(m.width, availableHeight)
 	} else {
-		// Full width task list
+		// Full width task list (ViewModeList or ViewModeSmall)
 		m.taskList.SetSize(m.width, availableHeight)
 	}
 
 	// Update input component widths if in input mode
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
-	   m.state == StateAnnotateInput || m.state == StateNewTaskInput {
+		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
 		// Calculate input width: available width - padding - prompt width - hint width - spacing
 		availableWidth := m.width - 2 // Account for padding
-		promptWidth := 12 // Approximate max prompt width ("New Task: " is longest)
-		hintWidth := 35   // Approximate hint width "(Enter to apply, Esc to cancel)"
+		promptWidth := 12             // Approximate max prompt width ("New Task: " is longest)
+		hintWidth := 35               // Approximate hint width "(Enter to apply, Esc to cancel)"
 		spacing := 2
 
 		inputWidth := availableWidth - promptWidth - hintWidth - spacing
