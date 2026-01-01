@@ -75,7 +75,15 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// Sync each task
 	created := 0
 	updated := 0
+	skipped := 0
 	for _, task := range tasks {
+		// Skip tasks without due date or scheduled date
+		if (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero()) {
+			slog.Debug("Skipping task without due date", "uuid", task.UUID, "description", task.Description)
+			skipped++
+			continue
+		}
+
 		if existingEvent, exists := eventMap[task.UUID]; exists {
 			// Update existing event
 			if s.shouldUpdateEvent(task, existingEvent) {
@@ -95,8 +103,8 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated)
-	fmt.Printf("Sync completed: %d tasks, %d created, %d updated\n", len(tasks), created, updated)
+	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped)
+	fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
 
 	return nil
 }
@@ -191,14 +199,12 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 	}
 
 	// Set event time based on due date or scheduled date
+	// Note: Tasks without dates are filtered before reaching this function
 	var eventTime time.Time
 	if task.Due != nil && !task.Due.IsZero() {
 		eventTime = *task.Due
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
 		eventTime = *task.Scheduled
-	} else {
-		// If no date is set, use today
-		eventTime = time.Now()
 	}
 
 	// Create all-day event
@@ -233,16 +239,15 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 	}
 
 	// Check if the date changed
+	// Note: Tasks without dates are filtered before reaching this function
 	var taskDate string
 	if task.Due != nil && !task.Due.IsZero() {
 		taskDate = task.Due.Format("2006-01-02")
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
 		taskDate = task.Scheduled.Format("2006-01-02")
-	} else {
-		taskDate = time.Now().Format("2006-01-02")
 	}
 
-	if event.Start != nil && event.Start.Date != taskDate {
+	if event.Start != nil && taskDate != "" && event.Start.Date != taskDate {
 		return true
 	}
 
