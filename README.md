@@ -256,13 +256,36 @@ wui sync --calendar "Urgent" --filter "+urgent priority:H"
 
 ### How it works
 
-- Tasks are synced as all-day events in Google Calendar
+**Bidirectional Sync**: The sync works in both directions:
+
+**Calendar → Taskwarrior**:
+- Manually created calendar events are automatically converted to tasks
+- Event title becomes the task description
+- Event date/time becomes the task due date/time
+- Optional metadata in event description:
+  - `Project:<project name>` - Sets the task project
+  - `Tags: <tag1>, <tag2>` - Adds tags to the task (comma-separated)
+- After conversion, the event is updated with the task UUID to prevent duplicates
+
+**Taskwarrior → Calendar**:
+- Tasks are synced as calendar events based on their due or scheduled dates
 - Each event includes the task UUID, project, tags, and status in its description
-- Event dates are based on the task's due date, or scheduled date if no due date is set
 - Completed tasks are marked with a ✓ checkmark in the title
 - Events are color-coded based on priority (red for high, yellow for medium)
 - Existing events are updated if the task changes
-- The sync is one-way: Taskwarrior → Google Calendar
+
+**Time Handling**:
+- All-day events ↔ Tasks with date only (e.g., `due:2026-01-15`)
+- Timed events ↔ Tasks with datetime (e.g., `due:2026-01-15T14:30:00`)
+- **Important**: Tasks with times at exactly midnight (00:00:00) are treated as all-day events
+- Time information is preserved bidirectionally for non-midnight times
+
+**Example**: Create a calendar event titled "Team Meeting" on Jan 15 at 2:30 PM with description:
+```
+Project:work
+Tags: meeting, urgent
+```
+After sync, this creates: `task add "Team Meeting" project:work +meeting +urgent due:2026-01-15T14:30:00`
 
 ## Filtering
 
