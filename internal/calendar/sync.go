@@ -80,11 +80,16 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// First, create tasks from manual calendar events
 	tasksCreatedFromEvents := 0
 	for _, event := range manualEvents {
-		if err := s.createTaskFromEvent(ctx, calendarID, event); err != nil {
+		uuid, err := s.createTaskFromEvent(ctx, calendarID, event)
+		if err != nil {
 			slog.Error("Failed to create task from event", "eventId", event.Id, "summary", event.Summary, "error", err)
 			continue
 		}
-		tasksCreatedFromEvents++
+		if uuid != "" {
+			// Add the updated event to eventMap to prevent duplicate creation
+			eventMap[uuid] = event
+			tasksCreatedFromEvents++
+		}
 	}
 
 	// Now sync tasks to calendar
@@ -350,10 +355,11 @@ func parseEventMetadata(description string) (project string, tags []string) {
 }
 
 // createTaskFromEvent creates a Taskwarrior task from a calendar event
-func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string, event *calendar.Event) error {
+// Returns the UUID of the created task, or empty string if no task was created
+func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string, event *calendar.Event) (string, error) {
 	if event.Summary == "" {
 		slog.Debug("Skipping event without summary", "id", event.Id)
-		return nil
+		return "", nil
 	}
 
 	// Parse metadata from event description
@@ -396,7 +402,7 @@ func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string,
 	// Create the task
 	uuid, err := s.taskClient.Add(taskDesc)
 	if err != nil {
-		return fmt.Errorf("failed to create task: %w", err)
+		return "", fmt.Errorf("failed to create task: %w", err)
 	}
 
 	slog.Info("Created task from calendar event", "uuid", uuid, "description", event.Summary)
@@ -425,5 +431,5 @@ func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string,
 		// Don't return error - task was created successfully
 	}
 
-	return nil
+	return uuid, nil
 }
