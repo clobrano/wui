@@ -469,8 +469,9 @@ func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string,
 			// Timed event - preserve time information
 			t, err := time.Parse(time.RFC3339, event.Start.DateTime)
 			if err == nil {
-				// Format as ISO 8601 datetime for Taskwarrior
-				dueDate = t.Format("2006-01-02T15:04:05")
+				// Convert to local time before formatting for Taskwarrior
+				localTime := t.Local()
+				dueDate = localTime.Format("2006-01-02T15:04:05")
 			}
 		}
 	}
