@@ -264,17 +264,84 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 		return true
 	}
 
-	// Check if the date changed
+	// Check if the date/time changed
 	// Note: Tasks without dates are filtered before reaching this function
-	var taskDate string
+	var taskTime time.Time
 	if task.Due != nil && !task.Due.IsZero() {
-		taskDate = task.Due.Format("2006-01-02")
+		taskTime = *task.Due
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
-		taskDate = task.Scheduled.Format("2006-01-02")
+		taskTime = *task.Scheduled
 	}
 
-	if event.Start != nil && taskDate != "" && event.Start.Date != taskDate {
-		return true
+	if event.Start != nil {
+		// Check if this is a timed event or all-day event
+		if taskTime.Hour() == 0 && taskTime.Minute() == 0 && taskTime.Second() == 0 {
+			// Should be all-day event
+			expectedDate := taskTime.Format("2006-01-02")
+			if event.Start.Date != expectedDate {
+				return true
+			}
+		} else {
+			// Should be timed event
+			expectedDateTime := taskTime.Format(time.RFC3339)
+			if event.Start.DateTime != expectedDateTime {
+				return true
+			}
+		}
+	}
+
+	// Check if project changed
+	if event.Description != "" {
+		projectPrefix := "\nProject: "
+		// Special case: check at start of description too
+		if strings.HasPrefix(event.Description, "Project: ") {
+			projectPrefix = "Project: "
+		}
+
+		var eventProject string
+		if idx := strings.Index(event.Description, projectPrefix); idx >= 0 {
+			start := idx + len(projectPrefix)
+			end := len(event.Description)
+			if newlineIdx := strings.Index(event.Description[start:], "\n"); newlineIdx >= 0 {
+				end = start + newlineIdx
+			}
+			eventProject = strings.TrimSpace(event.Description[start:end])
+		}
+
+		if eventProject != task.Project {
+			return true
+		}
+	}
+
+	// Check if tags changed
+	if event.Description != "" {
+		tagsPrefix := "\nTags: "
+		// Special case: check at start of description too
+		if strings.HasPrefix(event.Description, "Tags: ") {
+			tagsPrefix = "Tags: "
+		}
+
+		var eventTags []string
+		if idx := strings.Index(event.Description, tagsPrefix); idx >= 0 {
+			start := idx + len(tagsPrefix)
+			end := len(event.Description)
+			if newlineIdx := strings.Index(event.Description[start:], "\n"); newlineIdx >= 0 {
+				end = start + newlineIdx
+			}
+			tagsStr := strings.TrimSpace(event.Description[start:end])
+			if tagsStr != "" {
+				for _, tag := range strings.Split(tagsStr, ", ") {
+					eventTags = append(eventTags, strings.TrimSpace(tag))
+				}
+			}
+		}
+
+		// Compare tags (order-independent)
+		taskTagsStr := strings.Join(task.Tags, ", ")
+		eventTagsStr := strings.Join(eventTags, ", ")
+		if taskTagsStr != eventTagsStr {
+			return true
+		}
 	}
 
 	// Check if status changed by examining the event description
