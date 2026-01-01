@@ -64,15 +64,30 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 
 	slog.Info("Retrieved existing calendar events", "count", len(existingEvents))
 
-	// Build map of existing events by task UUID
+	// Separate events into task-originated and manual events
 	eventMap := make(map[string]*calendar.Event)
+	var manualEvents []*calendar.Event
 	for _, event := range existingEvents {
 		if uuid := extractUUIDFromEvent(event); uuid != "" {
 			eventMap[uuid] = event
+		} else {
+			manualEvents = append(manualEvents, event)
 		}
 	}
 
-	// Sync each task
+	slog.Info("Event breakdown", "task-originated", len(eventMap), "manual", len(manualEvents))
+
+	// First, create tasks from manual calendar events
+	tasksCreatedFromEvents := 0
+	for _, event := range manualEvents {
+		if err := s.createTaskFromEvent(ctx, calendarID, event); err != nil {
+			slog.Error("Failed to create task from event", "eventId", event.Id, "summary", event.Summary, "error", err)
+			continue
+		}
+		tasksCreatedFromEvents++
+	}
+
+	// Now sync tasks to calendar
 	created := 0
 	updated := 0
 	skipped := 0
@@ -103,8 +118,8 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped)
-	fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped, "tasksFromEvents", tasksCreatedFromEvents)
+	fmt.Printf("Sync completed: %d tasks, %d events created, %d events updated, %d skipped (no due date), %d tasks created from calendar\n", len(tasks), created, updated, skipped, tasksCreatedFromEvents)
 
 	return nil
 }
@@ -125,7 +140,7 @@ func (s *SyncClient) findCalendarByName(ctx context.Context, name string) (strin
 	return "", fmt.Errorf("calendar '%s' not found", name)
 }
 
-// getCalendarEvents retrieves events from the calendar that were created by this tool
+// getCalendarEvents retrieves all events from the calendar
 func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) ([]*calendar.Event, error) {
 	// Get events from the past 30 days to the next 365 days
 	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
@@ -142,15 +157,7 @@ func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) (
 		return nil, fmt.Errorf("failed to list events: %w", err)
 	}
 
-	// Filter events created by wui (check for UUID in description)
-	var wuiEvents []*calendar.Event
-	for _, event := range events.Items {
-		if extractUUIDFromEvent(event) != "" {
-			wuiEvents = append(wuiEvents, event)
-		}
-	}
-
-	return wuiEvents, nil
+	return events.Items, nil
 }
 
 // createEvent creates a new calendar event from a task
@@ -302,4 +309,120 @@ func extractUUIDFromEvent(event *calendar.Event) string {
 	}
 
 	return ""
+}
+
+// parseEventMetadata extracts project and tags from an event description
+// Expected format:
+//   Project:<project name>
+//   Tags: <tag1>, <tag2>
+func parseEventMetadata(description string) (project string, tags []string) {
+	if description == "" {
+		return "", nil
+	}
+
+	lines := strings.Split(description, "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+
+		// Parse project
+		if strings.HasPrefix(strings.ToLower(line), "project:") {
+			project = strings.TrimSpace(line[8:]) // len("Project:") = 8
+			continue
+		}
+
+		// Parse tags
+		if strings.HasPrefix(strings.ToLower(line), "tags:") {
+			tagStr := strings.TrimSpace(line[5:]) // len("Tags:") = 5
+			if tagStr != "" {
+				// Split by comma and trim each tag
+				rawTags := strings.Split(tagStr, ",")
+				for _, tag := range rawTags {
+					tag = strings.TrimSpace(tag)
+					if tag != "" {
+						tags = append(tags, tag)
+					}
+				}
+			}
+		}
+	}
+
+	return project, tags
+}
+
+// createTaskFromEvent creates a Taskwarrior task from a calendar event
+func (s *SyncClient) createTaskFromEvent(ctx context.Context, calendarID string, event *calendar.Event) error {
+	if event.Summary == "" {
+		slog.Debug("Skipping event without summary", "id", event.Id)
+		return nil
+	}
+
+	// Parse metadata from event description
+	project, tags := parseEventMetadata(event.Description)
+
+	// Build task description with project and tags
+	taskDesc := event.Summary
+
+	// Add project if specified
+	if project != "" {
+		taskDesc = fmt.Sprintf("%s project:%s", taskDesc, project)
+	}
+
+	// Add tags if specified
+	for _, tag := range tags {
+		taskDesc = fmt.Sprintf("%s +%s", taskDesc, tag)
+	}
+
+	// Extract date from event
+	var dueDate string
+	if event.Start != nil {
+		if event.Start.Date != "" {
+			// All-day event
+			dueDate = event.Start.Date
+		} else if event.Start.DateTime != "" {
+			// Timed event - parse and format as date
+			t, err := time.Parse(time.RFC3339, event.Start.DateTime)
+			if err == nil {
+				dueDate = t.Format("2006-01-02")
+			}
+		}
+	}
+
+	// Add due date if available
+	if dueDate != "" {
+		taskDesc = fmt.Sprintf("%s due:%s", taskDesc, dueDate)
+	}
+
+	// Create the task
+	uuid, err := s.taskClient.Add(taskDesc)
+	if err != nil {
+		return fmt.Errorf("failed to create task: %w", err)
+	}
+
+	slog.Info("Created task from calendar event", "uuid", uuid, "description", event.Summary)
+
+	// Update the event description to include the UUID
+	updatedDescription := fmt.Sprintf("Taskwarrior UUID: %s\n\n", uuid)
+	if event.Description != "" {
+		updatedDescription += event.Description
+	} else {
+		// Add project and tags info if they were parsed
+		if project != "" {
+			updatedDescription += fmt.Sprintf("Project: %s\n", project)
+		}
+		if len(tags) > 0 {
+			updatedDescription += fmt.Sprintf("Tags: %s\n", strings.Join(tags, ", "))
+		}
+		updatedDescription += "Status: pending"
+	}
+
+	event.Description = updatedDescription
+
+	// Update the event in the calendar
+	_, err = s.calendarService.Events.Update(calendarID, event.Id, event).Context(ctx).Do()
+	if err != nil {
+		slog.Warn("Failed to update event with UUID", "error", err, "eventId", event.Id)
+		// Don't return error - task was created successfully
+	}
+
+	return nil
 }
