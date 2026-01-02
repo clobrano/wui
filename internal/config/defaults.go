@@ -29,6 +29,7 @@ func DefaultCalendarSync() *CalendarSync {
 		TaskFilter:      "status:pending or status:completed",
 		CredentialsPath: filepath.Join(configDir, "credentials.json"),
 		TokenPath:       filepath.Join(configDir, "token.json"),
+		AutoSyncOnQuit:  false,
 	}
 }
 
@@ -92,14 +93,14 @@ func DefaultColumns() []string {
 func DefaultKeybindings() map[string]string {
 	return map[string]string{
 		// Navigation
-		"quit":          "q",
-		"help":          "?",
-		"up":            "k",
-		"down":          "j",
-		"page_up":       "ctrl+u",
-		"page_down":     "ctrl+d",
-		"first":         "g",
-		"last":          "G",
+		"quit":           "q",
+		"help":           "?",
+		"up":             "k",
+		"down":           "j",
+		"page_up":        "ctrl+u",
+		"page_down":      "ctrl+d",
+		"first":          "g",
+		"last":           "G",
 		"toggle_sidebar": "tab",
 
 		// Sections
@@ -142,19 +143,19 @@ func DefaultTheme() *Theme {
 		StatusCompleted: "8",  // Dim gray
 
 		// UI element colors
-		HeaderFg:       "12", // Bright cyan
-		FooterFg:       "8",  // Dim gray
-		SeparatorFg:    "8",  // Dim gray
-		SelectionBg:    "12", // Cyan
-		SelectionFg:    "0",  // Black
-		SidebarBorder:  "8",  // Dim gray
-		SidebarTitle:   "12", // Bright cyan
-		LabelFg:        "12", // Bright cyan
-		ValueFg:        "15", // White
-		DimFg:          "8",  // Dim gray
-		ErrorFg:        "9",  // Red
-		SuccessFg:      "10", // Green
-		TagFg:          "14", // Cyan
+		HeaderFg:      "12", // Bright cyan
+		FooterFg:      "8",  // Dim gray
+		SeparatorFg:   "8",  // Dim gray
+		SelectionBg:   "12", // Cyan
+		SelectionFg:   "0",  // Black
+		SidebarBorder: "8",  // Dim gray
+		SidebarTitle:  "12", // Bright cyan
+		LabelFg:       "12", // Bright cyan
+		ValueFg:       "15", // White
+		DimFg:         "8",  // Dim gray
+		ErrorFg:       "9",  // Red
+		SuccessFg:     "10", // Green
+		TagFg:         "14", // Cyan
 
 		// Section colors
 		SectionActiveFg:   "15",  // White
