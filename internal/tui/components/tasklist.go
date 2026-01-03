@@ -216,9 +216,12 @@ func (t TaskList) itemCount() int {
 //   - When moving up, scrolling triggers when cursor is 1 position from viewport top
 //   - This maintains context around the selected task during navigation
 //
-// Edge cases:
-//   - At list start (first few tasks): buffer only applies below cursor
-//   - At list end (last few tasks): buffer only applies above cursor
+// Adaptive buffer at list boundaries:
+//   - At list start: buffer below cursor is maintained, buffer above cursor is 0
+//   - At list end: buffer above cursor is maintained, buffer below cursor adapts to remaining tasks
+//   - Example: With scrollBuffer=3, when on task 18 of 20 tasks, only 1 task remains below,
+//     so the effective buffer below becomes 1 instead of 3
+//   - This prevents jarring jumps and ensures all tasks are reachable
 //   - With scrollBuffer=0: cursor can touch viewport edges (original behavior)
 //
 // Small screen handling:
@@ -256,15 +259,6 @@ func (t *TaskList) updateScroll() {
 		maxOffset = 0
 	}
 
-	// Special case: if cursor is near the end of the list (within last visibleTasks positions),
-	// just show the last viewport to ensure all end tasks are visible.
-	// This prevents the scroll buffer logic from trying to maintain space below the cursor
-	// when there aren't enough tasks remaining.
-	if t.cursor >= itemCount-visibleTasks {
-		t.offset = maxOffset
-		return
-	}
-
 	// Cursor moving up: scroll when cursor gets within buffer distance from top
 	// Unless we're already at the start of the list
 	if t.cursor < t.offset+t.scrollBuffer {
@@ -275,9 +269,18 @@ func (t *TaskList) updateScroll() {
 	}
 
 	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
-	// Unless we're already at the end of the list
-	if t.cursor >= t.offset+visibleTasks-t.scrollBuffer {
-		t.offset = t.cursor - visibleTasks + t.scrollBuffer + 1
+	// Use adaptive buffer that reduces when approaching the end of the list
+	tasksBelow := itemCount - t.cursor - 1
+	effectiveBufferBelow := t.scrollBuffer
+	if tasksBelow < effectiveBufferBelow {
+		effectiveBufferBelow = tasksBelow
+		if effectiveBufferBelow < 0 {
+			effectiveBufferBelow = 0
+		}
+	}
+
+	if t.cursor >= t.offset+visibleTasks-effectiveBufferBelow-1 {
+		t.offset = t.cursor - visibleTasks + effectiveBufferBelow + 1
 	}
 
 	// Ensure cursor is always visible (safety check)
