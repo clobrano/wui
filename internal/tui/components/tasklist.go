@@ -220,6 +220,10 @@ func (t TaskList) itemCount() int {
 //   - At list start (first few tasks): buffer only applies below cursor
 //   - At list end (last few tasks): buffer only applies above cursor
 //   - With scrollBuffer=0: cursor can touch viewport edges (original behavior)
+//
+// Small screen handling:
+//   - Small screens (width < 80) skip headers and use 2 lines per task
+//   - visibleTasks calculation accounts for these differences
 func (t *TaskList) updateScroll() {
 	itemCount := t.itemCount()
 	if itemCount == 0 {
@@ -227,7 +231,19 @@ func (t *TaskList) updateScroll() {
 		return
 	}
 
-	visibleHeight := t.height - 2 // Subtract 2 for header rows (title + separator)
+	// Calculate visible tasks accounting for screen size
+	isSmallScreen := t.width < 80
+	headerHeight := 0
+	if !isSmallScreen {
+		headerHeight = 2 // header + separator
+	}
+	visibleHeight := t.height - headerHeight
+
+	// Calculate how many tasks can fit in viewport
+	visibleTasks := visibleHeight
+	if isSmallScreen {
+		visibleTasks = visibleHeight / 2 // Each task takes 2 lines
+	}
 
 	// Cursor moving up: scroll when cursor gets within buffer distance from top
 	// Unless we're already at the start of the list
@@ -240,12 +256,12 @@ func (t *TaskList) updateScroll() {
 
 	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
 	// Unless we're already at the end of the list
-	if t.cursor > t.offset+visibleHeight-t.scrollBuffer-1 {
-		t.offset = t.cursor - visibleHeight + t.scrollBuffer + 1
+	if t.cursor > t.offset+visibleTasks-t.scrollBuffer-1 {
+		t.offset = t.cursor - visibleTasks + t.scrollBuffer + 1
 	}
 
 	// Don't scroll past the end of the list
-	maxOffset := itemCount - visibleHeight
+	maxOffset := itemCount - visibleTasks
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
