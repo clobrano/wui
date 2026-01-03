@@ -245,6 +245,17 @@ func (t *TaskList) updateScroll() {
 		visibleTasks = visibleHeight / 2 // Each task takes 2 lines
 	}
 
+	// Ensure we have at least 1 visible task
+	if visibleTasks < 1 {
+		visibleTasks = 1
+	}
+
+	// Calculate max offset - cannot scroll past the last task
+	maxOffset := itemCount - visibleTasks
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
 	// Cursor moving up: scroll when cursor gets within buffer distance from top
 	// Unless we're already at the start of the list
 	if t.cursor < t.offset+t.scrollBuffer {
@@ -256,17 +267,27 @@ func (t *TaskList) updateScroll() {
 
 	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
 	// Unless we're already at the end of the list
-	if t.cursor > t.offset+visibleTasks-t.scrollBuffer-1 {
+	if t.cursor >= t.offset+visibleTasks-t.scrollBuffer {
 		t.offset = t.cursor - visibleTasks + t.scrollBuffer + 1
 	}
 
-	// Don't scroll past the end of the list
-	maxOffset := itemCount - visibleTasks
-	if maxOffset < 0 {
-		maxOffset = 0
+	// Ensure cursor is always visible (safety check)
+	// This handles edge cases where buffer logic might fail
+	if t.cursor < t.offset {
+		t.offset = t.cursor
 	}
+	if t.cursor >= t.offset+visibleTasks {
+		t.offset = t.cursor - visibleTasks + 1
+	}
+
+	// Don't scroll past the end of the list
 	if t.offset > maxOffset {
 		t.offset = maxOffset
+	}
+
+	// Final safety: ensure offset is non-negative
+	if t.offset < 0 {
+		t.offset = 0
 	}
 }
 
