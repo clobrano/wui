@@ -43,6 +43,7 @@ type TaskList struct {
 	height         int
 	displayColumns []string // Column names to display
 	offset         int      // Scroll offset for viewport
+	scrollBuffer   int      // Number of tasks to keep visible above/below cursor
 	styles         TaskListStyles
 	emptyMessage   string // Custom message to show when list is empty
 }
@@ -75,6 +76,7 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		height:         height,
 		displayColumns: normalizedColumns,
 		offset:         0,
+		scrollBuffer:   1, // Default: keep 1 task visible above/below cursor
 		styles:         styles,
 	}
 }
@@ -111,6 +113,17 @@ func (t *TaskList) SetSize(width, height int) {
 // SetEmptyMessage sets a custom message to display when the list is empty
 func (t *TaskList) SetEmptyMessage(message string) {
 	t.emptyMessage = message
+}
+
+// SetScrollBuffer sets the number of tasks to keep visible above/below the cursor.
+// A buffer of 1 means the selected task will have at least 1 task visible above
+// and below it (when not at list boundaries). Set to 0 to disable buffering.
+func (t *TaskList) SetScrollBuffer(buffer int) {
+	if buffer < 0 {
+		buffer = 0
+	}
+	t.scrollBuffer = buffer
+	t.updateScroll()
 }
 
 // Update handles messages for the task list
@@ -195,7 +208,18 @@ func (t TaskList) itemCount() int {
 	return len(t.tasks)
 }
 
-// updateScroll adjusts the scroll offset to keep cursor visible
+// updateScroll adjusts the scroll offset to keep cursor visible with a configurable buffer.
+//
+// The scroll buffer (scrollBuffer) determines how many tasks remain visible above and below
+// the selected task when scrolling. For example, with scrollBuffer=1:
+//   - When moving down, scrolling triggers when cursor is 1 position from viewport bottom
+//   - When moving up, scrolling triggers when cursor is 1 position from viewport top
+//   - This maintains context around the selected task during navigation
+//
+// Edge cases:
+//   - At list start (first few tasks): buffer only applies below cursor
+//   - At list end (last few tasks): buffer only applies above cursor
+//   - With scrollBuffer=0: cursor can touch viewport edges (original behavior)
 func (t *TaskList) updateScroll() {
 	itemCount := t.itemCount()
 	if itemCount == 0 {
@@ -205,17 +229,22 @@ func (t *TaskList) updateScroll() {
 
 	visibleHeight := t.height - 2 // Subtract 2 for header rows (title + separator)
 
-	// Cursor is above viewport
-	if t.cursor < t.offset {
-		t.offset = t.cursor
+	// Cursor moving up: scroll when cursor gets within buffer distance from top
+	// Unless we're already at the start of the list
+	if t.cursor < t.offset+t.scrollBuffer {
+		t.offset = t.cursor - t.scrollBuffer
+		if t.offset < 0 {
+			t.offset = 0
+		}
 	}
 
-	// Cursor is below viewport
-	if t.cursor >= t.offset+visibleHeight {
-		t.offset = t.cursor - visibleHeight + 1
+	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
+	// Unless we're already at the end of the list
+	if t.cursor > t.offset+visibleHeight-t.scrollBuffer-1 {
+		t.offset = t.cursor - visibleHeight + t.scrollBuffer + 1
 	}
 
-	// Don't scroll past the end
+	// Don't scroll past the end of the list
 	maxOffset := itemCount - visibleHeight
 	if maxOffset < 0 {
 		maxOffset = 0
