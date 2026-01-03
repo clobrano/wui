@@ -739,9 +739,11 @@ func (m *Model) updateComponentSizes() {
 	// Update help component size
 	m.help.SetSize(m.width, m.height)
 
-	// Calculate available height (subtract sections bar and footer with padding)
-	// Footer has .Padding(1, 1) which adds 1 line top + 1 line bottom = 2 lines padding + 1 content = 3 total
-	availableHeight := m.height - 4 // sections(1) + footer(3: 1 pad top + 1 content + 1 pad bottom)
+	// Calculate available height (subtract sections bar, footer, and bottom border)
+	// - Sections bar: 1 line
+	// - Footer: 3 lines (1 pad top + 1 content + 1 pad bottom)
+	// - Bottom border: 1 line (added in renderTaskListWithComponents)
+	availableHeight := m.height - 5 // sections(1) + footer(3) + bottom border(1)
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
