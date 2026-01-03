@@ -33,3 +33,8 @@ type ProjectSummaryLoadedMsg struct {
 	Summaries []core.ProjectSummary
 	Err       error
 }
+
+// CalendarSyncCompletedMsg is sent when calendar sync completes
+type CalendarSyncCompletedMsg struct {
+	Err error
+}

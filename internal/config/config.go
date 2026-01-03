@@ -11,20 +11,21 @@ import (
 
 // CalendarSync represents Google Calendar sync configuration
 type CalendarSync struct {
-	Enabled        bool   `yaml:"enabled"`
-	CalendarName   string `yaml:"calendar_name"`
-	TaskFilter     string `yaml:"task_filter"`
+	Enabled         bool   `yaml:"enabled"`
+	CalendarName    string `yaml:"calendar_name"`
+	TaskFilter      string `yaml:"task_filter"`
 	CredentialsPath string `yaml:"credentials_path"`
-	TokenPath      string `yaml:"token_path"`
+	TokenPath       string `yaml:"token_path"`
+	AutoSyncOnQuit  bool   `yaml:"auto_sync_on_quit"`
 }
 
 // Config represents the wui configuration
 type Config struct {
-	TaskBin           string        `yaml:"task_bin"`
-	TaskrcPath        string        `yaml:"taskrc_path"`
-	TUI               *TUIConfig    `yaml:"tui"`
-	CalendarSync      *CalendarSync `yaml:"calendar_sync,omitempty"`
-	InitialSearchFilter string      `yaml:"-"` // Not persisted to config file, set via CLI flag
+	TaskBin             string        `yaml:"task_bin"`
+	TaskrcPath          string        `yaml:"taskrc_path"`
+	TUI                 *TUIConfig    `yaml:"tui"`
+	CalendarSync        *CalendarSync `yaml:"calendar_sync,omitempty"`
+	InitialSearchFilter string        `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
 
 // LoadConfig loads configuration from a YAML file

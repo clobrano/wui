@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -8,8 +9,10 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/clobrano/wui/internal/calendar"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
+	"github.com/clobrano/wui/internal/taskwarrior"
 	"github.com/clobrano/wui/internal/tui/components"
 )
 
@@ -133,6 +136,9 @@ type Model struct {
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
+
+	// Calendar sync state
+	syncingBeforeQuit bool // true when syncing before quit
 }
 
 // NewModel creates a new TUI model
@@ -381,6 +387,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case CalendarSyncCompletedMsg:
+		m.isLoading = false
+		m.syncingBeforeQuit = false
+		if msg.Err != nil {
+			m.errorMessage = "Calendar sync failed: " + msg.Err.Error()
+			// Don't quit on sync error, let user see the error
+			return m, nil
+		}
+		m.statusMessage = "Calendar synced successfully"
+		// Quit after successful sync
+		return m, tea.Quit
+
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
 	}
@@ -433,6 +451,17 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Check configured keybindings
 	if m.keyMatches(keyPressed, "quit") {
+		// Check if auto-sync before quit is enabled
+		if m.config.CalendarSync != nil &&
+			m.config.CalendarSync.Enabled &&
+			m.config.CalendarSync.AutoSyncOnQuit &&
+			!m.syncingBeforeQuit {
+			// Trigger calendar sync before quitting
+			m.syncingBeforeQuit = true
+			m.isLoading = true
+			m.statusMessage = "Syncing calendar before quit..."
+			return m, calendarSyncCmd(m.config, m.service)
+		}
 		return m, tea.Quit
 	}
 
@@ -1215,4 +1244,73 @@ func exportMarkdownCmd(tasks []core.Task) tea.Cmd {
 			IsError: false,
 		}
 	}
+}
+
+// calendarSyncCmd creates a command to sync tasks to Google Calendar
+func calendarSyncCmd(cfg *config.Config, service core.TaskService) tea.Cmd {
+	return func() tea.Msg {
+		// Validate calendar configuration
+		if cfg.CalendarSync == nil {
+			return CalendarSyncCompletedMsg{
+				Err: fmt.Errorf("calendar sync not configured"),
+			}
+		}
+
+		calendarName := cfg.CalendarSync.CalendarName
+		taskFilter := cfg.CalendarSync.TaskFilter
+		credentialsPath := cfg.CalendarSync.CredentialsPath
+		tokenPath := cfg.CalendarSync.TokenPath
+
+		// Validate required fields
+		if calendarName == "" {
+			return CalendarSyncCompletedMsg{
+				Err: fmt.Errorf("calendar name is not configured"),
+			}
+		}
+		if taskFilter == "" {
+			return CalendarSyncCompletedMsg{
+				Err: fmt.Errorf("task filter is not configured"),
+			}
+		}
+
+		// We need access to the taskwarrior client to create the calendar sync client
+		// Since the service interface doesn't expose the underlying client,
+		// we need to recreate it from the config
+		// This is necessary because the calendar sync requires the taskwarrior.Client type
+		taskClient, err := createTaskClient(cfg)
+		if err != nil {
+			return CalendarSyncCompletedMsg{
+				Err: fmt.Errorf("failed to create task client: %w", err),
+			}
+		}
+
+		// Perform the calendar sync
+		err = performCalendarSync(taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+		return CalendarSyncCompletedMsg{
+			Err: err,
+		}
+	}
+}
+
+// Helper function to create taskwarrior client from config
+func createTaskClient(cfg *config.Config) (*taskwarrior.Client, error) {
+	return taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
+}
+
+// Helper function to perform calendar sync
+func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string) error {
+	ctx := context.Background()
+
+	// Create sync client
+	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+	if err != nil {
+		return fmt.Errorf("failed to create sync client: %w", err)
+	}
+
+	// Perform sync
+	if err := syncClient.Sync(ctx); err != nil {
+		return fmt.Errorf("sync failed: %w", err)
+	}
+
+	return nil
 }
