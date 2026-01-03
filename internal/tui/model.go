@@ -739,11 +739,13 @@ func (m *Model) updateComponentSizes() {
 	// Update help component size
 	m.help.SetSize(m.width, m.height)
 
-	// Calculate available height (subtract sections bar, footer, and bottom border)
+	// Calculate available height (subtract sections bar, footer, bottom border, and spacing)
+	// Note: The actual space calculation must match view.go's trimming logic
 	// - Sections bar: 1 line
 	// - Footer: 3 lines (1 pad top + 1 content + 1 pad bottom)
 	// - Bottom border: 1 line (added in renderTaskListWithComponents)
-	availableHeight := m.height - 5 // sections(1) + footer(3) + bottom border(1)
+	// - Additional spacing/margins: 2 lines (empirically determined to prevent trimming)
+	availableHeight := m.height - 7 // sections(1) + footer(3) + bottom border(1) + spacing(2)
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
