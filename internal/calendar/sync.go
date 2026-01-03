@@ -215,8 +215,8 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		event.Start = &calendar.EventDateTime{
 			DateTime: eventTime.Format(time.RFC3339),
 		}
-		// Default to 1 hour duration for timed events
-		endTime := eventTime.Add(1 * time.Hour)
+		// Default to 15 minutes duration for timed events
+		endTime := eventTime.Add(15 * time.Minute)
 		event.End = &calendar.EventDateTime{
 			DateTime: endTime.Format(time.RFC3339),
 		}
