@@ -33,11 +33,11 @@ type ClearStatusMsg struct{}
 
 // StatusBar component displays transient status messages
 type StatusBar struct {
-	width          int
-	currentMessage *StatusMessage
+	width           int
+	currentMessage  *StatusMessage
 	showKeybindings bool
-	keybindings    string
-	styles         StatusBarStyles
+	keybindings     string
+	styles          StatusBarStyles
 }
 
 // StatusBarStyles contains styling for the status bar

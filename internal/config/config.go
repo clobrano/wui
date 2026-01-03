@@ -134,6 +134,9 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 		if loaded.TUI.SidebarWidth > 0 {
 			result.TUI.SidebarWidth = loaded.TUI.SidebarWidth
 		}
+		if loaded.TUI.ScrollBuffer >= 0 {
+			result.TUI.ScrollBuffer = loaded.TUI.ScrollBuffer
+		}
 		if len(loaded.TUI.Tabs) > 0 {
 			result.TUI.Tabs = loaded.TUI.Tabs
 		}

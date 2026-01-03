@@ -43,6 +43,7 @@ type TaskList struct {
 	height         int
 	displayColumns []string // Column names to display
 	offset         int      // Scroll offset for viewport
+	scrollBuffer   int      // Number of tasks to keep visible above/below cursor
 	styles         TaskListStyles
 	emptyMessage   string // Custom message to show when list is empty
 }
@@ -75,6 +76,7 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		height:         height,
 		displayColumns: normalizedColumns,
 		offset:         0,
+		scrollBuffer:   1, // Default: keep 1 task visible above/below cursor
 		styles:         styles,
 	}
 }
@@ -111,6 +113,17 @@ func (t *TaskList) SetSize(width, height int) {
 // SetEmptyMessage sets a custom message to display when the list is empty
 func (t *TaskList) SetEmptyMessage(message string) {
 	t.emptyMessage = message
+}
+
+// SetScrollBuffer sets the number of tasks to keep visible above/below the cursor.
+// A buffer of 1 means the selected task will have at least 1 task visible above
+// and below it (when not at list boundaries). Set to 0 to disable buffering.
+func (t *TaskList) SetScrollBuffer(buffer int) {
+	if buffer < 0 {
+		buffer = 0
+	}
+	t.scrollBuffer = buffer
+	t.updateScroll()
 }
 
 // Update handles messages for the task list
@@ -195,7 +208,25 @@ func (t TaskList) itemCount() int {
 	return len(t.tasks)
 }
 
-// updateScroll adjusts the scroll offset to keep cursor visible
+// updateScroll adjusts the scroll offset to keep cursor visible with a configurable buffer.
+//
+// The scroll buffer (scrollBuffer) determines how many tasks remain visible above and below
+// the selected task when scrolling. For example, with scrollBuffer=1:
+//   - When moving down, scrolling triggers when cursor is 1 position from viewport bottom
+//   - When moving up, scrolling triggers when cursor is 1 position from viewport top
+//   - This maintains context around the selected task during navigation
+//
+// Adaptive buffer at list boundaries:
+//   - At list start: buffer below cursor is maintained, buffer above cursor is 0
+//   - At list end: buffer above cursor is maintained, buffer below cursor adapts to remaining tasks
+//   - Example: With scrollBuffer=3, when on task 18 of 20 tasks, only 1 task remains below,
+//     so the effective buffer below becomes 1 instead of 3
+//   - This prevents jarring jumps and ensures all tasks are reachable
+//   - With scrollBuffer=0: cursor can touch viewport edges (original behavior)
+//
+// Small screen handling:
+//   - Small screens (width < 80) skip headers and use 2 lines per task
+//   - visibleTasks calculation accounts for these differences
 func (t *TaskList) updateScroll() {
 	itemCount := t.itemCount()
 	if itemCount == 0 {
@@ -203,25 +234,72 @@ func (t *TaskList) updateScroll() {
 		return
 	}
 
-	visibleHeight := t.height - 2 // Subtract 2 for header rows (title + separator)
+	// Calculate visible tasks accounting for screen size
+	isSmallScreen := t.width < 80
+	headerHeight := 0
+	if !isSmallScreen {
+		headerHeight = 2 // header + separator
+	}
+	visibleHeight := t.height - headerHeight
 
-	// Cursor is above viewport
-	if t.cursor < t.offset {
-		t.offset = t.cursor
+	// Calculate how many tasks can fit in viewport
+	visibleTasks := visibleHeight
+	if isSmallScreen {
+		visibleTasks = visibleHeight / 2 // Each task takes 2 lines
 	}
 
-	// Cursor is below viewport
-	if t.cursor >= t.offset+visibleHeight {
-		t.offset = t.cursor - visibleHeight + 1
+	// Ensure we have at least 1 visible task
+	if visibleTasks < 1 {
+		visibleTasks = 1
 	}
 
-	// Don't scroll past the end
-	maxOffset := itemCount - visibleHeight
+	// Calculate max offset - cannot scroll past the last task
+	maxOffset := itemCount - visibleTasks
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
+
+	// Cursor moving up: scroll when cursor gets within buffer distance from top
+	// Unless we're already at the start of the list
+	if t.cursor < t.offset+t.scrollBuffer {
+		t.offset = t.cursor - t.scrollBuffer
+		if t.offset < 0 {
+			t.offset = 0
+		}
+	}
+
+	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
+	// Use adaptive buffer that reduces when approaching the end of the list
+	tasksBelow := itemCount - t.cursor - 1
+	effectiveBufferBelow := t.scrollBuffer
+	if tasksBelow < effectiveBufferBelow {
+		effectiveBufferBelow = tasksBelow
+		if effectiveBufferBelow < 0 {
+			effectiveBufferBelow = 0
+		}
+	}
+
+	if t.cursor >= t.offset+visibleTasks-effectiveBufferBelow-1 {
+		t.offset = t.cursor - visibleTasks + effectiveBufferBelow + 1
+	}
+
+	// Ensure cursor is always visible (safety check)
+	// This handles edge cases where buffer logic might fail
+	if t.cursor < t.offset {
+		t.offset = t.cursor
+	}
+	if t.cursor >= t.offset+visibleTasks {
+		t.offset = t.cursor - visibleTasks + 1
+	}
+
+	// Don't scroll past the end of the list
 	if t.offset > maxOffset {
 		t.offset = maxOffset
+	}
+
+	// Final safety: ensure offset is non-negative
+	if t.offset < 0 {
+		t.offset = 0
 	}
 }
 

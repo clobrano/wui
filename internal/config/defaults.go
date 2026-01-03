@@ -37,6 +37,7 @@ func DefaultCalendarSync() *CalendarSync {
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
 		SidebarWidth: 33, // Percentage of terminal width (33%)
+		ScrollBuffer: 1,  // Number of tasks to keep visible above/below cursor
 		Tabs:         DefaultTabs(),
 		Columns:      DefaultColumns(),
 		Keybindings:  DefaultKeybindings(),

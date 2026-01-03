@@ -183,6 +183,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles())
+	taskList.SetScrollBuffer(cfg.TUI.ScrollBuffer)
 
 	// Determine initial section: Search tab if --search flag provided, otherwise "Next" tab
 	initialSectionIndex := 1 // Default to "Next" tab (index 1)
@@ -738,9 +739,13 @@ func (m *Model) updateComponentSizes() {
 	// Update help component size
 	m.help.SetSize(m.width, m.height)
 
-	// Calculate available height (subtract sections bar and footer with padding)
-	// Footer has .Padding(1, 1) which adds 1 line top + 1 line bottom = 2 lines padding + 1 content = 3 total
-	availableHeight := m.height - 4 // sections(1) + footer(3: 1 pad top + 1 content + 1 pad bottom)
+	// Calculate available height (subtract sections bar, footer, bottom border, and spacing)
+	// Note: The actual space calculation must match view.go's trimming logic
+	// - Sections bar: 1 line
+	// - Footer: 3 lines (1 pad top + 1 content + 1 pad bottom)
+	// - Bottom border: 1 line (added in renderTaskListWithComponents)
+	// - Additional spacing/margins: 2 lines (empirically determined to prevent trimming)
+	availableHeight := m.height - 7 // sections(1) + footer(3) + bottom border(1) + spacing(2)
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||

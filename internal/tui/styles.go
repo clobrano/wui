@@ -25,19 +25,19 @@ type ColorScheme struct {
 	StatusCompleted lipgloss.Color
 
 	// UI element colors
-	HeaderFg       lipgloss.Color
-	FooterFg       lipgloss.Color
-	SeparatorFg    lipgloss.Color
-	SelectionBg    lipgloss.Color
-	SelectionFg    lipgloss.Color
-	SidebarBorder  lipgloss.Color
-	SidebarTitle   lipgloss.Color
-	LabelFg        lipgloss.Color
-	ValueFg        lipgloss.Color
-	DimFg          lipgloss.Color
-	ErrorFg        lipgloss.Color
-	SuccessFg      lipgloss.Color
-	TagFg          lipgloss.Color
+	HeaderFg      lipgloss.Color
+	FooterFg      lipgloss.Color
+	SeparatorFg   lipgloss.Color
+	SelectionBg   lipgloss.Color
+	SelectionFg   lipgloss.Color
+	SidebarBorder lipgloss.Color
+	SidebarTitle  lipgloss.Color
+	LabelFg       lipgloss.Color
+	ValueFg       lipgloss.Color
+	DimFg         lipgloss.Color
+	ErrorFg       lipgloss.Color
+	SuccessFg     lipgloss.Color
+	TagFg         lipgloss.Color
 
 	// Section colors
 	SectionActiveFg   lipgloss.Color
@@ -72,23 +72,23 @@ func DefaultDarkTheme() Theme {
 			StatusCompleted: lipgloss.Color("8"),  // Dim gray
 
 			// UI element colors
-			HeaderFg:       lipgloss.Color("12"),  // Bright cyan
-			FooterFg:       lipgloss.Color("246"), // Light gray (more visible)
-			SeparatorFg:    lipgloss.Color("8"),   // Dim gray
-			SelectionBg:    lipgloss.Color("12"), // Cyan background
-			SelectionFg:    lipgloss.Color("0"),  // Black foreground
-			SidebarBorder:  lipgloss.Color("8"),  // Dim gray
-			SidebarTitle:   lipgloss.Color("12"), // Bright cyan
-			LabelFg:        lipgloss.Color("12"), // Bright cyan
-			ValueFg:        lipgloss.Color("15"), // White
-			DimFg:          lipgloss.Color("8"),  // Dim gray
-			ErrorFg:        lipgloss.Color("9"),  // Red
-			SuccessFg:      lipgloss.Color("10"), // Green
-			TagFg:          lipgloss.Color("14"), // Cyan
+			HeaderFg:      lipgloss.Color("12"),  // Bright cyan
+			FooterFg:      lipgloss.Color("246"), // Light gray (more visible)
+			SeparatorFg:   lipgloss.Color("8"),   // Dim gray
+			SelectionBg:   lipgloss.Color("12"),  // Cyan background
+			SelectionFg:   lipgloss.Color("0"),   // Black foreground
+			SidebarBorder: lipgloss.Color("8"),   // Dim gray
+			SidebarTitle:  lipgloss.Color("12"),  // Bright cyan
+			LabelFg:       lipgloss.Color("12"),  // Bright cyan
+			ValueFg:       lipgloss.Color("15"),  // White
+			DimFg:         lipgloss.Color("8"),   // Dim gray
+			ErrorFg:       lipgloss.Color("9"),   // Red
+			SuccessFg:     lipgloss.Color("10"),  // Green
+			TagFg:         lipgloss.Color("14"),  // Cyan
 
 			// Section colors
-			SectionActiveFg:   lipgloss.Color("15"), // White
-			SectionActiveBg:   lipgloss.Color("63"), // Purple/blue
+			SectionActiveFg:   lipgloss.Color("15"),  // White
+			SectionActiveBg:   lipgloss.Color("63"),  // Purple/blue
 			SectionInactiveFg: lipgloss.Color("246"), // Dim
 		},
 	}
@@ -100,9 +100,9 @@ func DefaultLightTheme() Theme {
 		Name: "light",
 		Colors: ColorScheme{
 			// Priority colors
-			PriorityHigh:   lipgloss.Color("1"),  // Dark red
-			PriorityMedium: lipgloss.Color("3"),  // Dark yellow
-			PriorityLow:    lipgloss.Color("4"),  // Dark blue
+			PriorityHigh:   lipgloss.Color("1"), // Dark red
+			PriorityMedium: lipgloss.Color("3"), // Dark yellow
+			PriorityLow:    lipgloss.Color("4"), // Dark blue
 
 			// Due date colors
 			DueOverdue: lipgloss.Color("1"), // Dark red
@@ -115,19 +115,19 @@ func DefaultLightTheme() Theme {
 			StatusCompleted: lipgloss.Color("8"), // Gray
 
 			// UI element colors
-			HeaderFg:       lipgloss.Color("4"),   // Dark blue
-			FooterFg:       lipgloss.Color("240"), // Darker gray (more visible on light background)
-			SeparatorFg:    lipgloss.Color("8"),   // Gray
-			SelectionBg:    lipgloss.Color("12"),  // Light cyan
-			SelectionFg:    lipgloss.Color("0"),   // Black
-			SidebarBorder:  lipgloss.Color("8"),   // Gray
-			SidebarTitle:   lipgloss.Color("4"),   // Dark blue
-			LabelFg:        lipgloss.Color("4"),   // Dark blue
-			ValueFg:        lipgloss.Color("0"),   // Black
-			DimFg:          lipgloss.Color("8"),   // Gray
-			ErrorFg:        lipgloss.Color("1"),   // Dark red
-			SuccessFg:      lipgloss.Color("2"),   // Dark green
-			TagFg:          lipgloss.Color("6"),   // Dark cyan
+			HeaderFg:      lipgloss.Color("4"),   // Dark blue
+			FooterFg:      lipgloss.Color("240"), // Darker gray (more visible on light background)
+			SeparatorFg:   lipgloss.Color("8"),   // Gray
+			SelectionBg:   lipgloss.Color("12"),  // Light cyan
+			SelectionFg:   lipgloss.Color("0"),   // Black
+			SidebarBorder: lipgloss.Color("8"),   // Gray
+			SidebarTitle:  lipgloss.Color("4"),   // Dark blue
+			LabelFg:       lipgloss.Color("4"),   // Dark blue
+			ValueFg:       lipgloss.Color("0"),   // Black
+			DimFg:         lipgloss.Color("8"),   // Gray
+			ErrorFg:       lipgloss.Color("1"),   // Dark red
+			SuccessFg:     lipgloss.Color("2"),   // Dark green
+			TagFg:         lipgloss.Color("6"),   // Dark cyan
 
 			// Section colors
 			SectionActiveFg:   lipgloss.Color("15"),  // White

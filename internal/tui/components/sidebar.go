@@ -12,20 +12,20 @@ import (
 
 // SidebarStyles holds the styles needed for rendering the sidebar
 type SidebarStyles struct {
-	Border        lipgloss.Style
-	Title         lipgloss.Style
-	Label         lipgloss.Style
-	Value         lipgloss.Style
-	Dim           lipgloss.Style
-	PriorityHigh  lipgloss.Color
+	Border         lipgloss.Style
+	Title          lipgloss.Style
+	Label          lipgloss.Style
+	Value          lipgloss.Style
+	Dim            lipgloss.Style
+	PriorityHigh   lipgloss.Color
 	PriorityMedium lipgloss.Color
-	PriorityLow   lipgloss.Color
-	DueOverdue    lipgloss.Color
-	StatusPending lipgloss.Color
-	StatusActive  lipgloss.Color
-	StatusDone    lipgloss.Color
-	StatusWaiting lipgloss.Color
-	Tag           lipgloss.Color
+	PriorityLow    lipgloss.Color
+	DueOverdue     lipgloss.Color
+	StatusPending  lipgloss.Color
+	StatusActive   lipgloss.Color
+	StatusDone     lipgloss.Color
+	StatusWaiting  lipgloss.Color
+	Tag            lipgloss.Color
 }
 
 // Sidebar displays detailed information about a task
