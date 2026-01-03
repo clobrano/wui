@@ -183,6 +183,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles())
+	taskList.SetScrollBuffer(cfg.TUI.ScrollBuffer)
 
 	// Determine initial section: Search tab if --search flag provided, otherwise "Next" tab
 	initialSectionIndex := 1 // Default to "Next" tab (index 1)

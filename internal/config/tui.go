@@ -2,11 +2,12 @@ package config
 
 // TUIConfig contains TUI-specific configuration
 type TUIConfig struct {
-	SidebarWidth int                `yaml:"sidebar_width"`
-	Tabs         []Tab              `yaml:"tabs"`
-	Columns      []string           `yaml:"columns"`
-	Keybindings  map[string]string  `yaml:"keybindings"`
-	Theme        *Theme             `yaml:"theme"`
+	SidebarWidth int               `yaml:"sidebar_width"`
+	ScrollBuffer int               `yaml:"scroll_buffer"`
+	Tabs         []Tab             `yaml:"tabs"`
+	Columns      []string          `yaml:"columns"`
+	Keybindings  map[string]string `yaml:"keybindings"`
+	Theme        *Theme            `yaml:"theme"`
 }
 
 // Tab represents a section/tab in the UI
@@ -35,19 +36,19 @@ type Theme struct {
 	StatusCompleted string `yaml:"status_completed"`
 
 	// UI element colors
-	HeaderFg       string `yaml:"header_fg"`
-	FooterFg       string `yaml:"footer_fg"`
-	SeparatorFg    string `yaml:"separator_fg"`
-	SelectionBg    string `yaml:"selection_bg"`
-	SelectionFg    string `yaml:"selection_fg"`
-	SidebarBorder  string `yaml:"sidebar_border"`
-	SidebarTitle   string `yaml:"sidebar_title"`
-	LabelFg        string `yaml:"label_fg"`
-	ValueFg        string `yaml:"value_fg"`
-	DimFg          string `yaml:"dim_fg"`
-	ErrorFg        string `yaml:"error_fg"`
-	SuccessFg      string `yaml:"success_fg"`
-	TagFg          string `yaml:"tag_fg"`
+	HeaderFg      string `yaml:"header_fg"`
+	FooterFg      string `yaml:"footer_fg"`
+	SeparatorFg   string `yaml:"separator_fg"`
+	SelectionBg   string `yaml:"selection_bg"`
+	SelectionFg   string `yaml:"selection_fg"`
+	SidebarBorder string `yaml:"sidebar_border"`
+	SidebarTitle  string `yaml:"sidebar_title"`
+	LabelFg       string `yaml:"label_fg"`
+	ValueFg       string `yaml:"value_fg"`
+	DimFg         string `yaml:"dim_fg"`
+	ErrorFg       string `yaml:"error_fg"`
+	SuccessFg     string `yaml:"success_fg"`
+	TagFg         string `yaml:"tag_fg"`
 
 	// Section colors
 	SectionActiveFg   string `yaml:"section_active_fg"`
