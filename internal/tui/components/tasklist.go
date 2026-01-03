@@ -256,6 +256,15 @@ func (t *TaskList) updateScroll() {
 		maxOffset = 0
 	}
 
+	// Special case: if cursor is near the end of the list (within last visibleTasks positions),
+	// just show the last viewport to ensure all end tasks are visible.
+	// This prevents the scroll buffer logic from trying to maintain space below the cursor
+	// when there aren't enough tasks remaining.
+	if t.cursor >= itemCount-visibleTasks {
+		t.offset = maxOffset
+		return
+	}
+
 	// Cursor moving up: scroll when cursor gets within buffer distance from top
 	// Unless we're already at the start of the list
 	if t.cursor < t.offset+t.scrollBuffer {
