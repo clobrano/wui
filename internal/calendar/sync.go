@@ -207,12 +207,27 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		eventTime = *task.Scheduled
 	}
 
-	// Create all-day event
-	event.Start = &calendar.EventDateTime{
-		Date: eventTime.Format("2006-01-02"),
-	}
-	event.End = &calendar.EventDateTime{
-		Date: eventTime.Format("2006-01-02"),
+	// Check if the task has a specific time component (not midnight)
+	hasTime := eventTime.Hour() != 0 || eventTime.Minute() != 0 || eventTime.Second() != 0
+
+	if hasTime {
+		// Create timed event with specific time
+		event.Start = &calendar.EventDateTime{
+			DateTime: eventTime.Format(time.RFC3339),
+		}
+		// Default to 15 minutes duration for timed events
+		endTime := eventTime.Add(15 * time.Minute)
+		event.End = &calendar.EventDateTime{
+			DateTime: endTime.Format(time.RFC3339),
+		}
+	} else {
+		// Create all-day event for tasks at midnight
+		event.Start = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
+		event.End = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
 	}
 
 	// Add color based on priority
@@ -238,17 +253,42 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 		return true
 	}
 
-	// Check if the date changed
+	// Check if the date or time changed
 	// Note: Tasks without dates are filtered before reaching this function
-	var taskDate string
+	var taskTime time.Time
 	if task.Due != nil && !task.Due.IsZero() {
-		taskDate = task.Due.Format("2006-01-02")
+		taskTime = *task.Due
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
-		taskDate = task.Scheduled.Format("2006-01-02")
+		taskTime = *task.Scheduled
 	}
 
-	if event.Start != nil && taskDate != "" && event.Start.Date != taskDate {
-		return true
+	// Check if the task has a specific time component
+	hasTime := taskTime.Hour() != 0 || taskTime.Minute() != 0 || taskTime.Second() != 0
+
+	if event.Start != nil {
+		if hasTime {
+			// Compare DateTime for timed events
+			if event.Start.DateTime != "" {
+				eventStartTime, err := time.Parse(time.RFC3339, event.Start.DateTime)
+				if err == nil && !eventStartTime.Equal(taskTime) {
+					return true
+				}
+			} else if event.Start.Date != "" {
+				// Event is all-day but task has time, needs update
+				return true
+			}
+		} else {
+			// Compare Date for all-day events
+			taskDate := taskTime.Format("2006-01-02")
+			if event.Start.Date != "" {
+				if event.Start.Date != taskDate {
+					return true
+				}
+			} else if event.Start.DateTime != "" {
+				// Event is timed but task is all-day, needs update
+				return true
+			}
+		}
 	}
 
 	// Check if status changed by examining the event description
