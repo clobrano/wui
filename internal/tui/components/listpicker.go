@@ -1,6 +1,7 @@
 package components
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -97,21 +98,26 @@ func (lp ListPicker) View() string {
 	b.WriteString(titleStyle.Render(lp.title))
 	b.WriteString("\n\n")
 
-	// Filter display
+	// Filter display and item count
+	infoStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Padding(0, 1)
+
 	if lp.filter != "" {
-		filterStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Padding(0, 1)
-		b.WriteString(filterStyle.Render("Filter: " + lp.filter))
+		b.WriteString(infoStyle.Render(fmt.Sprintf("Filter: %s", lp.filter)))
 		b.WriteString("\n")
 	}
+
+	// Show count info
+	b.WriteString(infoStyle.Render(fmt.Sprintf("Showing %d of %d items", len(lp.filteredItems), len(lp.allItems))))
+	b.WriteString("\n\n")
 
 	// Items list
 	if len(lp.filteredItems) == 0 {
 		noItemsStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
 			Padding(0, 1)
-		b.WriteString(noItemsStyle.Render("No items found"))
+		b.WriteString(noItemsStyle.Render("No matches found"))
 		b.WriteString("\n")
 	} else {
 		// Calculate visible range
