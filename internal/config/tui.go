@@ -4,6 +4,7 @@ package config
 type TUIConfig struct {
 	SidebarWidth int               `yaml:"sidebar_width"`
 	ScrollBuffer int               `yaml:"scroll_buffer"`
+	InputMode    string            `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
 	Tabs         []Tab             `yaml:"tabs"`
 	Columns      []string          `yaml:"columns"`
 	Keybindings  map[string]string `yaml:"keybindings"`
