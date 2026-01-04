@@ -19,7 +19,7 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 ### From Source
 
 Requirements:
-- Go 1.21 or higher
+- Go 1.24 or higher
 - Taskwarrior 3.x
 
 ```bash
