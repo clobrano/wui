@@ -329,11 +329,11 @@ func (m Model) renderFooter() string {
 		case StateConfirm:
 			keybindings = "y: confirm | n: cancel"
 		case StateModifyInput:
-			keybindings = "enter: apply | esc: cancel | tab: date picker (after due:/scheduled:/sched:)"
+			keybindings = "enter: apply | esc: cancel | tab: date picker (after due:/scheduled:/sched:/sch:)"
 		case StateAnnotateInput:
 			keybindings = "enter: apply | esc: cancel"
 		case StateNewTaskInput:
-			keybindings = "enter: create | esc: cancel | tab: date picker (after due:/scheduled:/sched:)"
+			keybindings = "enter: create | esc: cancel | tab: date picker (after due:/scheduled:/sched:/sch:)"
 		}
 	}
 

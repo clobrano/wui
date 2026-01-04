@@ -484,7 +484,7 @@ func detectDateFieldContext(input string, cursorPos int) (string, int, bool) {
 	textBefore := input[:cursorPos]
 
 	// Look for date field keywords at the end
-	// Support: "due:", "scheduled:", "sched:"
+	// Support: "due:", "scheduled:", "sched:", "sch:"
 	dateFields := []struct {
 		keyword   string
 		fieldType string
@@ -492,6 +492,7 @@ func detectDateFieldContext(input string, cursorPos int) (string, int, bool) {
 		{"due:", "due"},
 		{"scheduled:", "scheduled"},
 		{"sched:", "scheduled"},
+		{"sch:", "scheduled"},
 	}
 
 	for _, field := range dateFields {
