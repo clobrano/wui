@@ -51,14 +51,40 @@ func (f *Filter) SetValue(value string) {
 	f.textArea.SetValue(value)
 }
 
-// SetCursor sets the cursor position
+// SetCursor sets the cursor position (moves to end for textarea)
+// Note: textarea doesn't support arbitrary position setting like textinput,
+// so we move to the end after inserting text
 func (f *Filter) SetCursor(pos int) {
-	f.textInput.SetCursor(pos)
+	// For textarea, we just move to end since we can't set arbitrary positions easily
+	f.textArea.CursorEnd()
 }
 
-// CursorPosition returns the current cursor position
+// CursorPosition returns the current cursor position as a byte offset from start
 func (f Filter) CursorPosition() int {
-	return f.textInput.Position()
+	// Calculate byte offset from line and column position
+	lines := f.textArea.Value()
+	currentLine := f.textArea.Line()
+	currentCol := f.textArea.Col()
+
+	if currentLine == 0 {
+		return currentCol
+	}
+
+	// Count bytes up to current line
+	offset := 0
+	lineNum := 0
+	for i, ch := range lines {
+		if ch == '\n' {
+			lineNum++
+			if lineNum >= currentLine {
+				// Add column position
+				return offset + 1 + currentCol
+			}
+		}
+		offset = i + 1
+	}
+
+	return offset + currentCol
 }
 
 // SetWidth sets the width of the filter input
