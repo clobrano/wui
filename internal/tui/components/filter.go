@@ -60,31 +60,13 @@ func (f *Filter) SetCursor(pos int) {
 }
 
 // CursorPosition returns the current cursor position as a byte offset from start
+// For textarea, we return the length of the text (cursor assumed at end)
+// This is a simplification since textarea doesn't expose cursor position publicly
 func (f Filter) CursorPosition() int {
-	// Calculate byte offset from line and column position
-	lines := f.textArea.Value()
-	currentLine := f.textArea.Line()
-	currentCol := f.textArea.Col()
-
-	if currentLine == 0 {
-		return currentCol
-	}
-
-	// Count bytes up to current line
-	offset := 0
-	lineNum := 0
-	for i, ch := range lines {
-		if ch == '\n' {
-			lineNum++
-			if lineNum >= currentLine {
-				// Add column position
-				return offset + 1 + currentCol
-			}
-		}
-		offset = i + 1
-	}
-
-	return offset + currentCol
+	// Since textarea doesn't expose Col() and Line() publicly,
+	// we assume the cursor is at the end of the current value
+	// This works well for the common case of typing continuously
+	return len(f.textArea.Value())
 }
 
 // SetWidth sets the width of the filter input
