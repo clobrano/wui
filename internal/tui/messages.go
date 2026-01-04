@@ -38,3 +38,10 @@ type ProjectSummaryLoadedMsg struct {
 type CalendarSyncCompletedMsg struct {
 	Err error
 }
+
+// AutocompleteDataLoadedMsg is sent when autocomplete data (projects/tags) has been loaded
+type AutocompleteDataLoadedMsg struct {
+	Projects []string
+	Tags     []string
+	Err      error
+}

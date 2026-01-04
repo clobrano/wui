@@ -274,7 +274,11 @@ func (m Model) Init() tea.Cmd {
 		filterToUse = m.searchTabFilter
 	}
 
-	return loadTasksCmd(m.service, filterToUse, isSearchTab)
+	// Load both tasks and autocomplete data in parallel
+	return tea.Batch(
+		loadTasksCmd(m.service, filterToUse, isSearchTab),
+		loadAllProjectsAndTagsCmd(m.service),
+	)
 }
 
 // Update handles messages and updates the model
@@ -334,8 +338,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.errorMessage = ""
 
-		// Update available projects and tags for autocompletion
-		m.updateAvailableProjectsAndTags()
+		// Note: Projects/tags for autocompletion are loaded separately via AutocompleteDataLoadedMsg
+		// to ensure we have ALL projects/tags, not just those in the current filtered view
 
 		// Update sidebar with all tasks for dependency lookups
 		m.sidebar.SetAllTasks(m.tasks)
@@ -394,9 +398,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.errorMessage = "" // Clear any previous error
 		m.statusMessage = "Task updated successfully"
 		m.isLoading = true
-		// Refresh tasks
+		// Refresh tasks and autocomplete data
 		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
-		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
+		return m, tea.Batch(
+			loadTasksCmd(m.service, m.activeFilter, isSearchTab),
+			loadAllProjectsAndTagsCmd(m.service),
+		)
 
 	case ErrorMsg:
 		m.errorMessage = msg.Err.Error()
@@ -425,6 +432,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.statusMessage = "Calendar synced successfully"
 		// Quit after successful sync
 		return m, tea.Quit
+
+	case AutocompleteDataLoadedMsg:
+		if msg.Err != nil {
+			// Don't show error to user, just use empty lists
+			m.availableProjects = []string{}
+			m.availableTags = []string{}
+		} else {
+			m.availableProjects = msg.Projects
+			m.availableTags = msg.Tags
+		}
+		return m, nil
 
 	case tea.KeyMsg:
 		return m.handleKeyPress(msg)
@@ -1847,7 +1865,29 @@ func extractUniqueTags(tasks []core.Task) []string {
 }
 
 // updateAvailableProjectsAndTags updates the cached lists of available projects and tags
+// This should be called with ALL tasks, not just filtered ones
 func (m *Model) updateAvailableProjectsAndTags() {
 	m.availableProjects = extractUniqueProjects(m.tasks)
 	m.availableTags = extractUniqueTags(m.tasks)
+}
+
+// loadAllProjectsAndTagsCmd creates a command to load all projects and tags for autocompletion
+// This loads from ALL tasks (status:pending) to ensure complete autocomplete lists
+func loadAllProjectsAndTagsCmd(service core.TaskService) tea.Cmd {
+	return func() tea.Msg {
+		// Get all pending tasks to extract projects/tags
+		tasks, err := service.Export("status:pending")
+		if err != nil {
+			return AutocompleteDataLoadedMsg{Err: err}
+		}
+
+		projects := extractUniqueProjects(tasks)
+		tags := extractUniqueTags(tasks)
+
+		return AutocompleteDataLoadedMsg{
+			Projects: projects,
+			Tags:     tags,
+			Err:      nil,
+		}
+	}
 }
