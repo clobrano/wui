@@ -134,6 +134,13 @@ type Model struct {
 	sections      components.Sections
 	help          components.Help
 
+	// Calendar autocompletion
+	calendar              components.Calendar
+	calendarActive        bool   // true when calendar picker is shown
+	calendarFieldType     string // "due" or "scheduled" - which field is being completed
+	calendarInsertPos     int    // position in input where date should be inserted
+	calendarInputState    AppState // which input state triggered the calendar
+
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
 
@@ -415,6 +422,30 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
+	// If calendar is active, handle calendar input
+	if m.calendarActive {
+		var cmd tea.Cmd
+
+		switch msg.String() {
+		case "enter":
+			// Select date and insert into input
+			selectedDate := m.calendar.GetSelectedDate()
+			m.insertDateFromCalendar(selectedDate)
+			m.deactivateCalendar()
+			return m, nil
+
+		case "esc":
+			// Cancel calendar
+			m.deactivateCalendar()
+			return m, nil
+
+		default:
+			// Delegate to calendar component
+			m.calendar, cmd = m.calendar.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// State-specific handling
 	switch m.state {
 	case StateNormal:
@@ -443,6 +474,91 @@ func (m Model) keyMatches(keyPressed string, action string) bool {
 	}
 	configuredKey, exists := m.config.TUI.Keybindings[action]
 	return exists && configuredKey == keyPressed
+}
+
+// detectDateFieldContext checks if cursor is positioned after a date field keyword
+// Returns (fieldType, insertPosition, found) where fieldType is "due" or "scheduled"
+func detectDateFieldContext(input string, cursorPos int) (string, int, bool) {
+	// Get text before cursor
+	textBefore := input[:cursorPos]
+
+	// Look for date field keywords at the end
+	// Support: "due:", "scheduled:", "sched:"
+	dateFields := []struct {
+		keyword   string
+		fieldType string
+	}{
+		{"due:", "due"},
+		{"scheduled:", "scheduled"},
+		{"sched:", "scheduled"},
+	}
+
+	for _, field := range dateFields {
+		if strings.HasSuffix(textBefore, field.keyword) {
+			return field.fieldType, cursorPos, true
+		}
+
+		// Also check if there's a space after the keyword and cursor is in that space
+		// e.g., "due: " with cursor after the space
+		if len(textBefore) > len(field.keyword) {
+			lastWord := ""
+			parts := strings.Fields(textBefore)
+			if len(parts) > 0 {
+				lastWord = parts[len(parts)-1]
+				if lastWord == field.keyword[:len(field.keyword)-1] {
+					// Found keyword without colon in last word, check if there's a colon after
+					afterLastWord := textBefore[strings.LastIndex(textBefore, lastWord):]
+					if strings.HasPrefix(afterLastWord, field.keyword) {
+						return field.fieldType, cursorPos, true
+					}
+				}
+			}
+		}
+	}
+
+	return "", 0, false
+}
+
+// activateCalendar activates the calendar picker for date selection
+func (m *Model) activateCalendar(fieldType string, insertPos int, inputState AppState) {
+	m.calendar = components.NewCalendar(time.Now())
+	m.calendarActive = true
+	m.calendarFieldType = fieldType
+	m.calendarInsertPos = insertPos
+	m.calendarInputState = inputState
+}
+
+// deactivateCalendar closes the calendar picker
+func (m *Model) deactivateCalendar() {
+	m.calendarActive = false
+	m.calendarFieldType = ""
+	m.calendarInsertPos = 0
+}
+
+// insertDateFromCalendar inserts the selected date into the appropriate input field
+func (m *Model) insertDateFromCalendar(selectedDate time.Time) {
+	dateStr := selectedDate.Format("2006-01-02")
+
+	var currentValue string
+	var inputComponent *components.Filter
+
+	switch m.calendarInputState {
+	case StateModifyInput:
+		inputComponent = &m.modifyInput
+		currentValue = m.modifyInput.Value()
+	case StateNewTaskInput:
+		inputComponent = &m.newTaskInput
+		currentValue = m.newTaskInput.Value()
+	default:
+		return
+	}
+
+	// Insert date at the saved position
+	newValue := currentValue[:m.calendarInsertPos] + dateStr + currentValue[m.calendarInsertPos:]
+	inputComponent.SetValue(newValue)
+
+	// Move cursor to after the inserted date
+	inputComponent.SetCursor(m.calendarInsertPos + len(dateStr))
 }
 
 // handleNormalKeys handles keys in normal state
@@ -924,6 +1040,21 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
+	case "tab":
+		// Check if cursor is after a date field keyword (due:, scheduled:, sched:)
+		currentValue := m.modifyInput.Value()
+		cursorPos := m.modifyInput.CursorPosition()
+
+		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
+			// Activate calendar picker
+			m.activateCalendar(fieldType, insertPos, StateModifyInput)
+			return m, nil
+		}
+
+		// If not in date field context, let the input handle it normally
+		m.modifyInput, cmd = m.modifyInput.Update(msg)
+		return m, cmd
+
 	default:
 		// Delegate to input component for text input
 		m.modifyInput, cmd = m.modifyInput.Update(msg)
@@ -985,6 +1116,21 @@ func (m Model) handleNewTaskKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, addTaskCmd(m.service, description)
 		}
 		return m, nil
+
+	case "tab":
+		// Check if cursor is after a date field keyword (due:, scheduled:, sched:)
+		currentValue := m.newTaskInput.Value()
+		cursorPos := m.newTaskInput.CursorPosition()
+
+		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
+			// Activate calendar picker
+			m.activateCalendar(fieldType, insertPos, StateNewTaskInput)
+			return m, nil
+		}
+
+		// If not in date field context, let the input handle it normally
+		m.newTaskInput, cmd = m.newTaskInput.Update(msg)
+		return m, cmd
 
 	default:
 		// Delegate to input component for text input

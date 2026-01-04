@@ -51,6 +51,16 @@ func (f *Filter) SetValue(value string) {
 	f.textArea.SetValue(value)
 }
 
+// SetCursor sets the cursor position
+func (f *Filter) SetCursor(pos int) {
+	f.textInput.SetCursor(pos)
+}
+
+// CursorPosition returns the current cursor position
+func (f Filter) CursorPosition() int {
+	return f.textInput.Position()
+}
+
 // SetWidth sets the width of the filter input
 func (f *Filter) SetWidth(width int) {
 	f.textArea.SetWidth(width)
