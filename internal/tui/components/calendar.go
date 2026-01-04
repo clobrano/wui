@@ -47,8 +47,8 @@ func NewCalendar(initialDate time.Time) Calendar {
 		cursorDay:    initialDate.Day(),
 		dateInput:    ti,
 		editingDate:  false,
-		width:        40,
-		height:       12,
+		width:        28, // 7 days × 4 chars per day
+		height:       10,
 	}
 }
 
@@ -179,7 +179,7 @@ func (c Calendar) View() string {
 
 	title := fmt.Sprintf("%s %d", c.currentMonth.Format("January"), c.currentMonth.Year())
 	b.WriteString(titleStyle.Render(title))
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	// Day headers (Su Mo Tu We Th Fr Sa)
 	headerStyle := lipgloss.NewStyle().
@@ -241,14 +241,13 @@ func (c Calendar) View() string {
 		b.WriteString("\n")
 	}
 
-	// Navigation hints
+	// Navigation hints (more compact)
 	b.WriteString("\n")
-	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(hintStyle.Render("B: prev month | N: next month | T: today | E: edit date\n"))
-	b.WriteString(hintStyle.Render("Arrows/hjkl: navigate | Enter: select | Esc: cancel\n"))
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Width(c.width)
+	b.WriteString(hintStyle.Render("B/N:month T:today E:edit\n"))
+	b.WriteString(hintStyle.Render("↑↓←→:nav ⏎:ok ⎋:cancel\n"))
 
 	// Date input field at bottom
-	b.WriteString("\n")
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	b.WriteString(labelStyle.Render("Date: "))
 
@@ -257,14 +256,13 @@ func (c Calendar) View() string {
 	} else {
 		dateStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 		b.WriteString(dateStyle.Render(c.selectedDate.Format("2006-01-02")))
-		b.WriteString(hintStyle.Render(" (press E to edit)"))
 	}
 
-	// Wrap in border
+	// Wrap in border with minimal padding
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("205")).
-		Padding(1, 2)
+		Padding(0, 1)
 
 	return boxStyle.Render(b.String())
 }
