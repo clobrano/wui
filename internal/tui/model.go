@@ -148,6 +148,15 @@ type Model struct {
 	timePickerInsertPos   int      // position in input where time should be inserted
 	timePickerInputState  AppState // which input state triggered the time picker
 
+	// List picker autocompletion (for projects and tags)
+	listPicker            components.ListPicker
+	listPickerActive      bool     // true when list picker is shown
+	listPickerType        string   // "project" or "tag" - which type is being completed
+	listPickerInsertPos   int      // position in input where selection should be inserted
+	listPickerInputState  AppState // which input state triggered the list picker
+	availableProjects     []string // all unique projects from loaded tasks
+	availableTags         []string // all unique tags from loaded tasks
+
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
 
@@ -325,6 +334,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.tasks = msg.Tasks
 		m.errorMessage = ""
 
+		// Update available projects and tags for autocompletion
+		m.updateAvailableProjectsAndTags()
+
 		// Update sidebar with all tasks for dependency lookups
 		m.sidebar.SetAllTasks(m.tasks)
 
@@ -476,6 +488,31 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// If list picker is active, handle list picker input
+	if m.listPickerActive {
+		var cmd tea.Cmd
+
+		switch msg.String() {
+		case "enter":
+			// Select item and insert into input
+			if m.listPicker.HasItems() {
+				m.insertSelectionFromListPicker()
+			}
+			m.deactivateListPicker()
+			return m, nil
+
+		case "esc":
+			// Cancel list picker
+			m.deactivateListPicker()
+			return m, nil
+
+		default:
+			// Delegate to list picker component
+			m.listPicker, cmd = m.listPicker.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// State-specific handling
 	switch m.state {
 	case StateNormal:
@@ -548,6 +585,78 @@ func detectDateFieldContext(input string, cursorPos int) (string, int, bool) {
 	}
 
 	return "", 0, false
+}
+
+// detectProjectFieldContext checks if cursor is positioned after a project field keyword
+// Returns (filterPrefix, insertPosition, found) where filterPrefix is what user already typed
+func detectProjectFieldContext(input string, cursorPos int) (string, int, bool) {
+	// Get text before cursor
+	textBefore := input[:cursorPos]
+
+	// Look for project field keywords
+	// Support: "project:", "proj:", "pro:"
+	projectKeywords := []string{"project:", "proj:", "pro:"}
+
+	for _, keyword := range projectKeywords {
+		// Find the keyword in the text
+		idx := strings.LastIndex(textBefore, keyword)
+		if idx == -1 {
+			continue
+		}
+
+		// Check if keyword is at a word boundary (start or after space)
+		if idx > 0 {
+			charBefore := textBefore[idx-1]
+			if charBefore != ' ' && charBefore != '\t' {
+				continue
+			}
+		}
+
+		// Extract text after the keyword up to cursor
+		afterKeyword := textBefore[idx+len(keyword):]
+
+		// Check if there's only valid project characters (no spaces or other field separators)
+		if strings.ContainsAny(afterKeyword, " \t") {
+			continue
+		}
+
+		// Return the filter prefix (what user already typed) and insert position
+		return afterKeyword, idx + len(keyword), true
+	}
+
+	return "", 0, false
+}
+
+// detectTagFieldContext checks if cursor is positioned after a tag prefix "+"
+// Returns (filterPrefix, insertPosition, found) where filterPrefix is what user already typed
+func detectTagFieldContext(input string, cursorPos int) (string, int, bool) {
+	// Get text before cursor
+	textBefore := input[:cursorPos]
+
+	// Find the last "+" in the text
+	idx := strings.LastIndex(textBefore, "+")
+	if idx == -1 {
+		return "", 0, false
+	}
+
+	// Check if "+" is at a word boundary (start or after space)
+	if idx > 0 {
+		charBefore := textBefore[idx-1]
+		if charBefore != ' ' && charBefore != '\t' {
+			return "", 0, false
+		}
+	}
+
+	// Extract text after the "+" up to cursor
+	afterPlus := textBefore[idx+1:]
+
+	// Check if there's only valid tag characters (no spaces or other separators)
+	if strings.ContainsAny(afterPlus, " \t") {
+		return "", 0, false
+	}
+
+	// Return the filter prefix (what user already typed) and insert position
+	return afterPlus, idx + 1, true
 }
 
 // activateCalendar activates the calendar picker for date selection
@@ -672,6 +781,69 @@ func (m *Model) insertTimeFromPicker() {
 
 	// Move cursor to after the inserted time
 	inputComponent.SetCursor(m.timePickerInsertPos + len(timeStr))
+}
+
+// activateListPicker activates the list picker for project or tag selection
+func (m *Model) activateListPicker(pickerType string, filter string, insertPos int, inputState AppState) {
+	var items []string
+	var title string
+
+	if pickerType == "project" {
+		items = m.availableProjects
+		title = "Projects"
+	} else if pickerType == "tag" {
+		items = m.availableTags
+		title = "Tags"
+	}
+
+	m.listPicker = components.NewListPicker(title, items, filter)
+	m.listPickerActive = true
+	m.listPickerType = pickerType
+	m.listPickerInsertPos = insertPos
+	m.listPickerInputState = inputState
+}
+
+// deactivateListPicker closes the list picker
+func (m *Model) deactivateListPicker() {
+	m.listPickerActive = false
+	m.listPickerType = ""
+	m.listPickerInsertPos = 0
+}
+
+// insertSelectionFromListPicker inserts the selected item into the appropriate input field
+func (m *Model) insertSelectionFromListPicker() {
+	selectedItem := m.listPicker.SelectedItem()
+	if selectedItem == "" {
+		return
+	}
+
+	var currentValue string
+	var inputComponent *components.Filter
+
+	switch m.listPickerInputState {
+	case StateModifyInput:
+		inputComponent = &m.modifyInput
+		currentValue = m.modifyInput.Value()
+	case StateNewTaskInput:
+		inputComponent = &m.newTaskInput
+		currentValue = m.newTaskInput.Value()
+	default:
+		return
+	}
+
+	// Find the insertion position - we need to remove any filter text that was already typed
+	// and replace it with the selected item
+
+	// Get the text before and after the insertion point
+	beforeInsert := currentValue[:m.listPickerInsertPos]
+	afterInsert := currentValue[m.listPickerInsertPos:]
+
+	// Build the new value with the selected item
+	newValue := beforeInsert + selectedItem + afterInsert
+	inputComponent.SetValue(newValue)
+
+	// Move cursor to after the inserted selection
+	inputComponent.SetCursor(m.listPickerInsertPos + len(selectedItem))
 }
 
 // handleNormalKeys handles keys in normal state
@@ -1157,21 +1329,35 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		currentValue := m.modifyInput.Value()
 		cursorPos := m.modifyInput.CursorPosition()
 
-		// First, check if cursor is after a complete date (for time picker)
+		// Check for project field context
+		if filter, insertPos, found := detectProjectFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for projects
+			m.activateListPicker("project", filter, insertPos, StateModifyInput)
+			return m, nil
+		}
+
+		// Check for tag field context
+		if filter, insertPos, found := detectTagFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for tags
+			m.activateListPicker("tag", filter, insertPos, StateModifyInput)
+			return m, nil
+		}
+
+		// Check if cursor is after a complete date (for time picker)
 		if insertPos, found := detectCompleteDateContext(currentValue, cursorPos); found {
 			// Activate time picker
 			m.activateTimePicker(insertPos, StateModifyInput)
 			return m, nil
 		}
 
-		// Otherwise, check if cursor is after a date field keyword (for calendar)
+		// Check if cursor is after a date field keyword (for calendar)
 		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
 			// Activate calendar picker
 			m.activateCalendar(fieldType, insertPos, StateModifyInput)
 			return m, nil
 		}
 
-		// If not in date field context, let the input handle it normally
+		// If not in any field context, let the input handle it normally
 		m.modifyInput, cmd = m.modifyInput.Update(msg)
 		return m, cmd
 
@@ -1241,21 +1427,35 @@ func (m Model) handleNewTaskKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		currentValue := m.newTaskInput.Value()
 		cursorPos := m.newTaskInput.CursorPosition()
 
-		// First, check if cursor is after a complete date (for time picker)
+		// Check for project field context
+		if filter, insertPos, found := detectProjectFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for projects
+			m.activateListPicker("project", filter, insertPos, StateNewTaskInput)
+			return m, nil
+		}
+
+		// Check for tag field context
+		if filter, insertPos, found := detectTagFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for tags
+			m.activateListPicker("tag", filter, insertPos, StateNewTaskInput)
+			return m, nil
+		}
+
+		// Check if cursor is after a complete date (for time picker)
 		if insertPos, found := detectCompleteDateContext(currentValue, cursorPos); found {
 			// Activate time picker
 			m.activateTimePicker(insertPos, StateNewTaskInput)
 			return m, nil
 		}
 
-		// Otherwise, check if cursor is after a date field keyword (for calendar)
+		// Check if cursor is after a date field keyword (for calendar)
 		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
 			// Activate calendar picker
 			m.activateCalendar(fieldType, insertPos, StateNewTaskInput)
 			return m, nil
 		}
 
-		// If not in date field context, let the input handle it normally
+		// If not in any field context, let the input handle it normally
 		m.newTaskInput, cmd = m.newTaskInput.Update(msg)
 		return m, cmd
 
@@ -1591,4 +1791,63 @@ func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenP
 	}
 
 	return nil
+}
+
+// extractUniqueProjects extracts all unique projects from tasks
+func extractUniqueProjects(tasks []core.Task) []string {
+	projectMap := make(map[string]bool)
+	for _, task := range tasks {
+		if task.Project != "" {
+			projectMap[task.Project] = true
+		}
+	}
+
+	projects := make([]string, 0, len(projectMap))
+	for project := range projectMap {
+		projects = append(projects, project)
+	}
+
+	// Sort alphabetically for consistent ordering
+	// Using a simple bubble sort to avoid importing sort package
+	for i := 0; i < len(projects); i++ {
+		for j := i + 1; j < len(projects); j++ {
+			if projects[i] > projects[j] {
+				projects[i], projects[j] = projects[j], projects[i]
+			}
+		}
+	}
+
+	return projects
+}
+
+// extractUniqueTags extracts all unique tags from tasks
+func extractUniqueTags(tasks []core.Task) []string {
+	tagMap := make(map[string]bool)
+	for _, task := range tasks {
+		for _, tag := range task.Tags {
+			tagMap[tag] = true
+		}
+	}
+
+	tags := make([]string, 0, len(tagMap))
+	for tag := range tagMap {
+		tags = append(tags, tag)
+	}
+
+	// Sort alphabetically for consistent ordering
+	for i := 0; i < len(tags); i++ {
+		for j := i + 1; j < len(tags); j++ {
+			if tags[i] > tags[j] {
+				tags[i], tags[j] = tags[j], tags[i]
+			}
+		}
+	}
+
+	return tags
+}
+
+// updateAvailableProjectsAndTags updates the cached lists of available projects and tags
+func (m *Model) updateAvailableProjectsAndTags() {
+	m.availableProjects = extractUniqueProjects(m.tasks)
+	m.availableTags = extractUniqueTags(m.tasks)
 }
