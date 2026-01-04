@@ -1,13 +1,13 @@
 package components
 
 import (
-	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/charmbracelet/bubbles/textarea"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 // Filter is a component for entering task filter syntax
 type Filter struct {
-	textInput    textinput.Model
+	textArea     textarea.Model
 	history      []string // History of previous filter commands
 	historyIndex int      // Current position in history (-1 means not navigating history)
 	currentInput string   // Temporary storage for current input when navigating history
@@ -15,13 +15,16 @@ type Filter struct {
 
 // NewFilter creates a new filter input component
 func NewFilter() Filter {
-	ti := textinput.New()
-	ti.Placeholder = "Enter filter (e.g., +work -waiting priority:H)"
-	ti.CharLimit = 200
-	ti.Width = 50
+	ta := textarea.New()
+	ta.Placeholder = "Type your text here..."
+	ta.CharLimit = 1000
+	ta.SetWidth(60)
+	ta.SetHeight(4)
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.CursorLine = ta.FocusedStyle.Base
 
 	return Filter{
-		textInput:    ti,
+		textArea:     ta,
 		history:      []string{},
 		historyIndex: -1,
 	}
@@ -29,39 +32,45 @@ func NewFilter() Filter {
 
 // Focus sets focus on the filter input
 func (f *Filter) Focus() tea.Cmd {
-	return f.textInput.Focus()
+	f.textArea.Focus()
+	return nil
 }
 
 // Blur removes focus from the filter input
 func (f *Filter) Blur() {
-	f.textInput.Blur()
+	f.textArea.Blur()
 }
 
 // Value returns the current filter text
 func (f Filter) Value() string {
-	return f.textInput.Value()
+	return f.textArea.Value()
 }
 
 // SetValue sets the filter text
 func (f *Filter) SetValue(value string) {
-	f.textInput.SetValue(value)
+	f.textArea.SetValue(value)
 }
 
 // SetWidth sets the width of the filter input
 func (f *Filter) SetWidth(width int) {
-	f.textInput.Width = width
+	f.textArea.SetWidth(width)
+}
+
+// SetHeight sets the height of the filter input
+func (f *Filter) SetHeight(height int) {
+	f.textArea.SetHeight(height)
 }
 
 // Update handles messages for the filter input
 func (f Filter) Update(msg tea.Msg) (Filter, tea.Cmd) {
 	var cmd tea.Cmd
-	f.textInput, cmd = f.textInput.Update(msg)
+	f.textArea, cmd = f.textArea.Update(msg)
 	return f, cmd
 }
 
 // View renders the filter input
 func (f Filter) View() string {
-	return f.textInput.View()
+	return f.textArea.View()
 }
 
 // AddToHistory adds a filter command to the history
@@ -86,7 +95,7 @@ func (f *Filter) NavigateHistoryUp() {
 
 	// If we're starting history navigation, save the current input
 	if f.historyIndex == -1 {
-		f.currentInput = f.textInput.Value()
+		f.currentInput = f.textArea.Value()
 		f.historyIndex = len(f.history)
 	}
 
@@ -101,9 +110,9 @@ func (f *Filter) NavigateHistoryUp() {
 			}
 		}
 
-		f.textInput.SetValue(f.history[f.historyIndex])
+		f.textArea.SetValue(f.history[f.historyIndex])
 		// Move cursor to end of text
-		f.textInput.SetCursor(len(f.history[f.historyIndex]))
+		f.textArea.CursorEnd()
 	}
 }
 
@@ -118,12 +127,12 @@ func (f *Filter) NavigateHistoryDown() {
 
 	if f.historyIndex >= len(f.history) {
 		// Reached the end, restore current input
-		f.textInput.SetValue(f.currentInput)
-		f.textInput.SetCursor(len(f.currentInput))
+		f.textArea.SetValue(f.currentInput)
+		f.textArea.CursorEnd()
 		f.historyIndex = -1
 	} else {
-		f.textInput.SetValue(f.history[f.historyIndex])
-		f.textInput.SetCursor(len(f.history[f.historyIndex]))
+		f.textArea.SetValue(f.history[f.historyIndex])
+		f.textArea.CursorEnd()
 	}
 }
 

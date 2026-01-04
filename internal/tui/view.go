@@ -210,11 +210,11 @@ func (m Model) renderFloatingInput(baseView string) string {
 	switch m.state {
 	case StateFilterInput:
 		title = "Filter Tasks"
-		hint = "Enter: Apply  •  Esc: Cancel"
+		hint = "Enter: Apply  •  Esc: Cancel  •  ↑↓: History"
 		inputView = m.filter.View()
 	case StateModifyInput:
 		title = "Modify Tasks"
-		hint = "Enter: Apply  •  Esc: Cancel"
+		hint = "Enter: Apply  •  Esc: Cancel  •  ↑↓: History"
 		inputView = m.modifyInput.View()
 	case StateAnnotateInput:
 		title = "Add Annotation"
