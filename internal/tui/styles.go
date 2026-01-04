@@ -142,27 +142,29 @@ type Styles struct {
 	theme Theme
 
 	// Pre-computed styles
-	Header           lipgloss.Style
-	Footer           lipgloss.Style
-	Separator        lipgloss.Style
-	Selection        lipgloss.Style
-	Normal           lipgloss.Style
-	SidebarBorder    lipgloss.Style
-	SidebarTitle     lipgloss.Style
-	Label            lipgloss.Style
-	Value            lipgloss.Style
-	Dim              lipgloss.Style
-	Error            lipgloss.Style
-	Success          lipgloss.Style
-	Tag              lipgloss.Style
-	LoadingIndicator lipgloss.Style
-	SectionActive    lipgloss.Style
-	SectionInactive  lipgloss.Style
-	SectionCount     lipgloss.Style
-	TasklistHeader   lipgloss.Style
-	GroupHeader      lipgloss.Style
-	InputPrompt      lipgloss.Style
-	InputHint        lipgloss.Style
+	Header              lipgloss.Style
+	Footer              lipgloss.Style
+	Separator           lipgloss.Style
+	Selection           lipgloss.Style
+	Normal              lipgloss.Style
+	SidebarBorder       lipgloss.Style
+	SidebarTitle        lipgloss.Style
+	Label               lipgloss.Style
+	Value               lipgloss.Style
+	Dim                 lipgloss.Style
+	Error               lipgloss.Style
+	Success             lipgloss.Style
+	Tag                 lipgloss.Style
+	LoadingIndicator    lipgloss.Style
+	SectionActive       lipgloss.Style
+	SectionInactive     lipgloss.Style
+	SectionCount        lipgloss.Style
+	TasklistHeader      lipgloss.Style
+	GroupHeader         lipgloss.Style
+	InputPrompt         lipgloss.Style
+	InputHint           lipgloss.Style
+	FloatingWindowBox   lipgloss.Style
+	FloatingWindowTitle lipgloss.Style
 }
 
 // NewStyles creates a new Styles instance with the given theme
@@ -251,6 +253,15 @@ func NewStyles(theme Theme) *Styles {
 
 	s.InputHint = lipgloss.NewStyle().
 		Foreground(theme.Colors.DimFg)
+
+	s.FloatingWindowBox = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(theme.Colors.SidebarBorder).
+		Padding(2, 4)
+
+	s.FloatingWindowTitle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(theme.Colors.HeaderFg)
 
 	return s
 }

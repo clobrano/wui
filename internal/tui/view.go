@@ -51,15 +51,37 @@ func (m Model) View() string {
 	sections = append(sections, sectionsBar)
 	sections = append(sections, content)
 
+	// Check input mode configuration
+	inputMode := m.config.TUI.InputMode
+	if inputMode == "" {
+		inputMode = "floating" // Default to floating
+	}
+
 	// Input prompt area (if in input mode)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||
 		m.state == StateAnnotateInput || m.state == StateNewTaskInput {
-		sections = append(sections, m.renderInputPrompt())
+
+		if inputMode == "floating" {
+			// Floating window will be overlaid after the base view is built
+			// Don't add to sections - it will be rendered on top
+		} else {
+			// Bottom mode - add input prompt to sections
+			sections = append(sections, m.renderInputPrompt())
+		}
 	}
 
 	sections = append(sections, footer)
 
-	return lipgloss.JoinVertical(lipgloss.Left, sections...)
+	baseView := lipgloss.JoinVertical(lipgloss.Left, sections...)
+
+	// Overlay floating window if in floating mode and input state
+	if inputMode == "floating" &&
+		(m.state == StateFilterInput || m.state == StateModifyInput ||
+			m.state == StateAnnotateInput || m.state == StateNewTaskInput) {
+		return m.renderFloatingInput(baseView)
+	}
+
+	return baseView
 }
 
 // renderHeader renders the header section
@@ -181,6 +203,71 @@ func (m Model) renderInputPrompt() string {
 		Render(content)
 }
 
+// renderFloatingInput renders the input prompt as a floating window overlaid on the base view
+func (m Model) renderFloatingInput(baseView string) string {
+	var title, hint, inputView string
+
+	switch m.state {
+	case StateFilterInput:
+		title = "Filter Tasks"
+		hint = "Enter: Apply  •  Esc: Cancel  •  ↑↓: History"
+		inputView = m.filter.View()
+	case StateModifyInput:
+		title = "Modify Tasks"
+		hint = "Enter: Apply  •  Esc: Cancel  •  ↑↓: History"
+		inputView = m.modifyInput.View()
+	case StateAnnotateInput:
+		title = "Add Annotation"
+		hint = "Enter: Apply  •  Esc: Cancel"
+		inputView = m.annotateInput.View()
+	case StateNewTaskInput:
+		title = "New Task"
+		hint = "Enter: Create  •  Esc: Cancel"
+		inputView = m.newTaskInput.View()
+	default:
+		return baseView
+	}
+
+	// Get the dimensions
+	baseHeight := lipgloss.Height(baseView)
+	baseWidth := m.width
+
+	// Build window content with input
+	windowContent := inputView
+
+	// Create the bordered window
+	windowBox := m.styles.FloatingWindowBox.Render(
+		m.styles.FloatingWindowTitle.Render(title) + "\n\n" +
+			windowContent + "\n\n" +
+			m.styles.InputHint.Render(hint),
+	)
+
+	// Calculate position (center horizontally, slightly above center vertically)
+	windowHeight := lipgloss.Height(windowBox)
+	windowWidth := lipgloss.Width(windowBox)
+
+	// Position slightly above center for better visual balance
+	verticalPos := max(0, (baseHeight-windowHeight)/2-2)
+
+	// Split base view into lines
+	baseLines := strings.Split(baseView, "\n")
+
+	// Overlay the floating window
+	// We'll replace lines at the vertical position with the window content
+	windowLines := strings.Split(windowBox, "\n")
+
+	for i, windowLine := range windowLines {
+		lineIndex := verticalPos + i
+		if lineIndex < len(baseLines) {
+			// Center the window line horizontally
+			padding := max(0, (baseWidth-windowWidth)/2)
+			baseLines[lineIndex] = strings.Repeat(" ", padding) + windowLine
+		}
+	}
+
+	return strings.Join(baseLines, "\n")
+}
+
 // renderConfirm renders the confirmation prompt
 func (m Model) renderConfirm() string {
 	message := "Confirm? (y/N)"
@@ -240,4 +327,12 @@ func (m Model) renderFooter() string {
 		Width(m.width).
 		MaxWidth(m.width).
 		Render(footer)
+}
+
+// max returns the maximum of two integers
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
