@@ -142,6 +142,12 @@ type Model struct {
 	calendarInsertPos     int    // position in input where date should be inserted
 	calendarInputState    AppState // which input state triggered the calendar
 
+	// Time picker autocompletion
+	timePicker            components.TimePicker
+	timePickerActive      bool     // true when time picker is shown
+	timePickerInsertPos   int      // position in input where time should be inserted
+	timePickerInputState  AppState // which input state triggered the time picker
+
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
 
@@ -447,6 +453,29 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// If time picker is active, handle time picker input
+	if m.timePickerActive {
+		var cmd tea.Cmd
+
+		switch msg.String() {
+		case "enter":
+			// Select time and insert into input
+			m.insertTimeFromPicker()
+			m.deactivateTimePicker()
+			return m, nil
+
+		case "esc":
+			// Cancel time picker
+			m.deactivateTimePicker()
+			return m, nil
+
+		default:
+			// Delegate to time picker component
+			m.timePicker, cmd = m.timePicker.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// State-specific handling
 	switch m.state {
 	case StateNormal:
@@ -561,6 +590,88 @@ func (m *Model) insertDateFromCalendar(selectedDate time.Time) {
 
 	// Move cursor to after the inserted date
 	inputComponent.SetCursor(m.calendarInsertPos + len(dateStr))
+}
+
+// detectCompleteDateContext checks if cursor is positioned after a complete date (YYYY-MM-DD)
+// Returns (insertPosition, found) where insertPosition is where to insert the time
+func detectCompleteDateContext(input string, cursorPos int) (int, bool) {
+	// Get text before cursor
+	textBefore := input[:cursorPos]
+
+	// Look for date pattern at the end: YYYY-MM-DD
+	// The pattern should be preceded by due:/scheduled:/sched:/sch:
+	if len(textBefore) < 10 {
+		return 0, false
+	}
+
+	// Check if the last 10 characters match YYYY-MM-DD pattern
+	last10 := textBefore[len(textBefore)-10:]
+
+	// Simple validation: check format DDDD-DD-DD where D is digit
+	if len(last10) == 10 &&
+		last10[4] == '-' && last10[7] == '-' &&
+		isDigit(last10[0]) && isDigit(last10[1]) && isDigit(last10[2]) && isDigit(last10[3]) &&
+		isDigit(last10[5]) && isDigit(last10[6]) &&
+		isDigit(last10[8]) && isDigit(last10[9]) {
+
+		// Make sure it's preceded by a date field keyword
+		if len(textBefore) > 10 {
+			before := textBefore[:len(textBefore)-10]
+			if strings.HasSuffix(before, "due:") ||
+				strings.HasSuffix(before, "scheduled:") ||
+				strings.HasSuffix(before, "sched:") ||
+				strings.HasSuffix(before, "sch:") {
+				return cursorPos, true
+			}
+		}
+	}
+
+	return 0, false
+}
+
+// isDigit checks if a byte is an ASCII digit
+func isDigit(b byte) bool {
+	return b >= '0' && b <= '9'
+}
+
+// activateTimePicker activates the time picker for time selection
+func (m *Model) activateTimePicker(insertPos int, inputState AppState) {
+	m.timePicker = components.NewTimePicker()
+	m.timePickerActive = true
+	m.timePickerInsertPos = insertPos
+	m.timePickerInputState = inputState
+}
+
+// deactivateTimePicker closes the time picker
+func (m *Model) deactivateTimePicker() {
+	m.timePickerActive = false
+	m.timePickerInsertPos = 0
+}
+
+// insertTimeFromPicker inserts the selected time into the appropriate input field
+func (m *Model) insertTimeFromPicker() {
+	timeStr := "T" + m.timePicker.GetFormattedTime()
+
+	var currentValue string
+	var inputComponent *components.Filter
+
+	switch m.timePickerInputState {
+	case StateModifyInput:
+		inputComponent = &m.modifyInput
+		currentValue = m.modifyInput.Value()
+	case StateNewTaskInput:
+		inputComponent = &m.newTaskInput
+		currentValue = m.newTaskInput.Value()
+	default:
+		return
+	}
+
+	// Insert time at the saved position (after the date)
+	newValue := currentValue[:m.timePickerInsertPos] + timeStr + currentValue[m.timePickerInsertPos:]
+	inputComponent.SetValue(newValue)
+
+	// Move cursor to after the inserted time
+	inputComponent.SetCursor(m.timePickerInsertPos + len(timeStr))
 }
 
 // handleNormalKeys handles keys in normal state
@@ -1043,10 +1154,17 @@ func (m Model) handleModifyKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "tab":
-		// Check if cursor is after a date field keyword (due:, scheduled:, sched:)
 		currentValue := m.modifyInput.Value()
 		cursorPos := m.modifyInput.CursorPosition()
 
+		// First, check if cursor is after a complete date (for time picker)
+		if insertPos, found := detectCompleteDateContext(currentValue, cursorPos); found {
+			// Activate time picker
+			m.activateTimePicker(insertPos, StateModifyInput)
+			return m, nil
+		}
+
+		// Otherwise, check if cursor is after a date field keyword (for calendar)
 		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
 			// Activate calendar picker
 			m.activateCalendar(fieldType, insertPos, StateModifyInput)
@@ -1120,10 +1238,17 @@ func (m Model) handleNewTaskKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "tab":
-		// Check if cursor is after a date field keyword (due:, scheduled:, sched:)
 		currentValue := m.newTaskInput.Value()
 		cursorPos := m.newTaskInput.CursorPosition()
 
+		// First, check if cursor is after a complete date (for time picker)
+		if insertPos, found := detectCompleteDateContext(currentValue, cursorPos); found {
+			// Activate time picker
+			m.activateTimePicker(insertPos, StateNewTaskInput)
+			return m, nil
+		}
+
+		// Otherwise, check if cursor is after a date field keyword (for calendar)
 		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
 			// Activate calendar picker
 			m.activateCalendar(fieldType, insertPos, StateNewTaskInput)
