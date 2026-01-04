@@ -51,6 +51,24 @@ func (f *Filter) SetValue(value string) {
 	f.textArea.SetValue(value)
 }
 
+// SetCursor sets the cursor position (moves to end for textarea)
+// Note: textarea doesn't support arbitrary position setting like textinput,
+// so we move to the end after inserting text
+func (f *Filter) SetCursor(pos int) {
+	// For textarea, we just move to end since we can't set arbitrary positions easily
+	f.textArea.CursorEnd()
+}
+
+// CursorPosition returns the current cursor position as a byte offset from start
+// For textarea, we return the length of the text (cursor assumed at end)
+// This is a simplification since textarea doesn't expose cursor position publicly
+func (f Filter) CursorPosition() int {
+	// Since textarea doesn't expose Col() and Line() publicly,
+	// we assume the cursor is at the end of the current value
+	// This works well for the common case of typing continuously
+	return len(f.textArea.Value())
+}
+
 // SetWidth sets the width of the filter input
 func (f *Filter) SetWidth(width int) {
 	f.textArea.SetWidth(width)

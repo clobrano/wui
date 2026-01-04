@@ -78,7 +78,39 @@ func (m Model) View() string {
 	if inputMode == "floating" &&
 		(m.state == StateFilterInput || m.state == StateModifyInput ||
 			m.state == StateAnnotateInput || m.state == StateNewTaskInput) {
-		return m.renderFloatingInput(baseView)
+		baseView = m.renderFloatingInput(baseView)
+	}
+
+	// If calendar is active, overlay it on top of everything
+	if m.calendarActive {
+		calendarView := m.calendar.View()
+
+		// Place calendar in the center of the screen as an overlay
+		baseView = lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			calendarView,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+		)
+	}
+
+	// If time picker is active, overlay it on top of everything
+	if m.timePickerActive {
+		timePickerView := m.timePicker.View()
+
+		// Place time picker in the center of the screen as an overlay
+		baseView = lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			timePickerView,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+		)
 	}
 
 	return baseView
@@ -300,21 +332,27 @@ func (m Model) renderFooter() string {
 
 	// Show keybindings based on state
 	keybindings := ""
-	switch m.state {
-	case StateNormal:
-		keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
-	case StateHelp:
-		keybindings = "?: close help"
-	case StateFilterInput:
-		keybindings = "enter: apply | esc: cancel"
-	case StateConfirm:
-		keybindings = "y: confirm | n: cancel"
-	case StateModifyInput:
-		keybindings = "enter: apply | esc: cancel"
-	case StateAnnotateInput:
-		keybindings = "enter: apply | esc: cancel"
-	case StateNewTaskInput:
-		keybindings = "enter: create | esc: cancel"
+	if m.timePickerActive {
+		keybindings = "↑↓: change value | Tab/←→: switch field | N: now | enter: select | esc: cancel"
+	} else if m.calendarActive {
+		keybindings = "B/N: prev/next month | T: today | E: edit date | arrows/hjkl: navigate | enter: select | esc: cancel"
+	} else {
+		switch m.state {
+		case StateNormal:
+			keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
+		case StateHelp:
+			keybindings = "?: close help"
+		case StateFilterInput:
+			keybindings = "enter: apply | esc: cancel"
+		case StateConfirm:
+			keybindings = "y: confirm | n: cancel"
+		case StateModifyInput:
+			keybindings = "enter: apply | esc: cancel | tab: date+time picker"
+		case StateAnnotateInput:
+			keybindings = "enter: apply | esc: cancel"
+		case StateNewTaskInput:
+			keybindings = "enter: create | esc: cancel | tab: date+time picker"
+		}
 	}
 
 	if keybindings != "" {
