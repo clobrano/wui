@@ -48,7 +48,7 @@ func NewCalendar(initialDate time.Time) Calendar {
 		dateInput:    ti,
 		editingDate:  false,
 		width:        28, // 7 days × 4 chars per day
-		height:       10,
+		height:       11,
 	}
 }
 
@@ -241,11 +241,12 @@ func (c Calendar) View() string {
 		b.WriteString("\n")
 	}
 
-	// Navigation hints (compact, within width)
+	// Navigation hints
 	b.WriteString("\n")
 	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	b.WriteString(hintStyle.Render("B/N:◀▶ T:⊙ E:✎\n"))
-	b.WriteString(hintStyle.Render("hjkl/↑↓←→ ⏎:ok ⎋:✗\n"))
+	b.WriteString(hintStyle.Render("B/N:month ↑↓←→:day\n"))
+	b.WriteString(hintStyle.Render("T:today E:edit\n"))
+	b.WriteString(hintStyle.Render("⏎:select ⎋:cancel\n"))
 
 	// Date input field at bottom
 	b.WriteString("\n")
