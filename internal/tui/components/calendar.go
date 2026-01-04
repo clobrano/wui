@@ -241,13 +241,14 @@ func (c Calendar) View() string {
 		b.WriteString("\n")
 	}
 
-	// Navigation hints (more compact)
+	// Navigation hints (compact, within width)
 	b.WriteString("\n")
-	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Width(c.width)
-	b.WriteString(hintStyle.Render("B/N:month T:today E:edit\n"))
-	b.WriteString(hintStyle.Render("↑↓←→:nav ⏎:ok ⎋:cancel\n"))
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	b.WriteString(hintStyle.Render("B/N:◀▶ T:⊙ E:✎\n"))
+	b.WriteString(hintStyle.Render("hjkl/↑↓←→ ⏎:ok ⎋:✗\n"))
 
 	// Date input field at bottom
+	b.WriteString("\n")
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	b.WriteString(labelStyle.Render("Date: "))
 
