@@ -153,6 +153,7 @@ type Model struct {
 	listPickerActive      bool     // true when list picker is shown
 	listPickerType        string   // "project" or "tag" - which type is being completed
 	listPickerInsertPos   int      // position in input where selection should be inserted
+	listPickerFilterPrefix string  // the partial text that was typed before TAB (needs to be removed)
 	listPickerInputState  AppState // which input state triggered the list picker
 	availableProjects     []string // all unique projects from loaded tasks
 	availableTags         []string // all unique tags from loaded tasks
@@ -818,6 +819,7 @@ func (m *Model) activateListPicker(pickerType string, filter string, insertPos i
 	m.listPickerActive = true
 	m.listPickerType = pickerType
 	m.listPickerInsertPos = insertPos
+	m.listPickerFilterPrefix = filter
 	m.listPickerInputState = inputState
 }
 
@@ -826,6 +828,7 @@ func (m *Model) deactivateListPicker() {
 	m.listPickerActive = false
 	m.listPickerType = ""
 	m.listPickerInsertPos = 0
+	m.listPickerFilterPrefix = ""
 }
 
 // insertSelectionFromListPicker inserts the selected item into the appropriate input field
@@ -855,6 +858,12 @@ func (m *Model) insertSelectionFromListPicker() {
 	// Get the text before and after the insertion point
 	beforeInsert := currentValue[:m.listPickerInsertPos]
 	afterInsert := currentValue[m.listPickerInsertPos:]
+
+	// Remove the filter prefix from afterInsert if it starts with it
+	// This prevents duplication like "+G" + "GA" + "G" = "+GAG"
+	if m.listPickerFilterPrefix != "" && strings.HasPrefix(afterInsert, m.listPickerFilterPrefix) {
+		afterInsert = afterInsert[len(m.listPickerFilterPrefix):]
+	}
 
 	// Build the new value with the selected item
 	newValue := beforeInsert + selectedItem + afterInsert
