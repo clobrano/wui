@@ -169,10 +169,75 @@ tui:
     filter: "/"
     refresh: r
 
-  # Theme (dark or light)
+  # Theme customization
+  # Use predefined themes ("dark" or "light") or customize colors
   theme:
+    # Theme name: "dark", "light", or any custom name
+    # Predefined themes provide sensible defaults for dark/light terminals
     name: dark
+
+    # All color fields are optional - only specify what you want to customize
+    # Colors use ANSI color codes (0-255) or standard names (e.g., "9" for red)
+    # If omitted, the predefined theme's defaults are used
+
+    # Priority colors (for tasks marked H, M, L)
+    # priority_high: "9"      # High priority tasks (default: red)
+    # priority_medium: "11"   # Medium priority tasks (default: yellow)
+    # priority_low: "12"      # Low priority tasks (default: blue)
+
+    # Due date colors (based on urgency)
+    # due_overdue: "9"        # Overdue tasks (default: red)
+    # due_today: "11"         # Tasks due today (default: yellow)
+    # due_soon: "11"          # Tasks due soon (default: yellow)
+
+    # Status colors
+    # status_active: "15"     # Active/pending tasks (default: white/black)
+    # status_waiting: "8"     # Waiting tasks (default: gray)
+    # status_completed: "8"   # Completed tasks (default: gray, with strikethrough)
+
+    # UI element colors
+    # header_fg: "12"         # Header text (default: cyan)
+    # footer_fg: "246"        # Footer text (default: light/dark gray)
+    # separator_fg: "8"       # Separators between columns (default: gray)
+    # selection_bg: "12"      # Background of selected task (default: cyan)
+    # selection_fg: "0"       # Foreground of selected task (default: black)
+    # sidebar_border: "8"     # Sidebar border (default: gray)
+    # sidebar_title: "12"     # Sidebar title (default: cyan)
+    # label_fg: "12"          # Field labels in sidebar (default: cyan)
+    # value_fg: "15"          # Field values in sidebar (default: white/black)
+    # dim_fg: "8"             # Dimmed text (default: gray)
+    # error_fg: "9"           # Error messages (default: red)
+    # success_fg: "10"        # Success messages (default: green)
+    # tag_fg: "14"            # Task tags (default: cyan)
+
+    # Section/tab colors
+    # section_active_fg: "15"   # Active tab foreground (default: white)
+    # section_active_bg: "63"   # Active tab background (default: purple/blue)
+    # section_inactive_fg: "246" # Inactive tab foreground (default: gray)
 ```
+
+### Theme Customization Examples
+
+**Use a predefined theme:**
+```yaml
+theme:
+  name: dark  # or "light"
+```
+
+**Customize specific colors while using a base theme:**
+```yaml
+theme:
+  name: dark
+  priority_high: "196"      # Brighter red
+  selection_bg: "33"        # Different blue
+  header_fg: "10"           # Green header
+```
+
+**Color values:**
+- ANSI color codes: Numbers 0-255 (e.g., "9" for red, "12" for cyan)
+- Standard colors: 0-15 work across all terminals
+- Extended colors: 16-255 require 256-color terminal support
+- See [ANSI color codes](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) for reference
 
 ## CLI Flags
 
