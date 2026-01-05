@@ -170,10 +170,14 @@ tui:
     refresh: r
 
   # Theme customization
-  # Use predefined themes ("dark" or "light") or customize colors
   theme:
-    # Theme name: "dark", "light", or any custom name
-    # Predefined themes provide sensible defaults for dark/light terminals
+    # Theme name determines which base color palette to start from:
+    # - "dark" (or omitted): Uses dark theme defaults (cyan/white on dark background)
+    # - "light": Uses light theme defaults (dark blue/black on light background)
+    # - Any other name: Uses "dark" as base (e.g., "custom", "myTheme")
+    #
+    # The name ONLY selects the starting palette. To customize colors,
+    # specify color fields below - they override the base theme's defaults.
     name: dark
 
     # All color fields are optional - only specify what you want to customize
@@ -218,20 +222,36 @@ tui:
 
 ### Theme Customization Examples
 
-**Use a predefined theme:**
-```yaml
-theme:
-  name: dark  # or "light"
-```
-
-**Customize specific colors while using a base theme:**
+**Use the dark theme (default):**
 ```yaml
 theme:
   name: dark
-  priority_high: "196"      # Brighter red
-  selection_bg: "33"        # Different blue
-  header_fg: "10"           # Green header
 ```
+
+**Use the light theme:**
+```yaml
+theme:
+  name: light
+```
+
+**Customize specific colors on top of dark theme:**
+```yaml
+theme:
+  name: dark              # Start with dark theme as base
+  priority_high: "196"    # Override: use brighter red
+  selection_bg: "33"      # Override: use different blue
+  header_fg: "10"         # Override: use green headers
+```
+
+**Create a "custom" theme (still uses dark as base):**
+```yaml
+theme:
+  name: mycustom          # Any name other than "dark"/"light" uses dark as base
+  priority_high: "196"    # You must specify color overrides yourself
+  selection_bg: "33"      # The name alone doesn't provide different colors
+```
+
+**Important:** The `name` field only chooses between two built-in palettes ("dark" or "light"). Any other name uses "dark" as the base. To actually customize colors, you must specify the individual color fields.
 
 **Color values:**
 - ANSI color codes: Numbers 0-255 (e.g., "9" for red, "12" for cyan)
