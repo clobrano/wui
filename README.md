@@ -6,13 +6,13 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 
 - **Intuitive keyboard-driven interface** - Navigate and manage tasks efficiently without touching the mouse
 - **Multiple views** - Next, Waiting, Projects, Tags, and custom filtered views
-- **Detailed task sidebar** - View all task metadata, annotations, dependencies, and UDAs
+- **Detailed task sidebar** - View all task metadata, annotations, and dependencies
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
-- **Rich task metadata** - Full support for priorities, dates, dependencies, recurrence, and custom UDAs
+- **Rich task metadata** - Full support for priorities, dates, dependencies, and recurrence
 - **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
 - **Configurable** - Customize keybindings, colors, columns, and fully customize tabs/sections
-- **Respects Taskwarrior config** - Reads your `.taskrc` for UDAs, contexts, and settings
+- **Respects Taskwarrior config** - Reads your `.taskrc` for contexts and settings
 
 ## Installation
 
@@ -169,10 +169,95 @@ tui:
     filter: "/"
     refresh: r
 
-  # Theme (dark or light)
+  # Theme customization
   theme:
+    # Theme name determines which base color palette to start from:
+    # - "dark" (or omitted): Uses dark theme defaults (cyan/white on dark background)
+    # - "light": Uses light theme defaults (dark blue/black on light background)
+    # - Any other name: Uses "dark" as base (e.g., "custom", "myTheme")
+    #
+    # The name ONLY selects the starting palette. To customize colors,
+    # specify color fields below - they override the base theme's defaults.
     name: dark
+
+    # All color fields are optional - only specify what you want to customize
+    # Colors use ANSI color codes (0-255) or standard names (e.g., "9" for red)
+    # If omitted, the predefined theme's defaults are used
+
+    # Priority colors (for tasks marked H, M, L)
+    # priority_high: "9"      # High priority tasks (default: red)
+    # priority_medium: "11"   # Medium priority tasks (default: yellow)
+    # priority_low: "12"      # Low priority tasks (default: blue)
+
+    # Due date colors (based on urgency)
+    # due_overdue: "9"        # Overdue tasks (default: red)
+    # due_today: "11"         # Tasks due today (default: yellow)
+    # due_soon: "11"          # Tasks due soon (default: yellow)
+
+    # Status colors
+    # status_active: "15"     # Active/pending tasks (default: white/black)
+    # status_waiting: "8"     # Waiting tasks (default: gray)
+    # status_completed: "8"   # Completed tasks (default: gray, with strikethrough)
+
+    # UI element colors
+    # header_fg: "12"         # Header text (default: cyan)
+    # footer_fg: "246"        # Footer text (default: light/dark gray)
+    # separator_fg: "8"       # Separators between columns (default: gray)
+    # selection_bg: "12"      # Background of selected task (default: cyan)
+    # selection_fg: "0"       # Foreground of selected task (default: black)
+    # sidebar_border: "8"     # Sidebar border (default: gray)
+    # sidebar_title: "12"     # Sidebar title (default: cyan)
+    # label_fg: "12"          # Field labels in sidebar (default: cyan)
+    # value_fg: "15"          # Field values in sidebar (default: white/black)
+    # dim_fg: "8"             # Dimmed text (default: gray)
+    # error_fg: "9"           # Error messages (default: red)
+    # success_fg: "10"        # Success messages (default: green)
+    # tag_fg: "14"            # Task tags (default: cyan)
+
+    # Section/tab colors
+    # section_active_fg: "15"   # Active tab foreground (default: white)
+    # section_active_bg: "63"   # Active tab background (default: purple/blue)
+    # section_inactive_fg: "246" # Inactive tab foreground (default: gray)
 ```
+
+### Theme Customization Examples
+
+**Use the dark theme (default):**
+```yaml
+theme:
+  name: dark
+```
+
+**Use the light theme:**
+```yaml
+theme:
+  name: light
+```
+
+**Customize specific colors on top of dark theme:**
+```yaml
+theme:
+  name: dark              # Start with dark theme as base
+  priority_high: "196"    # Override: use brighter red
+  selection_bg: "33"      # Override: use different blue
+  header_fg: "10"         # Override: use green headers
+```
+
+**Create a "custom" theme (still uses dark as base):**
+```yaml
+theme:
+  name: mycustom          # Any name other than "dark"/"light" uses dark as base
+  priority_high: "196"    # You must specify color overrides yourself
+  selection_bg: "33"      # The name alone doesn't provide different colors
+```
+
+**Important:** The `name` field only chooses between two built-in palettes ("dark" or "light"). Any other name uses "dark" as the base. To actually customize colors, you must specify the individual color fields.
+
+**Color values:**
+- ANSI color codes: Numbers 0-255 (e.g., "9" for red, "12" for cyan)
+- Standard colors: 0-15 work across all terminals
+- Extended colors: 16-255 require 256-color terminal support
+- See [ANSI color codes](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) for reference
 
 ## CLI Flags
 
@@ -332,7 +417,6 @@ wui is inspired by [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui
 - Modern bubbletea framework vs termbox
 - Written in Go vs Rust
 - Focus on speed and simplicity
-- Better UDA support
 - Grouped views (Projects/Tags)
 - Fully customizable tabs
 
