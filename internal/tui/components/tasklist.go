@@ -731,7 +731,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	// Apply status-based styling
 	var lineStyle lipgloss.Style
 
-	if isMultiSelected {
+	if isCursor || isMultiSelected {
 		lineStyle = t.styles.Selection
 	} else {
 		// Apply status styling based on task status
@@ -825,7 +825,7 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 
 	// Apply status-based styling to both lines
 	var lineStyle lipgloss.Style
-	if isMultiSelected {
+	if isCursor || isMultiSelected {
 		lineStyle = t.styles.Selection
 	} else {
 		lineStyle = lipgloss.NewStyle()
