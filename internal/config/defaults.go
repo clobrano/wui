@@ -148,8 +148,8 @@ func DefaultTheme() *Theme {
 		HeaderFg:      "12", // Bright cyan
 		FooterFg:      "8",  // Dim gray
 		SeparatorFg:   "8",  // Dim gray
-		SelectionBg:   "12", // Cyan
-		SelectionFg:   "0",  // Black
+		SelectionBg:   "250", // Light gray
+		SelectionFg:   "16",  // Dark gray
 		SidebarBorder: "8",  // Dim gray
 		SidebarTitle:  "12", // Bright cyan
 		LabelFg:       "12", // Bright cyan

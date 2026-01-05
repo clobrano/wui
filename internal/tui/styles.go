@@ -75,8 +75,8 @@ func DefaultDarkTheme() Theme {
 			HeaderFg:      lipgloss.Color("12"),  // Bright cyan
 			FooterFg:      lipgloss.Color("246"), // Light gray (more visible)
 			SeparatorFg:   lipgloss.Color("8"),   // Dim gray
-			SelectionBg:   lipgloss.Color("12"),  // Cyan background
-			SelectionFg:   lipgloss.Color("0"),   // Black foreground
+			SelectionBg:   lipgloss.Color("250"), // Light gray background
+			SelectionFg:   lipgloss.Color("16"),  // Dark gray foreground
 			SidebarBorder: lipgloss.Color("8"),   // Dim gray
 			SidebarTitle:  lipgloss.Color("12"),  // Bright cyan
 			LabelFg:       lipgloss.Color("12"),  // Bright cyan
