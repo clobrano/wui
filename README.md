@@ -6,13 +6,13 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 
 - **Intuitive keyboard-driven interface** - Navigate and manage tasks efficiently without touching the mouse
 - **Multiple views** - Next, Waiting, Projects, Tags, and custom filtered views
-- **Detailed task sidebar** - View all task metadata, annotations, dependencies, and UDAs
+- **Detailed task sidebar** - View all task metadata, annotations, and dependencies
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
-- **Rich task metadata** - Full support for priorities, dates, dependencies, recurrence, and custom UDAs
+- **Rich task metadata** - Full support for priorities, dates, dependencies, and recurrence
 - **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
 - **Configurable** - Customize keybindings, colors, columns, and fully customize tabs/sections
-- **Respects Taskwarrior config** - Reads your `.taskrc` for UDAs, contexts, and settings
+- **Respects Taskwarrior config** - Reads your `.taskrc` for contexts and settings
 
 ## Installation
 
@@ -332,7 +332,6 @@ wui is inspired by [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui
 - Modern bubbletea framework vs termbox
 - Written in Go vs Rust
 - Focus on speed and simplicity
-- Better UDA support
 - Grouped views (Projects/Tags)
 - Fully customizable tabs
 
