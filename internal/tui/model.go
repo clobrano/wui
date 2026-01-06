@@ -136,27 +136,27 @@ type Model struct {
 	help          components.Help
 
 	// Calendar autocompletion
-	calendar              components.Calendar
-	calendarActive        bool   // true when calendar picker is shown
-	calendarFieldType     string // "due" or "scheduled" - which field is being completed
-	calendarInsertPos     int    // position in input where date should be inserted
-	calendarInputState    AppState // which input state triggered the calendar
+	calendar           components.Calendar
+	calendarActive     bool     // true when calendar picker is shown
+	calendarFieldType  string   // "due" or "scheduled" - which field is being completed
+	calendarInsertPos  int      // position in input where date should be inserted
+	calendarInputState AppState // which input state triggered the calendar
 
 	// Time picker autocompletion
-	timePicker            components.TimePicker
-	timePickerActive      bool     // true when time picker is shown
-	timePickerInsertPos   int      // position in input where time should be inserted
-	timePickerInputState  AppState // which input state triggered the time picker
+	timePicker           components.TimePicker
+	timePickerActive     bool     // true when time picker is shown
+	timePickerInsertPos  int      // position in input where time should be inserted
+	timePickerInputState AppState // which input state triggered the time picker
 
 	// List picker autocompletion (for projects and tags)
-	listPicker            components.ListPicker
-	listPickerActive      bool     // true when list picker is shown
-	listPickerType        string   // "project" or "tag" - which type is being completed
-	listPickerInsertPos   int      // position in input where selection should be inserted
-	listPickerFilterPrefix string  // the partial text that was typed before TAB (needs to be removed)
-	listPickerInputState  AppState // which input state triggered the list picker
-	availableProjects     []string // all unique projects from loaded tasks
-	availableTags         []string // all unique tags from loaded tasks
+	listPicker             components.ListPicker
+	listPickerActive       bool     // true when list picker is shown
+	listPickerType         string   // "project" or "tag" - which type is being completed
+	listPickerInsertPos    int      // position in input where selection should be inserted
+	listPickerFilterPrefix string   // the partial text that was typed before TAB (needs to be removed)
+	listPickerInputState   AppState // which input state triggered the list picker
+	availableProjects      []string // all unique projects from loaded tasks
+	availableTags          []string // all unique tags from loaded tasks
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -708,6 +708,9 @@ func (m *Model) insertDateFromCalendar(selectedDate time.Time) {
 	case StateNewTaskInput:
 		inputComponent = &m.newTaskInput
 		currentValue = m.newTaskInput.Value()
+	case StateFilterInput:
+		inputComponent = &m.filter
+		currentValue = m.filter.Value()
 	default:
 		return
 	}
@@ -790,6 +793,9 @@ func (m *Model) insertTimeFromPicker() {
 	case StateNewTaskInput:
 		inputComponent = &m.newTaskInput
 		currentValue = m.newTaskInput.Value()
+	case StateFilterInput:
+		inputComponent = &m.filter
+		currentValue = m.filter.Value()
 	default:
 		return
 	}
@@ -848,6 +854,9 @@ func (m *Model) insertSelectionFromListPicker() {
 	case StateNewTaskInput:
 		inputComponent = &m.newTaskInput
 		currentValue = m.newTaskInput.Value()
+	case StateFilterInput:
+		inputComponent = &m.filter
+		currentValue = m.filter.Value()
 	default:
 		return
 	}
@@ -1278,6 +1287,42 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Navigate to next command in history
 		m.filter.NavigateHistoryDown()
 		return m, nil
+
+	case "tab":
+		currentValue := m.filter.Value()
+		cursorPos := m.filter.CursorPosition()
+
+		// Check for project field context
+		if filter, insertPos, found := detectProjectFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for projects
+			m.activateListPicker("project", filter, insertPos, StateFilterInput)
+			return m, nil
+		}
+
+		// Check for tag field context
+		if filter, insertPos, found := detectTagFieldContext(currentValue, cursorPos); found {
+			// Activate list picker for tags
+			m.activateListPicker("tag", filter, insertPos, StateFilterInput)
+			return m, nil
+		}
+
+		// Check if cursor is after a complete date (for time picker)
+		if insertPos, found := detectCompleteDateContext(currentValue, cursorPos); found {
+			// Activate time picker
+			m.activateTimePicker(insertPos, StateFilterInput)
+			return m, nil
+		}
+
+		// Check if cursor is after a date field keyword (for calendar)
+		if fieldType, insertPos, found := detectDateFieldContext(currentValue, cursorPos); found {
+			// Activate calendar picker
+			m.activateCalendar(fieldType, insertPos, StateFilterInput)
+			return m, nil
+		}
+
+		// If not in any field context, let the input handle it normally
+		m.filter, cmd = m.filter.Update(msg)
+		return m, cmd
 
 	default:
 		// When user types, reset history navigation
