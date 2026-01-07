@@ -237,6 +237,48 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		event.ColorId = "5" // Yellow for medium priority
 	}
 
+	// Set notification based on scheduled field
+	if task.Scheduled != nil && !task.Scheduled.IsZero() {
+		var reminderMinutes int64
+		var hasWarning bool
+
+		if task.Due != nil && !task.Due.IsZero() {
+			// Both scheduled and due exist
+			timeDiff := task.Due.Sub(*task.Scheduled)
+
+			if timeDiff > 0 {
+				// Scheduled is before due - normal case
+				// Set notification at scheduled time (time difference before the event)
+				reminderMinutes = int64(timeDiff.Minutes())
+			} else {
+				// Scheduled is after or equal to due - warning case
+				hasWarning = true
+				// Still set a notification at a default time
+				reminderMinutes = 15
+			}
+		} else {
+			// Only scheduled exists (event time is based on scheduled)
+			// Set a default notification
+			reminderMinutes = 15
+		}
+
+		// Add warning to description if scheduled is after due
+		if hasWarning {
+			event.Description = event.Description + "\n\n⚠️ WARNING: Scheduled time is after due time!"
+		}
+
+		// Set the reminder
+		event.Reminders = &calendar.EventReminders{
+			UseDefault: false,
+			Overrides: []*calendar.EventReminder{
+				{
+					Method:  "popup",
+					Minutes: reminderMinutes,
+				},
+			},
+		}
+	}
+
 	return event
 }
 
@@ -319,6 +361,43 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	if expectedColorId != "" && event.ColorId != expectedColorId {
 		return true
+	}
+
+	// Check if reminder/notification changed based on scheduled field
+	if task.Scheduled != nil && !task.Scheduled.IsZero() {
+		var expectedReminderMinutes int64
+
+		if task.Due != nil && !task.Due.IsZero() {
+			timeDiff := task.Due.Sub(*task.Scheduled)
+			if timeDiff > 0 {
+				expectedReminderMinutes = int64(timeDiff.Minutes())
+			} else {
+				expectedReminderMinutes = 15
+			}
+		} else {
+			expectedReminderMinutes = 15
+		}
+
+		// Check if event has reminders set correctly
+		if event.Reminders == nil || event.Reminders.UseDefault {
+			// Event doesn't have custom reminders but should
+			return true
+		}
+
+		if len(event.Reminders.Overrides) == 0 {
+			// Event has no reminder overrides but should
+			return true
+		}
+
+		// Check if the reminder minutes match
+		if event.Reminders.Overrides[0].Minutes != expectedReminderMinutes {
+			return true
+		}
+	} else {
+		// Task has no scheduled time, event shouldn't have custom reminders
+		if event.Reminders != nil && !event.Reminders.UseDefault && len(event.Reminders.Overrides) > 0 {
+			return true
+		}
 	}
 
 	return false
