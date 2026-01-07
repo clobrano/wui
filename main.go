@@ -311,11 +311,22 @@ func runSync() error {
 	}
 
 	// Perform sync
-	if err := syncClient.Sync(ctx); err != nil {
+	result, err := syncClient.Sync(ctx)
+	if err != nil {
 		slog.Error("Sync failed", "error", err)
 		return fmt.Errorf("sync failed: %w", err)
 	}
 
-	slog.Info("Sync completed successfully")
+	slog.Info("Sync completed successfully", "created", result.Created, "updated", result.Updated)
+
+	// Print warnings if any (for TUI mode when output might be lost)
+	if len(result.Warnings) > 0 {
+		fmt.Println("\n========================================")
+		for _, warning := range result.Warnings {
+			fmt.Printf("⚠️  WARNING: %s\n", warning)
+		}
+		fmt.Println("========================================")
+	}
+
 	return nil
 }

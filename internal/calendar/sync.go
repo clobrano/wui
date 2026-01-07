@@ -36,14 +36,27 @@ func NewSyncClient(ctx context.Context, taskClient *taskwarrior.Client, credenti
 	}, nil
 }
 
+// SyncResult contains the results of a sync operation
+type SyncResult struct {
+	Total    int
+	Created  int
+	Updated  int
+	Skipped  int
+	Warnings []string
+}
+
 // Sync performs the synchronization from Taskwarrior to Google Calendar
-func (s *SyncClient) Sync(ctx context.Context) error {
+func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 	slog.Info("Starting sync", "calendar", s.calendarName, "filter", s.taskFilter)
+
+	result := &SyncResult{
+		Warnings: make([]string, 0),
+	}
 
 	// Get the calendar ID by name
 	calendarID, err := s.findCalendarByName(ctx, s.calendarName)
 	if err != nil {
-		return fmt.Errorf("failed to find calendar: %w", err)
+		return nil, fmt.Errorf("failed to find calendar: %w", err)
 	}
 
 	slog.Info("Found calendar", "id", calendarID, "name", s.calendarName)
@@ -51,7 +64,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// Get tasks from Taskwarrior
 	tasks, err := s.taskClient.Export(s.taskFilter)
 	if err != nil {
-		return fmt.Errorf("failed to get tasks: %w", err)
+		return nil, fmt.Errorf("failed to get tasks: %w", err)
 	}
 
 	slog.Info("Retrieved tasks", "count", len(tasks))
@@ -59,7 +72,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// Get existing events from calendar
 	existingEvents, err := s.getCalendarEvents(ctx, calendarID)
 	if err != nil {
-		return fmt.Errorf("failed to get calendar events: %w", err)
+		return nil, fmt.Errorf("failed to get calendar events: %w", err)
 	}
 
 	slog.Info("Retrieved existing calendar events", "count", len(existingEvents))
@@ -76,6 +89,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	created := 0
 	updated := 0
 	skipped := 0
+	warnings := 0
 	for _, task := range tasks {
 		// Skip tasks without due date or scheduled date
 		if (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero()) {
@@ -84,14 +98,61 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 			continue
 		}
 
+		// Check if scheduled is after due and log warning
+		if task.Scheduled != nil && !task.Scheduled.IsZero() && task.Due != nil && !task.Due.IsZero() {
+			if task.Scheduled.After(*task.Due) || task.Scheduled.Equal(*task.Due) {
+				warningMsg := fmt.Sprintf("Task '%s' has scheduled time (%s) after due time (%s)",
+					task.Description,
+					task.Scheduled.Format("2006-01-02 15:04"),
+					task.Due.Format("2006-01-02 15:04"))
+				slog.Warn("Task has scheduled time after or equal to due time",
+					"uuid", task.UUID,
+					"description", task.Description,
+					"scheduled", task.Scheduled.Format("2006-01-02 15:04:05"),
+					"due", task.Due.Format("2006-01-02 15:04:05"))
+				fmt.Printf("⚠️  WARNING: %s\n", warningMsg)
+				result.Warnings = append(result.Warnings, warningMsg)
+				warnings++
+			}
+		}
+
 		if existingEvent, exists := eventMap[task.UUID]; exists {
 			// Update existing event
-			if s.shouldUpdateEvent(task, existingEvent) {
+			slog.Info("Found existing event for task",
+				"uuid", task.UUID,
+				"description", task.Description,
+				"task_due", task.Due,
+				"task_scheduled", task.Scheduled)
+
+			// Log event details
+			slog.Info("Existing event details",
+				"uuid", task.UUID,
+				"event_summary", existingEvent.Summary,
+				"event_start", existingEvent.Start,
+				"event_has_reminders", existingEvent.Reminders != nil,
+				"event_reminders_use_default", existingEvent.Reminders != nil && existingEvent.Reminders.UseDefault)
+
+			if existingEvent.Reminders != nil && len(existingEvent.Reminders.Overrides) > 0 {
+				slog.Info("Event reminder details",
+					"uuid", task.UUID,
+					"reminder_minutes", existingEvent.Reminders.Overrides[0].Minutes,
+					"reminder_method", existingEvent.Reminders.Overrides[0].Method)
+			}
+
+			needsUpdate := s.shouldUpdateEvent(task, existingEvent)
+			slog.Info("Update check result",
+				"uuid", task.UUID,
+				"description", task.Description,
+				"needs_update", needsUpdate)
+			if needsUpdate {
 				if err := s.updateEvent(ctx, calendarID, task, existingEvent); err != nil {
 					slog.Error("Failed to update event", "uuid", task.UUID, "error", err)
 					continue
 				}
+				slog.Info("Updated event", "uuid", task.UUID, "description", task.Description)
 				updated++
+			} else {
+				slog.Debug("Event already up to date", "uuid", task.UUID)
 			}
 		} else {
 			// Create new event
@@ -103,10 +164,22 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped)
-	fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+	// Populate result
+	result.Total = len(tasks)
+	result.Created = created
+	result.Updated = updated
+	result.Skipped = skipped
 
-	return nil
+	slog.Info("Sync completed", "total", result.Total, "created", result.Created, "updated", result.Updated, "skipped", result.Skipped, "warnings", len(result.Warnings))
+
+	// Print summary (for CLI mode and visibility)
+	fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n",
+		result.Total, result.Created, result.Updated, result.Skipped)
+	if len(result.Warnings) > 0 {
+		fmt.Printf("⚠️  %d WARNINGS: Tasks with scheduled > due\n", len(result.Warnings))
+	}
+
+	return result, nil
 }
 
 // findCalendarByName finds a calendar ID by its name
@@ -137,6 +210,7 @@ func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) (
 		TimeMax(timeMax).
 		SingleEvents(true).
 		OrderBy("startTime").
+		Fields("items(id,summary,description,start,end,colorId,reminders)").
 		Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list events: %w", err)
@@ -237,11 +311,67 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		event.ColorId = "5" // Yellow for medium priority
 	}
 
+	// Set notification based on scheduled field
+	if task.Scheduled != nil && !task.Scheduled.IsZero() {
+		var reminderMinutes int64
+		var hasWarning bool
+
+		if task.Due != nil && !task.Due.IsZero() {
+			// Both scheduled and due exist
+			timeDiff := task.Due.Sub(*task.Scheduled)
+
+			if timeDiff > 0 {
+				// Scheduled is before due - normal case
+				// Set notification at scheduled time (time difference before the event)
+				reminderMinutes = int64(timeDiff.Minutes())
+			} else {
+				// Scheduled is after or equal to due - warning case
+				hasWarning = true
+				// Still set a notification at a default time
+				reminderMinutes = 15
+			}
+		} else {
+			// Only scheduled exists (event time is based on scheduled)
+			// Set a default notification
+			reminderMinutes = 15
+		}
+
+		// Add warning to description if scheduled is after due
+		if hasWarning {
+			event.Description = event.Description + "\n\n⚠️ WARNING: Scheduled time is after due time!"
+		}
+
+		// Set the reminder
+		// ForceSendFields ensures UseDefault:false is explicitly sent to override calendar defaults
+		event.Reminders = &calendar.EventReminders{
+			UseDefault:       false,
+			ForceSendFields: []string{"UseDefault"},
+			Overrides: []*calendar.EventReminder{
+				{
+					Method:  "popup",
+					Minutes: reminderMinutes,
+				},
+			},
+		}
+	} else {
+		// No scheduled field, use default calendar reminders
+		event.Reminders = &calendar.EventReminders{
+			UseDefault: true,
+		}
+	}
+
 	return event
 }
 
 // shouldUpdateEvent checks if an event needs to be updated
 func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bool {
+	slog.Debug("Comparing event with task",
+		"uuid", task.UUID,
+		"task_desc", task.Description,
+		"event_summary", event.Summary,
+		"event_has_reminders", event.Reminders != nil,
+		"event_reminders_use_default", event.Reminders != nil && event.Reminders.UseDefault)
+
 	// Build expected summary (with checkmark if completed)
 	expectedSummary := task.Description
 	if task.Status == "completed" {
@@ -250,6 +380,31 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if summary (description) changed
 	if event.Summary != expectedSummary {
+		slog.Debug("Summary changed", "uuid", task.UUID, "expected", expectedSummary, "actual", event.Summary)
+		return true
+	}
+
+	// Build expected description to check if it changed (including warning)
+	expectedDescription := fmt.Sprintf("Taskwarrior UUID: %s\n\nProject: %s\nTags: %s\nStatus: %s",
+		task.UUID,
+		task.Project,
+		strings.Join(task.Tags, ", "),
+		task.Status,
+	)
+
+	// Add warning to expected description if scheduled is after due
+	if task.Scheduled != nil && !task.Scheduled.IsZero() && task.Due != nil && !task.Due.IsZero() {
+		if !task.Scheduled.Before(*task.Due) { // scheduled >= due
+			expectedDescription = expectedDescription + "\n\n⚠️ WARNING: Scheduled time is after due time!"
+		}
+	}
+
+	// Check if description changed
+	if event.Description != expectedDescription {
+		slog.Debug("Description changed",
+			"uuid", task.UUID,
+			"event_desc_len", len(event.Description),
+			"expected_desc_len", len(expectedDescription))
 		return true
 	}
 
@@ -261,6 +416,12 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
 		taskTime = *task.Scheduled
 	}
+
+	slog.Debug("Checking date/time",
+		"uuid", task.UUID,
+		"task_time", taskTime,
+		"task_due", task.Due,
+		"task_scheduled", task.Scheduled)
 
 	// Check if the task has a specific time component
 	hasTime := taskTime.Hour() != 0 || taskTime.Minute() != 0 || taskTime.Second() != 0
@@ -319,6 +480,62 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	if expectedColorId != "" && event.ColorId != expectedColorId {
 		return true
+	}
+
+	// Check if reminder/notification changed based on scheduled field
+	taskHasScheduled := task.Scheduled != nil && !task.Scheduled.IsZero()
+	eventHasCustomReminders := event.Reminders != nil && !event.Reminders.UseDefault && len(event.Reminders.Overrides) > 0
+
+	slog.Debug("Checking reminders",
+		"uuid", task.UUID,
+		"task_has_scheduled", taskHasScheduled,
+		"event_has_custom_reminders", eventHasCustomReminders,
+		"event_reminders_nil", event.Reminders == nil,
+		"event_reminders_use_default", event.Reminders != nil && event.Reminders.UseDefault)
+
+	if taskHasScheduled {
+		// Task has scheduled, so event should have custom reminders
+		var expectedReminderMinutes int64
+
+		if task.Due != nil && !task.Due.IsZero() {
+			timeDiff := task.Due.Sub(*task.Scheduled)
+			if timeDiff > 0 {
+				expectedReminderMinutes = int64(timeDiff.Minutes())
+			} else {
+				expectedReminderMinutes = 15
+			}
+		} else {
+			expectedReminderMinutes = 15
+		}
+
+		slog.Debug("Task has scheduled, checking reminders",
+			"uuid", task.UUID,
+			"expected_reminder_minutes", expectedReminderMinutes,
+			"scheduled", task.Scheduled,
+			"due", task.Due)
+
+		// Check if event has custom reminders
+		if !eventHasCustomReminders {
+			slog.Debug("Event missing custom reminders", "uuid", task.UUID, "expected_minutes", expectedReminderMinutes)
+			return true
+		}
+
+		// Check if the reminder minutes match
+		actualReminderMinutes := event.Reminders.Overrides[0].Minutes
+		slog.Debug("Comparing reminder minutes",
+			"uuid", task.UUID,
+			"expected", expectedReminderMinutes,
+			"actual", actualReminderMinutes)
+		if actualReminderMinutes != expectedReminderMinutes {
+			slog.Debug("Reminder minutes mismatch", "uuid", task.UUID, "expected", expectedReminderMinutes, "actual", actualReminderMinutes)
+			return true
+		}
+	} else {
+		// Task has no scheduled time, event shouldn't have custom reminders
+		if eventHasCustomReminders {
+			slog.Debug("Event has unwanted custom reminders", "uuid", task.UUID)
+			return true
+		}
 	}
 
 	return false
