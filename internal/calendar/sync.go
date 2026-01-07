@@ -36,6 +36,15 @@ func NewSyncClient(ctx context.Context, taskClient *taskwarrior.Client, credenti
 	}, nil
 }
 
+// SyncResult contains the results of a sync operation
+type SyncResult struct {
+	Total    int
+	Created  int
+	Updated  int
+	Skipped  int
+	Warnings []string
+}
+
 // Sync performs the synchronization from Taskwarrior to Google Calendar
 func (s *SyncClient) Sync(ctx context.Context) error {
 	slog.Info("Starting sync", "calendar", s.calendarName, "filter", s.taskFilter)
@@ -103,12 +112,22 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 
 		if existingEvent, exists := eventMap[task.UUID]; exists {
 			// Update existing event
-			if s.shouldUpdateEvent(task, existingEvent) {
+			needsUpdate := s.shouldUpdateEvent(task, existingEvent)
+			slog.Debug("Checking if event needs update",
+				"uuid", task.UUID,
+				"description", task.Description,
+				"needs_update", needsUpdate,
+				"task_due", task.Due,
+				"task_scheduled", task.Scheduled)
+			if needsUpdate {
 				if err := s.updateEvent(ctx, calendarID, task, existingEvent); err != nil {
 					slog.Error("Failed to update event", "uuid", task.UUID, "error", err)
 					continue
 				}
+				slog.Info("Updated event", "uuid", task.UUID, "description", task.Description)
 				updated++
+			} else {
+				slog.Debug("Event already up to date", "uuid", task.UUID)
 			}
 		} else {
 			// Create new event
@@ -122,9 +141,14 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 
 	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped, "warnings", warnings)
 	if warnings > 0 {
-		fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date), %d warnings (scheduled > due)\n", len(tasks), created, updated, skipped, warnings)
-	} else {
+		fmt.Printf("\n========================================\n")
 		fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+		fmt.Printf("⚠️  %d WARNINGS: Tasks with scheduled > due\n", warnings)
+		fmt.Printf("========================================\n")
+		fmt.Printf("Waiting 5 seconds so you can read the warnings above...\n")
+		time.Sleep(5 * time.Second)
+	} else {
+		fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
 	}
 
 	return nil
@@ -158,6 +182,7 @@ func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) (
 		TimeMax(timeMax).
 		SingleEvents(true).
 		OrderBy("startTime").
+		Fields("items(id,summary,description,start,end,colorId,reminders)").
 		Do()
 	if err != nil {
 		return nil, fmt.Errorf("failed to list events: %w", err)
@@ -305,6 +330,13 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 
 // shouldUpdateEvent checks if an event needs to be updated
 func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bool {
+	slog.Debug("Comparing event with task",
+		"uuid", task.UUID,
+		"task_desc", task.Description,
+		"event_summary", event.Summary,
+		"event_has_reminders", event.Reminders != nil,
+		"event_reminders_use_default", event.Reminders != nil && event.Reminders.UseDefault)
+
 	// Build expected summary (with checkmark if completed)
 	expectedSummary := task.Description
 	if task.Status == "completed" {
@@ -313,6 +345,7 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if summary (description) changed
 	if event.Summary != expectedSummary {
+		slog.Debug("Summary changed", "uuid", task.UUID, "expected", expectedSummary, "actual", event.Summary)
 		return true
 	}
 
@@ -333,6 +366,10 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if description changed
 	if event.Description != expectedDescription {
+		slog.Debug("Description changed",
+			"uuid", task.UUID,
+			"event_desc_len", len(event.Description),
+			"expected_desc_len", len(expectedDescription))
 		return true
 	}
 
@@ -408,6 +445,13 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 	taskHasScheduled := task.Scheduled != nil && !task.Scheduled.IsZero()
 	eventHasCustomReminders := event.Reminders != nil && !event.Reminders.UseDefault && len(event.Reminders.Overrides) > 0
 
+	slog.Debug("Checking reminders",
+		"uuid", task.UUID,
+		"task_has_scheduled", taskHasScheduled,
+		"event_has_custom_reminders", eventHasCustomReminders,
+		"event_reminders_nil", event.Reminders == nil,
+		"event_reminders_use_default", event.Reminders != nil && event.Reminders.UseDefault)
+
 	if taskHasScheduled {
 		// Task has scheduled, so event should have custom reminders
 		var expectedReminderMinutes int64
@@ -423,6 +467,12 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 			expectedReminderMinutes = 15
 		}
 
+		slog.Debug("Task has scheduled, checking reminders",
+			"uuid", task.UUID,
+			"expected_reminder_minutes", expectedReminderMinutes,
+			"scheduled", task.Scheduled,
+			"due", task.Due)
+
 		// Check if event has custom reminders
 		if !eventHasCustomReminders {
 			slog.Debug("Event missing custom reminders", "uuid", task.UUID, "expected_minutes", expectedReminderMinutes)
@@ -431,6 +481,10 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 		// Check if the reminder minutes match
 		actualReminderMinutes := event.Reminders.Overrides[0].Minutes
+		slog.Debug("Comparing reminder minutes",
+			"uuid", task.UUID,
+			"expected", expectedReminderMinutes,
+			"actual", actualReminderMinutes)
 		if actualReminderMinutes != expectedReminderMinutes {
 			slog.Debug("Reminder minutes mismatch", "uuid", task.UUID, "expected", expectedReminderMinutes, "actual", actualReminderMinutes)
 			return true
