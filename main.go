@@ -161,42 +161,6 @@ func runTUI() error {
 	return tui.Run(client, cfg)
 }
 
-// initSyncLogging initializes logging for sync command (outputs to stderr for visibility)
-func initSyncLogging() {
-	// Parse log level from flag or environment variable
-	var level slog.Level
-	envLevel := os.Getenv("SLOG_LEVEL")
-	if envLevel != "" {
-		logLevel = envLevel
-	}
-
-	switch logLevel {
-	case "debug":
-		level = slog.LevelDebug
-	case "info":
-		level = slog.LevelInfo
-	case "warn":
-		level = slog.LevelWarn
-	case "error":
-		level = slog.LevelError
-	default:
-		level = slog.LevelInfo
-	}
-
-	// Create handler for stderr
-	var handler slog.Handler
-	opts := &slog.HandlerOptions{Level: level}
-
-	if logFormat == "json" {
-		handler = slog.NewJSONHandler(os.Stderr, opts)
-	} else {
-		handler = slog.NewTextHandler(os.Stderr, opts)
-	}
-
-	// Set default logger
-	slog.SetDefault(slog.New(handler))
-}
-
 // initLogging initializes the logging system based on CLI flags
 func initLogging() {
 	// Parse log level
@@ -271,8 +235,8 @@ Visit https://taskwarrior.org for more information.`, err)
 
 // runSync performs the Google Calendar sync operation
 func runSync() error {
-	// Initialize logging for sync - output to stderr not file
-	initSyncLogging()
+	// Initialize logging
+	initLogging()
 
 	slog.Info("Starting Google Calendar sync", "version", version.GetVersion())
 
