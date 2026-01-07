@@ -1,6 +1,9 @@
 package tui
 
-import "github.com/clobrano/wui/internal/core"
+import (
+	"github.com/clobrano/wui/internal/calendar"
+	"github.com/clobrano/wui/internal/core"
+)
 
 // TasksLoadedMsg is sent when tasks have been loaded from the service
 type TasksLoadedMsg struct {
@@ -36,7 +39,8 @@ type ProjectSummaryLoadedMsg struct {
 
 // CalendarSyncCompletedMsg is sent when calendar sync completes
 type CalendarSyncCompletedMsg struct {
-	Err error
+	Result *calendar.SyncResult
+	Err    error
 }
 
 // AutocompleteDataLoadedMsg is sent when autocomplete data (projects/tags) has been loaded

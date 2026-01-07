@@ -430,9 +430,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Don't quit on sync error, let user see the error
 			return m, nil
 		}
-		m.statusMessage = "Calendar synced successfully"
-		// Quit after successful sync
-		return m, tea.Quit
+
+		// Build status message with result details
+		if msg.Result != nil {
+			m.statusMessage = fmt.Sprintf("Calendar synced: %d created, %d updated", msg.Result.Created, msg.Result.Updated)
+			if len(msg.Result.Warnings) > 0 {
+				m.statusMessage += fmt.Sprintf(", %d warnings", len(msg.Result.Warnings))
+			}
+		} else {
+			m.statusMessage = "Calendar synced successfully"
+		}
+
+		// Quit after successful sync, and print warnings after quit
+		return m, tea.Batch(
+			tea.Quit,
+			printSyncResultCmd(msg.Result),
+		)
 
 	case AutocompleteDataLoadedMsg:
 		if msg.Err != nil {
@@ -1835,9 +1848,10 @@ func calendarSyncCmd(cfg *config.Config, service core.TaskService) tea.Cmd {
 		}
 
 		// Perform the calendar sync
-		err = performCalendarSync(taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+		result, err := performCalendarSync(taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
 		return CalendarSyncCompletedMsg{
-			Err: err,
+			Result: result,
+			Err:    err,
 		}
 	}
 }
@@ -1848,21 +1862,39 @@ func createTaskClient(cfg *config.Config) (*taskwarrior.Client, error) {
 }
 
 // Helper function to perform calendar sync
-func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string) error {
+func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string) (*calendar.SyncResult, error) {
 	ctx := context.Background()
 
 	// Create sync client
 	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
 	if err != nil {
-		return fmt.Errorf("failed to create sync client: %w", err)
+		return nil, fmt.Errorf("failed to create sync client: %w", err)
 	}
 
 	// Perform sync
-	if err := syncClient.Sync(ctx); err != nil {
-		return fmt.Errorf("sync failed: %w", err)
+	result, err := syncClient.Sync(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("sync failed: %w", err)
 	}
 
-	return nil
+	return result, nil
+}
+
+// printSyncResultCmd creates a command to print sync results after TUI quits
+func printSyncResultCmd(result *calendar.SyncResult) tea.Cmd {
+	return func() tea.Msg {
+		// Print warnings if any (after TUI has quit)
+		if result != nil && len(result.Warnings) > 0 {
+			fmt.Println("\n========================================")
+			fmt.Printf("Calendar sync completed with %d warnings:\n", len(result.Warnings))
+			fmt.Println("========================================")
+			for _, warning := range result.Warnings {
+				fmt.Printf("⚠️  %s\n", warning)
+			}
+			fmt.Println("========================================\n")
+		}
+		return nil
+	}
 }
 
 // extractUniqueProjects extracts all unique projects from tasks

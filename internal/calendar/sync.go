@@ -46,13 +46,17 @@ type SyncResult struct {
 }
 
 // Sync performs the synchronization from Taskwarrior to Google Calendar
-func (s *SyncClient) Sync(ctx context.Context) error {
+func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 	slog.Info("Starting sync", "calendar", s.calendarName, "filter", s.taskFilter)
+
+	result := &SyncResult{
+		Warnings: make([]string, 0),
+	}
 
 	// Get the calendar ID by name
 	calendarID, err := s.findCalendarByName(ctx, s.calendarName)
 	if err != nil {
-		return fmt.Errorf("failed to find calendar: %w", err)
+		return nil, fmt.Errorf("failed to find calendar: %w", err)
 	}
 
 	slog.Info("Found calendar", "id", calendarID, "name", s.calendarName)
@@ -60,7 +64,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// Get tasks from Taskwarrior
 	tasks, err := s.taskClient.Export(s.taskFilter)
 	if err != nil {
-		return fmt.Errorf("failed to get tasks: %w", err)
+		return nil, fmt.Errorf("failed to get tasks: %w", err)
 	}
 
 	slog.Info("Retrieved tasks", "count", len(tasks))
@@ -68,7 +72,7 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	// Get existing events from calendar
 	existingEvents, err := s.getCalendarEvents(ctx, calendarID)
 	if err != nil {
-		return fmt.Errorf("failed to get calendar events: %w", err)
+		return nil, fmt.Errorf("failed to get calendar events: %w", err)
 	}
 
 	slog.Info("Retrieved existing calendar events", "count", len(existingEvents))
@@ -97,15 +101,17 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		// Check if scheduled is after due and log warning
 		if task.Scheduled != nil && !task.Scheduled.IsZero() && task.Due != nil && !task.Due.IsZero() {
 			if task.Scheduled.After(*task.Due) || task.Scheduled.Equal(*task.Due) {
+				warningMsg := fmt.Sprintf("Task '%s' has scheduled time (%s) after due time (%s)",
+					task.Description,
+					task.Scheduled.Format("2006-01-02 15:04"),
+					task.Due.Format("2006-01-02 15:04"))
 				slog.Warn("Task has scheduled time after or equal to due time",
 					"uuid", task.UUID,
 					"description", task.Description,
 					"scheduled", task.Scheduled.Format("2006-01-02 15:04:05"),
 					"due", task.Due.Format("2006-01-02 15:04:05"))
-				fmt.Printf("⚠️  WARNING: Task '%s' has scheduled time (%s) after due time (%s)\n",
-					task.Description,
-					task.Scheduled.Format("2006-01-02 15:04"),
-					task.Due.Format("2006-01-02 15:04"))
+				fmt.Printf("⚠️  WARNING: %s\n", warningMsg)
+				result.Warnings = append(result.Warnings, warningMsg)
 				warnings++
 			}
 		}
@@ -139,19 +145,22 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped, "warnings", warnings)
-	if warnings > 0 {
-		fmt.Printf("\n========================================\n")
-		fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
-		fmt.Printf("⚠️  %d WARNINGS: Tasks with scheduled > due\n", warnings)
-		fmt.Printf("========================================\n")
-		fmt.Printf("Waiting 5 seconds so you can read the warnings above...\n")
-		time.Sleep(5 * time.Second)
-	} else {
-		fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+	// Populate result
+	result.Total = len(tasks)
+	result.Created = created
+	result.Updated = updated
+	result.Skipped = skipped
+
+	slog.Info("Sync completed", "total", result.Total, "created", result.Created, "updated", result.Updated, "skipped", result.Skipped, "warnings", len(result.Warnings))
+
+	// Print summary (for CLI mode and visibility)
+	fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n",
+		result.Total, result.Created, result.Updated, result.Skipped)
+	if len(result.Warnings) > 0 {
+		fmt.Printf("⚠️  %d WARNINGS: Tasks with scheduled > due\n", len(result.Warnings))
 	}
 
-	return nil
+	return result, nil
 }
 
 // findCalendarByName finds a calendar ID by its name
