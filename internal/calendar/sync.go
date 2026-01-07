@@ -76,12 +76,29 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 	created := 0
 	updated := 0
 	skipped := 0
+	warnings := 0
 	for _, task := range tasks {
 		// Skip tasks without due date or scheduled date
 		if (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero()) {
 			slog.Debug("Skipping task without due date", "uuid", task.UUID, "description", task.Description)
 			skipped++
 			continue
+		}
+
+		// Check if scheduled is after due and log warning
+		if task.Scheduled != nil && !task.Scheduled.IsZero() && task.Due != nil && !task.Due.IsZero() {
+			if task.Scheduled.After(*task.Due) || task.Scheduled.Equal(*task.Due) {
+				slog.Warn("Task has scheduled time after or equal to due time",
+					"uuid", task.UUID,
+					"description", task.Description,
+					"scheduled", task.Scheduled.Format("2006-01-02 15:04:05"),
+					"due", task.Due.Format("2006-01-02 15:04:05"))
+				fmt.Printf("⚠️  WARNING: Task '%s' has scheduled time (%s) after due time (%s)\n",
+					task.Description,
+					task.Scheduled.Format("2006-01-02 15:04"),
+					task.Due.Format("2006-01-02 15:04"))
+				warnings++
+			}
 		}
 
 		if existingEvent, exists := eventMap[task.UUID]; exists {
@@ -103,8 +120,12 @@ func (s *SyncClient) Sync(ctx context.Context) error {
 		}
 	}
 
-	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped)
-	fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+	slog.Info("Sync completed", "total", len(tasks), "created", created, "updated", updated, "skipped", skipped, "warnings", warnings)
+	if warnings > 0 {
+		fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date), %d warnings (scheduled > due)\n", len(tasks), created, updated, skipped, warnings)
+	} else {
+		fmt.Printf("Sync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n", len(tasks), created, updated, skipped)
+	}
 
 	return nil
 }
