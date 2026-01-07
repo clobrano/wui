@@ -342,14 +342,21 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		}
 
 		// Set the reminder
+		// ForceSendFields ensures UseDefault:false is explicitly sent to override calendar defaults
 		event.Reminders = &calendar.EventReminders{
-			UseDefault: false,
+			UseDefault:       false,
+			ForceSendFields: []string{"UseDefault"},
 			Overrides: []*calendar.EventReminder{
 				{
 					Method:  "popup",
 					Minutes: reminderMinutes,
 				},
 			},
+		}
+	} else {
+		// No scheduled field, use default calendar reminders
+		event.Reminders = &calendar.EventReminders{
+			UseDefault: true,
 		}
 	}
 
