@@ -316,6 +316,26 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 		return true
 	}
 
+	// Build expected description to check if it changed (including warning)
+	expectedDescription := fmt.Sprintf("Taskwarrior UUID: %s\n\nProject: %s\nTags: %s\nStatus: %s",
+		task.UUID,
+		task.Project,
+		strings.Join(task.Tags, ", "),
+		task.Status,
+	)
+
+	// Add warning to expected description if scheduled is after due
+	if task.Scheduled != nil && !task.Scheduled.IsZero() && task.Due != nil && !task.Due.IsZero() {
+		if !task.Scheduled.Before(*task.Due) { // scheduled >= due
+			expectedDescription = expectedDescription + "\n\n⚠️ WARNING: Scheduled time is after due time!"
+		}
+	}
+
+	// Check if description changed
+	if event.Description != expectedDescription {
+		return true
+	}
+
 	// Check if the date or time changed
 	// Note: Tasks without dates are filtered before reaching this function
 	var taskTime time.Time
@@ -385,7 +405,11 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 	}
 
 	// Check if reminder/notification changed based on scheduled field
-	if task.Scheduled != nil && !task.Scheduled.IsZero() {
+	taskHasScheduled := task.Scheduled != nil && !task.Scheduled.IsZero()
+	eventHasCustomReminders := event.Reminders != nil && !event.Reminders.UseDefault && len(event.Reminders.Overrides) > 0
+
+	if taskHasScheduled {
+		// Task has scheduled, so event should have custom reminders
 		var expectedReminderMinutes int64
 
 		if task.Due != nil && !task.Due.IsZero() {
@@ -399,24 +423,22 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 			expectedReminderMinutes = 15
 		}
 
-		// Check if event has reminders set correctly
-		if event.Reminders == nil || event.Reminders.UseDefault {
-			// Event doesn't have custom reminders but should
-			return true
-		}
-
-		if len(event.Reminders.Overrides) == 0 {
-			// Event has no reminder overrides but should
+		// Check if event has custom reminders
+		if !eventHasCustomReminders {
+			slog.Debug("Event missing custom reminders", "uuid", task.UUID, "expected_minutes", expectedReminderMinutes)
 			return true
 		}
 
 		// Check if the reminder minutes match
-		if event.Reminders.Overrides[0].Minutes != expectedReminderMinutes {
+		actualReminderMinutes := event.Reminders.Overrides[0].Minutes
+		if actualReminderMinutes != expectedReminderMinutes {
+			slog.Debug("Reminder minutes mismatch", "uuid", task.UUID, "expected", expectedReminderMinutes, "actual", actualReminderMinutes)
 			return true
 		}
 	} else {
 		// Task has no scheduled time, event shouldn't have custom reminders
-		if event.Reminders != nil && !event.Reminders.UseDefault && len(event.Reminders.Overrides) > 0 {
+		if eventHasCustomReminders {
+			slog.Debug("Event has unwanted custom reminders", "uuid", task.UUID)
 			return true
 		}
 	}
