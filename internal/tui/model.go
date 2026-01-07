@@ -162,7 +162,8 @@ type Model struct {
 	confirmAction string // "delete", "done", etc.
 
 	// Calendar sync state
-	syncingBeforeQuit bool // true when syncing before quit
+	syncingBeforeQuit bool                  // true when syncing before quit
+	syncWarnings      *calendar.SyncResult // warnings to print after quit
 }
 
 // NewModel creates a new TUI model
@@ -435,17 +436,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Result != nil {
 			m.statusMessage = fmt.Sprintf("Calendar synced: %d created, %d updated", msg.Result.Created, msg.Result.Updated)
 			if len(msg.Result.Warnings) > 0 {
-				m.statusMessage += fmt.Sprintf(", %d warnings", len(msg.Result.Warnings))
+				m.statusMessage += fmt.Sprintf(", %d warnings - see output after quit", len(msg.Result.Warnings))
 			}
 		} else {
 			m.statusMessage = "Calendar synced successfully"
 		}
 
-		// Quit after successful sync, and print warnings after quit
-		return m, tea.Batch(
-			tea.Quit,
-			printSyncResultCmd(msg.Result),
-		)
+		// Store warnings to print after quit
+		m.syncWarnings = msg.Result
+
+		// Quit after successful sync
+		return m, tea.Quit
 
 	case AutocompleteDataLoadedMsg:
 		if msg.Err != nil {
@@ -1878,23 +1879,6 @@ func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenP
 	}
 
 	return result, nil
-}
-
-// printSyncResultCmd creates a command to print sync results after TUI quits
-func printSyncResultCmd(result *calendar.SyncResult) tea.Cmd {
-	return func() tea.Msg {
-		// Print warnings if any (after TUI has quit)
-		if result != nil && len(result.Warnings) > 0 {
-			fmt.Println("\n========================================")
-			fmt.Printf("Calendar sync completed with %d warnings:\n", len(result.Warnings))
-			fmt.Println("========================================")
-			for _, warning := range result.Warnings {
-				fmt.Printf("⚠️  %s\n", warning)
-			}
-			fmt.Println("========================================\n")
-		}
-		return nil
-	}
 }
 
 // extractUniqueProjects extracts all unique projects from tasks

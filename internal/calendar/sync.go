@@ -118,13 +118,32 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 
 		if existingEvent, exists := eventMap[task.UUID]; exists {
 			// Update existing event
-			needsUpdate := s.shouldUpdateEvent(task, existingEvent)
-			slog.Debug("Checking if event needs update",
+			slog.Info("Found existing event for task",
 				"uuid", task.UUID,
 				"description", task.Description,
-				"needs_update", needsUpdate,
 				"task_due", task.Due,
 				"task_scheduled", task.Scheduled)
+
+			// Log event details
+			slog.Info("Existing event details",
+				"uuid", task.UUID,
+				"event_summary", existingEvent.Summary,
+				"event_start", existingEvent.Start,
+				"event_has_reminders", existingEvent.Reminders != nil,
+				"event_reminders_use_default", existingEvent.Reminders != nil && existingEvent.Reminders.UseDefault)
+
+			if existingEvent.Reminders != nil && len(existingEvent.Reminders.Overrides) > 0 {
+				slog.Info("Event reminder details",
+					"uuid", task.UUID,
+					"reminder_minutes", existingEvent.Reminders.Overrides[0].Minutes,
+					"reminder_method", existingEvent.Reminders.Overrides[0].Method)
+			}
+
+			needsUpdate := s.shouldUpdateEvent(task, existingEvent)
+			slog.Info("Update check result",
+				"uuid", task.UUID,
+				"description", task.Description,
+				"needs_update", needsUpdate)
 			if needsUpdate {
 				if err := s.updateEvent(ctx, calendarID, task, existingEvent); err != nil {
 					slog.Error("Failed to update event", "uuid", task.UUID, "error", err)
@@ -390,6 +409,12 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
 		taskTime = *task.Scheduled
 	}
+
+	slog.Debug("Checking date/time",
+		"uuid", task.UUID,
+		"task_time", taskTime,
+		"task_due", task.Due,
+		"task_scheduled", task.Scheduled)
 
 	// Check if the task has a specific time component
 	hasTime := taskTime.Hour() != 0 || taskTime.Minute() != 0 || taskTime.Second() != 0
