@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -83,7 +84,26 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 
 // SetTasks updates the task list and switches to task display mode
 func (t *TaskList) SetTasks(tasks []core.Task) {
-	t.tasks = tasks
+	// Sort tasks: non-completed tasks first, completed tasks last
+	// Use stable sort to maintain original order within each group
+	sortedTasks := make([]core.Task, len(tasks))
+	copy(sortedTasks, tasks)
+
+	sort.SliceStable(sortedTasks, func(i, j int) bool {
+		// Completed tasks should come after non-completed tasks
+		isCompletedI := sortedTasks[i].Status == "completed"
+		isCompletedJ := sortedTasks[j].Status == "completed"
+
+		// If one is completed and the other is not, non-completed comes first
+		if isCompletedI != isCompletedJ {
+			return !isCompletedI // true if i is not completed (i comes first)
+		}
+
+		// Otherwise maintain original order (stable sort)
+		return false
+	})
+
+	t.tasks = sortedTasks
 	t.displayMode = DisplayModeTasks
 	// Reset cursor if out of bounds
 	if t.cursor >= len(t.tasks) {
