@@ -367,3 +367,42 @@ func TestSelectedIndex(t *testing.T) {
 		t.Errorf("Expected selected index 1, got %d", tl.SelectedIndex())
 	}
 }
+
+func TestCompletedTasksSortedToBottom(t *testing.T) {
+	tl := NewTaskList(80, 24, []string{"id", "project", "description", "due", "priority"}, defaultTaskListStyles())
+
+	// Create a mixed list of tasks with completed tasks in the middle
+	tasks := []core.Task{
+		{ID: 1, UUID: "uuid-1", Description: "Pending Task 1", Status: "pending"},
+		{ID: 2, UUID: "uuid-2", Description: "Completed Task 1", Status: "completed"},
+		{ID: 3, UUID: "uuid-3", Description: "Pending Task 2", Status: "pending"},
+		{ID: 4, UUID: "uuid-4", Description: "Completed Task 2", Status: "completed"},
+		{ID: 5, UUID: "uuid-5", Description: "Pending Task 3", Status: "pending"},
+	}
+
+	tl.SetTasks(tasks)
+
+	// Verify that pending tasks come first
+	if tl.tasks[0].Status == "completed" {
+		t.Errorf("Expected first task to be pending, got %s", tl.tasks[0].Status)
+	}
+	if tl.tasks[1].Status == "completed" {
+		t.Errorf("Expected second task to be pending, got %s", tl.tasks[1].Status)
+	}
+	if tl.tasks[2].Status == "completed" {
+		t.Errorf("Expected third task to be pending, got %s", tl.tasks[2].Status)
+	}
+
+	// Verify that completed tasks come last
+	if tl.tasks[3].Status != "completed" {
+		t.Errorf("Expected fourth task to be completed, got %s", tl.tasks[3].Status)
+	}
+	if tl.tasks[4].Status != "completed" {
+		t.Errorf("Expected fifth task to be completed, got %s", tl.tasks[4].Status)
+	}
+
+	// Verify total count
+	if len(tl.tasks) != 5 {
+		t.Errorf("Expected 5 tasks, got %d", len(tl.tasks))
+	}
+}
