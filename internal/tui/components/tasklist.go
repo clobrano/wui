@@ -44,8 +44,9 @@ type TaskList struct {
 	selectedUUIDs  map[string]bool  // Multi-select: UUIDs of selected tasks
 	width          int
 	height         int
-	displayColumns []string         // Column names to display
+	displayColumns []string          // Column names to display
 	columnLabels   map[string]string // Map of column name to display label
+	columnLengths  map[string]int    // Map of column name to custom max length (0 = use default)
 	offset         int               // Scroll offset for viewport
 	scrollBuffer   int               // Number of tasks to keep visible above/below cursor
 	styles         TaskListStyles
@@ -64,13 +65,15 @@ func NewTaskList(width, height int, columns config.Columns, styles TaskListStyle
 		columns = columns[:8]
 	}
 
-	// Build column names and labels map
+	// Build column names, labels, and lengths maps
 	normalizedColumns := make([]string, len(columns))
 	columnLabels := make(map[string]string)
+	columnLengths := make(map[string]int)
 	for i, col := range columns {
 		normalizedName := strings.ToLower(col.Name)
 		normalizedColumns[i] = normalizedName
 		columnLabels[normalizedName] = col.Label
+		columnLengths[normalizedName] = col.Length
 	}
 
 	return TaskList{
@@ -83,6 +86,7 @@ func NewTaskList(width, height int, columns config.Columns, styles TaskListStyle
 		height:         height,
 		displayColumns: normalizedColumns,
 		columnLabels:   columnLabels,
+		columnLengths:  columnLengths,
 		offset:         0,
 		scrollBuffer:   1, // Default: keep 1 task visible above/below cursor
 		styles:         styles,
@@ -573,12 +577,20 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 	var flexibleColumns []string
 
 	for _, col := range t.displayColumns {
-		width, isFixed := getColumnWidth(col)
-		if isFixed {
-			widths[col] = width
-			fixedWidth += width + spacing
+		// Check if user specified a custom length for this column
+		if customLength, hasCustom := t.columnLengths[col]; hasCustom && customLength > 0 {
+			// Use custom length specified by user
+			widths[col] = customLength
+			fixedWidth += customLength + spacing
 		} else {
-			flexibleColumns = append(flexibleColumns, col)
+			// Use default width calculation
+			width, isFixed := getColumnWidth(col)
+			if isFixed {
+				widths[col] = width
+				fixedWidth += width + spacing
+			} else {
+				flexibleColumns = append(flexibleColumns, col)
+			}
 		}
 	}
 

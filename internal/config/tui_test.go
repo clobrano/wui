@@ -291,3 +291,52 @@ columns:
 		}
 	}
 }
+
+func TestColumnsUnmarshal_WithLength(t *testing.T) {
+	// Test new format with custom lengths
+	yamlData := `
+columns:
+  - name: id
+    label: "#"
+    length: 5
+  - name: project
+    label: "Project"
+    length: 20
+  - name: description
+    label: "Task"
+    length: 40
+  - name: due
+    label: "Due"
+`
+	var cfg struct {
+		Columns Columns `yaml:"columns"`
+	}
+
+	err := yaml.Unmarshal([]byte(yamlData), &cfg)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal columns with length: %v", err)
+	}
+
+	if len(cfg.Columns) != 4 {
+		t.Errorf("Expected 4 columns, got %d", len(cfg.Columns))
+	}
+
+	// Check custom lengths
+	expectedLengths := map[string]int{
+		"id":          5,
+		"project":     20,
+		"description": 40,
+		"due":         0, // No length specified
+	}
+
+	for _, col := range cfg.Columns {
+		expectedLength, exists := expectedLengths[col.Name]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", col.Name)
+			continue
+		}
+		if col.Length != expectedLength {
+			t.Errorf("Expected length %d for column '%s', got %d", expectedLength, col.Name, col.Length)
+		}
+	}
+}

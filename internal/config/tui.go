@@ -21,8 +21,9 @@ type Tab struct {
 
 // Column represents a table column configuration
 type Column struct {
-	Name  string `yaml:"name"`  // Taskwarrior property name (e.g., "id", "project", "priority")
-	Label string `yaml:"label"` // Display label for the column header
+	Name   string `yaml:"name"`           // Taskwarrior property name (e.g., "id", "project", "priority")
+	Label  string `yaml:"label"`          // Display label for the column header
+	Length int    `yaml:"length,omitempty"` // Maximum width in characters (0 = use default/dynamic)
 }
 
 // Columns is a wrapper type that supports both old ([]string) and new ([]Column) formats
