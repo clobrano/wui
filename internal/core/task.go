@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -87,7 +88,7 @@ func (t *Task) GetProperty(name string) (string, bool) {
 		for _, tag := range t.Tags {
 			tagList = append(tagList, "+"+tag)
 		}
-		return fmt.Sprintf("%v", tagList), true
+		return strings.Join(tagList, ", "), true
 	case "due":
 		if t.Due == nil {
 			return "-", true
