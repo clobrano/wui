@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
 )
 
@@ -42,18 +43,19 @@ type TaskList struct {
 	selectedUUIDs  map[string]bool  // Multi-select: UUIDs of selected tasks
 	width          int
 	height         int
-	displayColumns []string // Column names to display
-	offset         int      // Scroll offset for viewport
-	scrollBuffer   int      // Number of tasks to keep visible above/below cursor
+	displayColumns []string         // Column names to display
+	columnLabels   map[string]string // Map of column name to display label
+	offset         int               // Scroll offset for viewport
+	scrollBuffer   int               // Number of tasks to keep visible above/below cursor
 	styles         TaskListStyles
 	emptyMessage   string // Custom message to show when list is empty
 }
 
 // NewTaskList creates a new task list component
-func NewTaskList(width, height int, columns []string, styles TaskListStyles) TaskList {
+func NewTaskList(width, height int, columns config.Columns, styles TaskListStyles) TaskList {
 	// Default columns if none provided
 	if len(columns) == 0 {
-		columns = []string{"id", "project", "priority", "due", "description"}
+		columns = config.DefaultColumns()
 	}
 
 	// Limit to maximum 8 columns
@@ -61,10 +63,13 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		columns = columns[:8]
 	}
 
-	// Normalize column names to lowercase
+	// Build column names and labels map
 	normalizedColumns := make([]string, len(columns))
+	columnLabels := make(map[string]string)
 	for i, col := range columns {
-		normalizedColumns[i] = strings.ToLower(col)
+		normalizedName := strings.ToLower(col.Name)
+		normalizedColumns[i] = normalizedName
+		columnLabels[normalizedName] = col.Label
 	}
 
 	return TaskList{
@@ -76,6 +81,7 @@ func NewTaskList(width, height int, columns []string, styles TaskListStyles) Tas
 		width:          width,
 		height:         height,
 		displayColumns: normalizedColumns,
+		columnLabels:   columnLabels,
 		offset:         0,
 		scrollBuffer:   1, // Default: keep 1 task visible above/below cursor
 		styles:         styles,
@@ -452,24 +458,13 @@ func (t TaskList) renderGroupList() string {
 func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
-	// Column name mappings
-	columnNames := map[string]string{
-		"id":          "ID",
-		"project":     "PROJECT",
-		"priority":    "P",
-		"due":         "DUE",
-		"tags":        "TAGS",
-		"annotation":  "A",
-		"dependency":  "D",
-		"description": "DESCRIPTION",
-	}
-
 	// Build header dynamically based on displayColumns
 	parts := []string{"  "} // Start with cursor space
 
 	for _, col := range t.displayColumns {
 		width := cols.widths[col]
-		name := columnNames[col]
+		// Use custom label from configuration, or uppercase column name as fallback
+		name := t.columnLabels[col]
 		if name == "" {
 			name = strings.ToUpper(col)
 		}

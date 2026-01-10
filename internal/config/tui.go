@@ -1,12 +1,14 @@
 package config
 
+import "gopkg.in/yaml.v3"
+
 // TUIConfig contains TUI-specific configuration
 type TUIConfig struct {
 	SidebarWidth int               `yaml:"sidebar_width"`
 	ScrollBuffer int               `yaml:"scroll_buffer"`
 	InputMode    string            `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
 	Tabs         []Tab             `yaml:"tabs"`
-	Columns      []string          `yaml:"columns"`
+	Columns      Columns           `yaml:"columns"`
 	Keybindings  map[string]string `yaml:"keybindings"`
 	Theme        *Theme            `yaml:"theme"`
 }
@@ -15,6 +17,59 @@ type TUIConfig struct {
 type Tab struct {
 	Name   string `yaml:"name"`
 	Filter string `yaml:"filter"`
+}
+
+// Column represents a table column configuration
+type Column struct {
+	Name  string `yaml:"name"`  // Taskwarrior property name (e.g., "id", "project", "priority")
+	Label string `yaml:"label"` // Display label for the column header
+}
+
+// Columns is a wrapper type that supports both old ([]string) and new ([]Column) formats
+type Columns []Column
+
+// UnmarshalYAML implements custom unmarshaling to support backward compatibility
+// Accepts both:
+//   - Old format: ["id", "project", "priority"]
+//   - New format: [{name: "id", label: "#"}, {name: "project", label: "Project"}]
+func (c *Columns) UnmarshalYAML(node *yaml.Node) error {
+	// Try to unmarshal as []Column (new format)
+	var columns []Column
+	if err := node.Decode(&columns); err == nil {
+		*c = columns
+		return nil
+	}
+
+	// Fall back to old format: []string
+	var oldFormat []string
+	if err := node.Decode(&oldFormat); err != nil {
+		return err
+	}
+
+	// Convert old format to new format with default labels
+	defaultLabels := map[string]string{
+		"id":          "ID",
+		"project":     "PROJECT",
+		"priority":    "P",
+		"due":         "DUE",
+		"tags":        "TAGS",
+		"annotation":  "A",
+		"dependency":  "D",
+		"description": "DESCRIPTION",
+	}
+
+	columns = make([]Column, len(oldFormat))
+	for i, name := range oldFormat {
+		label := defaultLabels[name]
+		if label == "" {
+			// For unknown columns, use uppercase of the name
+			label = name
+		}
+		columns[i] = Column{Name: name, Label: label}
+	}
+
+	*c = columns
+	return nil
 }
 
 // Theme contains color and style configuration
