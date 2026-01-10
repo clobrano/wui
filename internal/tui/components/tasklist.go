@@ -668,33 +668,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 			value = "-"
 		}
 
-		// Apply special formatting and styling for specific columns
-		switch col {
-		case "priority":
-			// Apply color coding for priority (only when not multi-selected)
-			if !isMultiSelected && task.Priority != "" {
-				priorityStyle := lipgloss.NewStyle()
-				switch task.Priority {
-				case "H":
-					priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
-				case "M":
-					priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
-				case "L":
-					priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
-				}
-				value = priorityStyle.Render(value)
-			}
-			parts = append(parts, value+" ")
-			continue
-
-		case "due":
-			// Apply color coding for overdue tasks (only when not multi-selected)
-			if !isMultiSelected && task.IsOverdue() {
-				dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
-				value = dueStyle.Render(value)
-			}
-
-		case "description":
+		// Handle description separately (add status icons)
+		if col == "description" {
 			// Add status icon prefix for description
 			statusIcon := ""
 			if task.Start != nil {
@@ -722,12 +697,44 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 			}
 		}
 
+		// Pad value to column width BEFORE applying styling
 		// Single-character columns don't need padding
 		if col == "priority" || col == "annotation" || col == "dependency" {
-			parts = append(parts, value+" ")
+			// These will be handled with styling below, just add space
 		} else {
-			parts = append(parts, fmt.Sprintf("%-*s ", width, value))
+			// Pad to width for consistent column alignment
+			value = fmt.Sprintf("%-*s", width, value)
 		}
+
+		// Apply styling for specific columns AFTER padding
+		switch col {
+		case "priority":
+			// Apply color coding for priority (only when not multi-selected)
+			if !isMultiSelected && task.Priority != "" {
+				priorityStyle := lipgloss.NewStyle()
+				switch task.Priority {
+				case "H":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
+				case "M":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
+				case "L":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
+				}
+				value = priorityStyle.Render(value)
+			}
+			parts = append(parts, value+" ")
+			continue
+
+		case "due":
+			// Apply color coding for overdue tasks (only when not multi-selected)
+			if !isMultiSelected && task.IsOverdue() {
+				dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
+				value = dueStyle.Render(value)
+			}
+		}
+
+		// Add to parts with trailing space
+		parts = append(parts, value+" ")
 	}
 
 	line := strings.Join(parts, "")
