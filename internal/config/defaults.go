@@ -80,14 +80,14 @@ func DefaultTabs() []Tab {
 }
 
 // DefaultColumns returns the default column list
-func DefaultColumns() []string {
-	return []string{
-		"id",
-		"project",
-		"priority",
-		"due",
-		"dependency",
-		"description",
+func DefaultColumns() Columns {
+	return Columns{
+		{Name: "id", Label: "ID"},
+		{Name: "project", Label: "PROJECT"},
+		{Name: "priority", Label: "P"},
+		{Name: "due", Label: "DUE"},
+		{Name: "dependency", Label: "D"},
+		{Name: "description", Label: "DESCRIPTION"},
 	}
 }
 

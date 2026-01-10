@@ -2,6 +2,8 @@ package config
 
 import (
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestTUIConfigStruct(t *testing.T) {
@@ -11,7 +13,12 @@ func TestTUIConfigStruct(t *testing.T) {
 			{Name: "Work", Filter: "+work"},
 			{Name: "Home", Filter: "+home"},
 		},
-		Columns: []string{"id", "project", "description", "due"},
+		Columns: Columns{
+			{Name: "id", Label: "ID"},
+			{Name: "project", Label: "PROJECT"},
+			{Name: "description", Label: "DESCRIPTION"},
+			{Name: "due", Label: "DUE"},
+		},
 		Keybindings: map[string]string{
 			"quit":   "q",
 			"help":   "?",
@@ -174,13 +181,162 @@ func TestDefaultColumns(t *testing.T) {
 	for _, col := range essentialCols {
 		found := false
 		for _, c := range cols {
-			if c == col {
+			if c.Name == col {
 				found = true
 				break
 			}
 		}
 		if !found {
 			t.Errorf("Expected column '%s' in default columns", col)
+		}
+	}
+
+	// Check that all columns have labels
+	for _, c := range cols {
+		if c.Label == "" {
+			t.Errorf("Expected column '%s' to have a label", c.Name)
+		}
+	}
+}
+
+func TestColumnsUnmarshal_OldFormat(t *testing.T) {
+	// Test backward compatibility with old string array format
+	yamlData := `
+columns:
+  - id
+  - project
+  - priority
+  - due
+  - description
+`
+	var cfg struct {
+		Columns Columns `yaml:"columns"`
+	}
+
+	err := yaml.Unmarshal([]byte(yamlData), &cfg)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal old format: %v", err)
+	}
+
+	if len(cfg.Columns) != 5 {
+		t.Errorf("Expected 5 columns, got %d", len(cfg.Columns))
+	}
+
+	// Check that columns were converted with default labels
+	expectedColumns := map[string]string{
+		"id":          "ID",
+		"project":     "PROJECT",
+		"priority":    "P",
+		"due":         "DUE",
+		"description": "DESCRIPTION",
+	}
+
+	for _, col := range cfg.Columns {
+		expectedLabel, exists := expectedColumns[col.Name]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", col.Name)
+			continue
+		}
+		if col.Label != expectedLabel {
+			t.Errorf("Expected label '%s' for column '%s', got '%s'", expectedLabel, col.Name, col.Label)
+		}
+	}
+}
+
+func TestColumnsUnmarshal_NewFormat(t *testing.T) {
+	// Test new object format with custom labels
+	yamlData := `
+columns:
+  - name: id
+    label: "#"
+  - name: project
+    label: "Proj"
+  - name: priority
+    label: "!"
+  - name: due
+    label: "Due Date"
+  - name: description
+    label: "Task"
+`
+	var cfg struct {
+		Columns Columns `yaml:"columns"`
+	}
+
+	err := yaml.Unmarshal([]byte(yamlData), &cfg)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal new format: %v", err)
+	}
+
+	if len(cfg.Columns) != 5 {
+		t.Errorf("Expected 5 columns, got %d", len(cfg.Columns))
+	}
+
+	// Check that columns have custom labels
+	expectedColumns := map[string]string{
+		"id":          "#",
+		"project":     "Proj",
+		"priority":    "!",
+		"due":         "Due Date",
+		"description": "Task",
+	}
+
+	for _, col := range cfg.Columns {
+		expectedLabel, exists := expectedColumns[col.Name]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", col.Name)
+			continue
+		}
+		if col.Label != expectedLabel {
+			t.Errorf("Expected label '%s' for column '%s', got '%s'", expectedLabel, col.Name, col.Label)
+		}
+	}
+}
+
+func TestColumnsUnmarshal_WithLength(t *testing.T) {
+	// Test new format with custom lengths
+	yamlData := `
+columns:
+  - name: id
+    label: "#"
+    length: 5
+  - name: project
+    label: "Project"
+    length: 20
+  - name: description
+    label: "Task"
+    length: 40
+  - name: due
+    label: "Due"
+`
+	var cfg struct {
+		Columns Columns `yaml:"columns"`
+	}
+
+	err := yaml.Unmarshal([]byte(yamlData), &cfg)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal columns with length: %v", err)
+	}
+
+	if len(cfg.Columns) != 4 {
+		t.Errorf("Expected 4 columns, got %d", len(cfg.Columns))
+	}
+
+	// Check custom lengths
+	expectedLengths := map[string]int{
+		"id":          5,
+		"project":     20,
+		"description": 40,
+		"due":         0, // No length specified
+	}
+
+	for _, col := range cfg.Columns {
+		expectedLength, exists := expectedLengths[col.Name]
+		if !exists {
+			t.Errorf("Unexpected column name: %s", col.Name)
+			continue
+		}
+		if col.Length != expectedLength {
+			t.Errorf("Expected length %d for column '%s', got %d", expectedLength, col.Name, col.Length)
 		}
 	}
 }

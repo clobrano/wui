@@ -238,3 +238,54 @@ func TestParseTaskwarriorDate_InvalidFormat(t *testing.T) {
 		t.Error("Expected nil for invalid date")
 	}
 }
+
+func TestMapToCore_WithUDAs(t *testing.T) {
+	tw := TaskwarriorTask{
+		UUID:        "abc-123",
+		Description: "Task with UDAs",
+		Status:      "pending",
+		Entry:       "20251016T120000Z",
+		Urgency:     5.0,
+		UDA: map[string]interface{}{
+			"estimate":       "2h",
+			"priority_score": float64(8),
+			"custom_field":   "custom value",
+			"recur":          "weekly",
+		},
+	}
+
+	coreTask := MapToCore(tw)
+
+	// Verify UDAs are mapped
+	if coreTask.UDAs == nil {
+		t.Fatal("Expected UDAs map to be populated, got nil")
+	}
+
+	// Check string UDA
+	if val, ok := coreTask.UDAs["estimate"]; !ok {
+		t.Error("Expected 'estimate' UDA to be present")
+	} else if val != "2h" {
+		t.Errorf("Expected estimate '2h', got %v", val)
+	}
+
+	// Check numeric UDA (should be converted to string)
+	if val, ok := coreTask.UDAs["priority_score"]; !ok {
+		t.Error("Expected 'priority_score' UDA to be present")
+	} else if val != "8" {
+		t.Errorf("Expected priority_score '8', got %v", val)
+	}
+
+	// Check custom field
+	if val, ok := coreTask.UDAs["custom_field"]; !ok {
+		t.Error("Expected 'custom_field' UDA to be present")
+	} else if val != "custom value" {
+		t.Errorf("Expected custom_field 'custom value', got %v", val)
+	}
+
+	// Check recur field
+	if val, ok := coreTask.UDAs["recur"]; !ok {
+		t.Error("Expected 'recur' UDA to be present")
+	} else if val != "weekly" {
+		t.Errorf("Expected recur 'weekly', got %v", val)
+	}
+}
