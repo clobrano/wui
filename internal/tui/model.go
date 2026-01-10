@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -1103,6 +1104,24 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Open URL (not in default config, but 'o' is commonly used)
+	if keyPressed == "o" {
+		// Open URL from task (checks UDAs, description, and annotations)
+		// Skip if in group view
+		if !m.inGroupView {
+			selectedTask := m.taskList.SelectedTask()
+			if selectedTask != nil {
+				url := extractURLFromTask(selectedTask)
+				if url != "" {
+					return m, openURLCmd(url)
+				} else {
+					m.statusMessage = "No URL found in task"
+				}
+			}
+		}
+		return m, nil
+	}
+
 	// Section navigation (not configurable - uses tab, h/l, arrows, and number keys)
 	if keyPressed == "tab" || keyPressed == "shift+tab" || keyPressed == "h" || keyPressed == "l" ||
 		keyPressed == "left" || keyPressed == "right" {
@@ -1958,6 +1977,82 @@ func loadAllProjectsAndTagsCmd(service core.TaskService) tea.Cmd {
 			Projects: projects,
 			Tags:     tags,
 			Err:      nil,
+		}
+	}
+}
+
+// extractURLFromTask finds the first URL in a task (checks UDAs, description, and annotations)
+func extractURLFromTask(task *core.Task) string {
+	if task == nil {
+		return ""
+	}
+
+	// Check UDAs for 'url' field (most common case)
+	if url, exists := task.UDAs["url"]; exists && url != "" {
+		return url
+	}
+
+	// Check description for URLs
+	if url := findURLInText(task.Description); url != "" {
+		return url
+	}
+
+	// Check annotations for URLs
+	for _, annotation := range task.Annotations {
+		if url := findURLInText(annotation.Description); url != "" {
+			return url
+		}
+	}
+
+	return ""
+}
+
+// findURLInText searches for a URL in text using simple pattern matching
+func findURLInText(text string) string {
+	// Split text into words
+	words := strings.Fields(text)
+
+	for _, word := range words {
+		// Check if word starts with http:// or https://
+		if strings.HasPrefix(word, "http://") || strings.HasPrefix(word, "https://") {
+			return word
+		}
+	}
+
+	return ""
+}
+
+// openURL opens a URL in the default browser (platform-specific)
+func openURL(url string) error {
+	var cmd *exec.Cmd
+
+	switch runtime.GOOS {
+	case "linux":
+		cmd = exec.Command("xdg-open", url)
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	default:
+		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
+	}
+
+	return cmd.Start()
+}
+
+// openURLCmd creates a command to open a URL in the default browser
+func openURLCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		err := openURL(url)
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Failed to open URL: %s", err.Error()),
+				IsError: true,
+			}
+		}
+		return StatusMsg{
+			Message: fmt.Sprintf("Opening URL: %s", url),
+			IsError: false,
 		}
 	}
 }

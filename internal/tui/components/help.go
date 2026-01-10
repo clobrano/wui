@@ -143,6 +143,7 @@ func defaultKeybindingGroups() []KeybindingGroup {
 				{Keys: []string{"Esc"}, Description: "Close sidebar / Back to group list"},
 				{Keys: []string{"/"}, Description: "Filter tasks"},
 				{Keys: []string{"r"}, Description: "Refresh task list"},
+				{Keys: []string{"o"}, Description: "Open URL from task in browser"},
 			},
 		},
 		{
@@ -226,6 +227,7 @@ func keybindingGroupsFromConfig(keybindings map[string]string) []KeybindingGroup
 				{Keys: []string{"Esc"}, Description: "Close sidebar / Back to group list"},
 				{Keys: []string{getKey("filter", "/")}, Description: "Filter tasks"},
 				{Keys: []string{getKey("refresh", "r")}, Description: "Refresh task list"},
+				{Keys: []string{"o"}, Description: "Open URL from task in browser"},
 			},
 		},
 		{
