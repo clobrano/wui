@@ -4,13 +4,21 @@ import "gopkg.in/yaml.v3"
 
 // TUIConfig contains TUI-specific configuration
 type TUIConfig struct {
-	SidebarWidth int               `yaml:"sidebar_width"`
-	ScrollBuffer int               `yaml:"scroll_buffer"`
-	InputMode    string            `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
-	Tabs         []Tab             `yaml:"tabs"`
-	Columns      Columns           `yaml:"columns"`
-	Keybindings  map[string]string `yaml:"keybindings"`
-	Theme        *Theme            `yaml:"theme"`
+	SidebarWidth   int                      `yaml:"sidebar_width"`
+	ScrollBuffer   int                      `yaml:"scroll_buffer"`
+	InputMode      string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
+	Tabs           []Tab                    `yaml:"tabs"`
+	Columns        Columns                  `yaml:"columns"`
+	Keybindings    map[string]string        `yaml:"keybindings"`
+	Theme          *Theme                   `yaml:"theme"`
+	CustomCommands map[string]CustomCommand `yaml:"custom_commands,omitempty"`
+}
+
+// CustomCommand represents a user-defined command that can be executed with task data
+type CustomCommand struct {
+	Name        string `yaml:"name"`        // Display name for the command
+	Command     string `yaml:"command"`     // Command template with {{.field}} placeholders
+	Description string `yaml:"description"` // Optional description for help text
 }
 
 // Tab represents a section/tab in the UI
