@@ -536,9 +536,9 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 	// UUID column (short form)
 	case "uuid":
 		return 8, true
-	// Date columns (YYYY-MM-DD format)
+	// Date columns (YYYY-MM-DD HH:MM format - 16 chars max)
 	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
-		return 10, true
+		return 16, true
 	// Tags column
 	case "tags":
 		return 15, true
@@ -706,10 +706,20 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		}
 
 		// Truncate value if it exceeds column width
-		if len(value) > width && width > 3 {
-			value = value[:width-3] + "..."
-		} else if len(value) > width {
-			value = value[:width]
+		// Date columns should be truncated without ellipses
+		isDateColumn := col == "due" || col == "scheduled" || col == "wait" ||
+			col == "start" || col == "entry" || col == "modified" || col == "end"
+
+		if len(value) > width {
+			if isDateColumn {
+				// Hard truncate date columns without ellipses
+				value = value[:width]
+			} else if width > 3 {
+				// Add ellipses for other columns
+				value = value[:width-3] + "..."
+			} else {
+				value = value[:width]
+			}
 		}
 
 		// Single-character columns don't need padding
