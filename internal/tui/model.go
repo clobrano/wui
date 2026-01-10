@@ -229,13 +229,17 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		var customCmds map[string]components.CustomCommand
 		if len(cfg.TUI.CustomCommands) > 0 {
 			customCmds = make(map[string]components.CustomCommand)
+			fmt.Fprintf(os.Stderr, "[DEBUG] Loading %d custom commands\n", len(cfg.TUI.CustomCommands))
 			for key, cmd := range cfg.TUI.CustomCommands {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Custom command: key=%s name=%s\n", key, cmd.Name)
 				customCmds[key] = components.CustomCommand{
 					Name:        cmd.Name,
 					Command:     cmd.Command,
 					Description: cmd.Description,
 				}
 			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] No custom commands found in config\n")
 		}
 
 		if cfg.TUI.Keybindings != nil || len(customCmds) > 0 {
