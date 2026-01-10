@@ -61,9 +61,14 @@ func MapToCore(t TaskwarriorTask) core.Task {
 		}
 	}
 
-	// TODO: Map UDAs (User Defined Attributes)
-	// This will require dynamic parsing of unmapped JSON fields
+	// Map UDAs (User Defined Attributes)
 	coreTask.UDAs = make(map[string]string)
+	for key, value := range t.UDA {
+		// Convert interface{} to string
+		if value != nil {
+			coreTask.UDAs[key] = fmt.Sprintf("%v", value)
+		}
+	}
 
 	return coreTask
 }

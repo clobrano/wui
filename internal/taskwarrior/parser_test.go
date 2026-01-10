@@ -186,3 +186,78 @@ func TestParseTaskJSON_NotArray(t *testing.T) {
 		t.Error("Expected error for non-array JSON, got nil")
 	}
 }
+
+func TestParseTaskJSON_WithUDAs(t *testing.T) {
+	json := []byte(`[
+		{
+			"uuid": "abc-123-def",
+			"description": "Test task with UDAs",
+			"status": "pending",
+			"entry": "20251016T120000Z",
+			"urgency": 5.2,
+			"estimate": "2h",
+			"priority_score": 8,
+			"custom_field": "custom value",
+			"recur": "weekly",
+			"until": "20260101T000000Z"
+		}
+	]`)
+
+	tasks, err := ParseTaskJSON(json)
+	if err != nil {
+		t.Errorf("Expected no error, got %v", err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("Expected 1 task, got %d", len(tasks))
+	}
+
+	task := tasks[0]
+
+	// Check that UDA fields are captured
+	if task.UDA == nil {
+		t.Fatal("Expected UDA map to be populated, got nil")
+	}
+
+	// Check custom UDA fields
+	if val, ok := task.UDA["estimate"]; !ok {
+		t.Error("Expected 'estimate' UDA field to be present")
+	} else if val != "2h" {
+		t.Errorf("Expected estimate '2h', got %v", val)
+	}
+
+	if val, ok := task.UDA["priority_score"]; !ok {
+		t.Error("Expected 'priority_score' UDA field to be present")
+	} else if val != float64(8) {
+		t.Errorf("Expected priority_score 8, got %v", val)
+	}
+
+	if val, ok := task.UDA["custom_field"]; !ok {
+		t.Error("Expected 'custom_field' UDA field to be present")
+	} else if val != "custom value" {
+		t.Errorf("Expected custom_field 'custom value', got %v", val)
+	}
+
+	// Check that non-explicitly-mapped taskwarrior fields are captured
+	if val, ok := task.UDA["recur"]; !ok {
+		t.Error("Expected 'recur' field to be present in UDA")
+	} else if val != "weekly" {
+		t.Errorf("Expected recur 'weekly', got %v", val)
+	}
+
+	if val, ok := task.UDA["until"]; !ok {
+		t.Error("Expected 'until' field to be present in UDA")
+	} else if val != "20260101T000000Z" {
+		t.Errorf("Expected until '20260101T000000Z', got %v", val)
+	}
+
+	// Verify that explicitly mapped fields are NOT in UDA
+	if _, ok := task.UDA["uuid"]; ok {
+		t.Error("uuid should not be in UDA map (it's explicitly mapped)")
+	}
+	if _, ok := task.UDA["description"]; ok {
+		t.Error("description should not be in UDA map (it's explicitly mapped)")
+	}
+	if _, ok := task.UDA["status"]; ok {
+		t.Error("status should not be in UDA map (it's explicitly mapped)")
+	}
+}
