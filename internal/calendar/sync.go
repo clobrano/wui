@@ -41,6 +41,7 @@ type SyncResult struct {
 	Total    int
 	Created  int
 	Updated  int
+	Deleted  int
 	Skipped  int
 	Warnings []string
 }
@@ -85,16 +86,37 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 		}
 	}
 
+	// Build map of tasks by UUID for deletion tracking
+	taskMap := make(map[string]core.Task)
+	for _, task := range tasks {
+		taskMap[task.UUID] = task
+	}
+
 	// Sync each task
 	created := 0
 	updated := 0
+	deleted := 0
 	skipped := 0
 	warnings := 0
 	for _, task := range tasks {
-		// Skip tasks without due date or scheduled date
-		if (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero()) {
-			slog.Debug("Skipping task without due date", "uuid", task.UUID, "description", task.Description)
-			skipped++
+		// Check if task has no due date and no scheduled date
+		hasNoDates := (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero())
+
+		if hasNoDates {
+			// If task has an existing event, delete it
+			if existingEvent, exists := eventMap[task.UUID]; exists {
+				slog.Info("Deleting event for task without dates", "uuid", task.UUID, "description", task.Description)
+				if err := s.deleteEvent(ctx, calendarID, existingEvent.Id); err != nil {
+					slog.Error("Failed to delete event", "uuid", task.UUID, "error", err)
+					continue
+				}
+				deleted++
+				// Remove from eventMap to avoid processing again
+				delete(eventMap, task.UUID)
+			} else {
+				slog.Debug("Skipping task without due date or scheduled date", "uuid", task.UUID, "description", task.Description)
+				skipped++
+			}
 			continue
 		}
 
@@ -168,13 +190,14 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 	result.Total = len(tasks)
 	result.Created = created
 	result.Updated = updated
+	result.Deleted = deleted
 	result.Skipped = skipped
 
-	slog.Info("Sync completed", "total", result.Total, "created", result.Created, "updated", result.Updated, "skipped", result.Skipped, "warnings", len(result.Warnings))
+	slog.Info("Sync completed", "total", result.Total, "created", result.Created, "updated", result.Updated, "deleted", result.Deleted, "skipped", result.Skipped, "warnings", len(result.Warnings))
 
 	// Print summary (for CLI mode and visibility)
-	fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d skipped (no due date)\n",
-		result.Total, result.Created, result.Updated, result.Skipped)
+	fmt.Printf("\nSync completed: %d tasks, %d created, %d updated, %d deleted, %d skipped (no dates)\n",
+		result.Total, result.Created, result.Updated, result.Deleted, result.Skipped)
 	if len(result.Warnings) > 0 {
 		fmt.Printf("⚠️  %d WARNINGS: Tasks with scheduled > due\n", len(result.Warnings))
 	}
@@ -251,6 +274,17 @@ func (s *SyncClient) updateEvent(ctx context.Context, calendarID string, task co
 	}
 
 	slog.Debug("Updated event", "uuid", task.UUID, "description", task.Description)
+	return nil
+}
+
+// deleteEvent deletes a calendar event
+func (s *SyncClient) deleteEvent(ctx context.Context, calendarID string, eventID string) error {
+	err := s.calendarService.Events.Delete(calendarID, eventID).Context(ctx).Do()
+	if err != nil {
+		return fmt.Errorf("failed to delete event: %w", err)
+	}
+
+	slog.Debug("Deleted event", "event_id", eventID)
 	return nil
 }
 
@@ -344,7 +378,7 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		// Set the reminder
 		// ForceSendFields ensures UseDefault:false is explicitly sent to override calendar defaults
 		event.Reminders = &calendar.EventReminders{
-			UseDefault:       false,
+			UseDefault:      false,
 			ForceSendFields: []string{"UseDefault"},
 			Overrides: []*calendar.EventReminder{
 				{
