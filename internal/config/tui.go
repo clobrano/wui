@@ -28,6 +28,32 @@ type Column struct {
 // Columns is a wrapper type that supports both old ([]string) and new ([]Column) formats
 type Columns []Column
 
+// GetDefaultLabels returns default labels for all known taskwarrior properties
+func GetDefaultLabels() map[string]string {
+	return map[string]string{
+		// Core fields
+		"id":          "ID",
+		"uuid":        "UUID",
+		"description": "DESCRIPTION",
+		"project":     "PROJECT",
+		"priority":    "P",
+		"status":      "STATUS",
+		"tags":        "TAGS",
+		// Date fields
+		"due":       "DUE",
+		"scheduled": "SCHEDULED",
+		"wait":      "WAIT",
+		"start":     "START",
+		"entry":     "ENTRY",
+		"modified":  "MODIFIED",
+		"end":       "END",
+		// Other fields
+		"urgency":    "URG",
+		"annotation": "A",
+		"dependency": "D",
+	}
+}
+
 // UnmarshalYAML implements custom unmarshaling to support backward compatibility
 // Accepts both:
 //   - Old format: ["id", "project", "priority"]
@@ -47,16 +73,7 @@ func (c *Columns) UnmarshalYAML(node *yaml.Node) error {
 	}
 
 	// Convert old format to new format with default labels
-	defaultLabels := map[string]string{
-		"id":          "ID",
-		"project":     "PROJECT",
-		"priority":    "P",
-		"due":         "DUE",
-		"tags":        "TAGS",
-		"annotation":  "A",
-		"dependency":  "D",
-		"description": "DESCRIPTION",
-	}
+	defaultLabels := GetDefaultLabels()
 
 	columns = make([]Column, len(oldFormat))
 	for i, name := range oldFormat {

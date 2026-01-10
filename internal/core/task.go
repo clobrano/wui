@@ -53,6 +53,110 @@ func (t *Task) GetUDA(key string) string {
 	return t.UDAs[key]
 }
 
+// GetProperty returns the value of any task property as a formatted string
+// Returns empty string and false if the property doesn't exist
+// Supports all standard taskwarrior properties and UDAs
+func (t *Task) GetProperty(name string) (string, bool) {
+	switch name {
+	case "id":
+		if t.ID == 0 {
+			return t.UUID, true
+		}
+		return fmt.Sprintf("%d", t.ID), true
+	case "uuid":
+		return t.UUID, true
+	case "description":
+		return t.Description, true
+	case "project":
+		if t.Project == "" {
+			return "-", true
+		}
+		return t.Project, true
+	case "priority":
+		if t.Priority == "" {
+			return "-", true
+		}
+		return string(t.Priority[0]), true
+	case "status":
+		return t.Status, true
+	case "tags":
+		if len(t.Tags) == 0 {
+			return "-", true
+		}
+		var tagList []string
+		for _, tag := range t.Tags {
+			tagList = append(tagList, "+"+tag)
+		}
+		return fmt.Sprintf("%v", tagList), true
+	case "due":
+		if t.Due == nil {
+			return "-", true
+		}
+		return t.formatDate(t.Due), true
+	case "scheduled":
+		if t.Scheduled == nil {
+			return "-", true
+		}
+		return t.formatDate(t.Scheduled), true
+	case "wait":
+		if t.Wait == nil {
+			return "-", true
+		}
+		return t.formatDate(t.Wait), true
+	case "start":
+		if t.Start == nil {
+			return "-", true
+		}
+		return t.formatDate(t.Start), true
+	case "entry":
+		return t.formatDate(&t.Entry), true
+	case "modified":
+		if t.Modified == nil {
+			return "-", true
+		}
+		return t.formatDate(t.Modified), true
+	case "end":
+		if t.End == nil {
+			return "-", true
+		}
+		return t.formatDate(t.End), true
+	case "urgency":
+		return fmt.Sprintf("%.1f", t.Urgency), true
+	case "annotation":
+		if len(t.Annotations) > 0 {
+			return "*", true
+		}
+		return "-", true
+	case "dependency":
+		if len(t.Depends) > 0 {
+			return "*", true
+		}
+		return "-", true
+	default:
+		// Check if it's a UDA
+		if val := t.GetUDA(name); val != "" {
+			return val, true
+		}
+		return "", false
+	}
+}
+
+// formatDate formats a time.Time pointer as YYYY-MM-DD or YYYY-MM-DD HH:MM
+// Shows time only if it's not midnight. Converts to local timezone for display.
+func (t *Task) formatDate(date *time.Time) string {
+	if date == nil {
+		return ""
+	}
+	// Convert to local timezone
+	localTime := date.Local()
+
+	// Show time if it's not midnight (00:00:00) in local time
+	if localTime.Hour() == 0 && localTime.Minute() == 0 && localTime.Second() == 0 {
+		return localTime.Format("2006-01-02")
+	}
+	return localTime.Format("2006-01-02 15:04")
+}
+
 // FormatDueDate returns the due date formatted as YYYY-MM-DD or YYYY-MM-DD HH:MM
 // Shows time only if it's not midnight. Returns empty string if due date is not set.
 // Converts to local timezone for display.

@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 
@@ -523,58 +524,87 @@ func (t TaskList) hasColumn(name string) bool {
 	return false
 }
 
+// getColumnWidth returns the default width for a column type
+func getColumnWidth(columnName string) (width int, isFixed bool) {
+	switch columnName {
+	// Single-character columns
+	case "priority", "annotation", "dependency":
+		return 1, true
+	// ID column
+	case "id":
+		return 4, true
+	// UUID column (short form)
+	case "uuid":
+		return 8, true
+	// Date columns (YYYY-MM-DD format)
+	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
+		return 10, true
+	// Tags column
+	case "tags":
+		return 15, true
+	// Urgency column
+	case "urgency":
+		return 5, true
+	// Status column
+	case "status":
+		return 10, true
+	// Variable-width columns
+	case "project":
+		return 10, false // minimum width, can grow
+	case "description":
+		return 20, false // minimum width, can grow
+	default:
+		// Unknown columns get a default width
+		return 15, true
+	}
+}
+
 // calculateColumnWidths determines column widths based on available space
 func (t TaskList) calculateColumnWidths() columnWidths {
 	const (
-		cursorWidth     = 2  // "■ " or "1 "
-		idWidth         = 4  // Sequential ID
-		priorityWidth   = 1  // H/M/L
-		dueWidth        = 10 // Date format
-		tagsWidth       = 15 // Tags column
-		annotationWidth = 1  // * or nothing
-		dependencyWidth = 1  // * or nothing
-		minProject      = 10
-		minDesc         = 20
-		spacing         = 7
+		cursorWidth = 2 // "■ " or "  "
+		spacing     = 1 // Space between columns
 	)
-
-	fixedWidth := cursorWidth + idWidth + priorityWidth + dueWidth + tagsWidth + spacing
-	remainingWidth := t.width - fixedWidth
 
 	widths := make(map[string]int)
 
-	// Set fixed widths for columns that are enabled
-	if t.hasColumn("id") {
-		widths["id"] = idWidth
-	}
-	if t.hasColumn("priority") {
-		widths["priority"] = priorityWidth
-	}
-	if t.hasColumn("due") {
-		widths["due"] = dueWidth
-	}
-	if t.hasColumn("tags") {
-		widths["tags"] = tagsWidth
-	}
-	if t.hasColumn("annotation") {
-		widths["annotation"] = annotationWidth
-	}
-	if t.hasColumn("dependency") {
-		widths["dependency"] = dependencyWidth
+	// Calculate fixed width and identify flexible columns
+	fixedWidth := cursorWidth
+	var flexibleColumns []string
+
+	for _, col := range t.displayColumns {
+		width, isFixed := getColumnWidth(col)
+		if isFixed {
+			widths[col] = width
+			fixedWidth += width + spacing
+		} else {
+			flexibleColumns = append(flexibleColumns, col)
+		}
 	}
 
-	// Calculate remaining space for flexible columns (project and description)
-	if remainingWidth < minProject+minDesc {
-		if t.hasColumn("project") {
-			widths["project"] = minProject
+	// Calculate remaining width for flexible columns
+	remainingWidth := t.width - fixedWidth
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
+
+	// Distribute remaining width among flexible columns
+	if len(flexibleColumns) > 0 {
+		// Special handling for project and description combination
+		hasProject := false
+		hasDescription := false
+		for _, col := range flexibleColumns {
+			if col == "project" {
+				hasProject = true
+			} else if col == "description" {
+				hasDescription = true
+			}
 		}
-		if t.hasColumn("description") {
-			widths["description"] = minDesc
-		}
-	} else {
-		// Allocate 25% to project, 75% to description
-		if t.hasColumn("project") && t.hasColumn("description") {
+
+		if hasProject && hasDescription {
+			// Allocate 25% to project, 75% to description
 			projectWidth := remainingWidth / 4
+			minProject, _ := getColumnWidth("project")
 			if projectWidth < minProject {
 				projectWidth = minProject
 			}
@@ -583,10 +613,27 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 			}
 			widths["project"] = projectWidth
 			widths["description"] = remainingWidth - projectWidth
-		} else if t.hasColumn("project") {
-			widths["project"] = remainingWidth
-		} else if t.hasColumn("description") {
-			widths["description"] = remainingWidth
+
+			// Remove project and description from flexibleColumns
+			newFlexible := []string{}
+			for _, col := range flexibleColumns {
+				if col != "project" && col != "description" {
+					newFlexible = append(newFlexible, col)
+				}
+			}
+			flexibleColumns = newFlexible
+		}
+
+		// Distribute remaining space equally among other flexible columns
+		if len(flexibleColumns) > 0 {
+			widthPerColumn := remainingWidth / len(flexibleColumns)
+			for _, col := range flexibleColumns {
+				minWidth, _ := getColumnWidth(col)
+				if widthPerColumn < minWidth {
+					widthPerColumn = minWidth
+				}
+				widths[col] = widthPerColumn
+			}
 		}
 	}
 
@@ -609,131 +656,63 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	}
 	// Note: quickJump numbers (1-9) are for keyboard shortcuts only, not displayed
 
-	// ID column: task ID
-	id := fmt.Sprintf("%d", task.ID)
-	if task.ID == 0 {
-		id = task.UUID
-		if len(id) > cols.widths["id"] {
-			id = id[:cols.widths["id"]]
-		}
-	}
-
-	// Project
-	project := task.Project
-	if project == "" {
-		project = "-"
-	}
-	if len(project) > cols.widths["project"] && cols.widths["project"] > 3 {
-		project = project[:cols.widths["project"]-3] + "..."
-	} else if len(project) > cols.widths["project"] {
-		project = project[:cols.widths["project"]]
-	}
-
-	// Priority - conditionally style based on selection
-	priority := "-"
-	var priorityText string
-	if task.Priority != "" {
-		priority = string(task.Priority[0])
-		if !isMultiSelected {
-			// Apply color only when not selected
-			priorityStyle := lipgloss.NewStyle()
-			switch task.Priority {
-			case "H":
-				priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
-			case "M":
-				priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
-			case "L":
-				priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
-			}
-			priorityText = priorityStyle.Render(priority)
-		} else {
-			priorityText = priority
-		}
-	} else {
-		priorityText = priority
-	}
-
-	// Due date - conditionally style based on selection
-	due := "-"
-	var dueText string
-	if task.Due != nil {
-		due = task.FormatDueDate()
-		if len(due) > cols.widths["due"] {
-			due = due[:cols.widths["due"]]
-		}
-		if !isMultiSelected && task.IsOverdue() {
-			// Apply overdue color only when not selected
-			dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
-			dueText = dueStyle.Render(due)
-		} else {
-			dueText = due
-		}
-	} else {
-		dueText = due
-	}
-
-	// Tags - format with + prefix like taskwarrior
-	tags := "-"
-	if len(task.Tags) > 0 {
-		var tagList []string
-		for _, tag := range task.Tags {
-			tagList = append(tagList, "+"+tag)
-		}
-		tags = strings.Join(tagList, " ")
-		if len(tags) > cols.widths["tags"] && cols.widths["tags"] > 3 {
-			tags = tags[:cols.widths["tags"]-3] + "..."
-		} else if len(tags) > cols.widths["tags"] {
-			tags = tags[:cols.widths["tags"]]
-		}
-	}
-
-	// Status icon prefix for description
-	statusIcon := ""
-	if task.Start != nil {
-		// Task is started (has Start field)
-		statusIcon = "▶ "
-	} else if task.Status == "waiting" {
-		statusIcon = "⏸ "
-	}
-
-	// Description - pad to fill remaining width (accounting for status icon)
-	description := statusIcon + task.Description
-	if len(description) > cols.widths["description"] && cols.widths["description"] > 3 {
-		description = description[:cols.widths["description"]-3] + "..."
-	} else if len(description) > cols.widths["description"] {
-		description = description[:cols.widths["description"]]
-	}
-
-	// Annotation indicator - show "*" if task has annotations
-	annotation := "-"
-	if len(task.Annotations) > 0 {
-		annotation = "*"
-	}
-
-	// Dependency indicator - show "*" if task has dependencies
-	dependency := "-"
-	if len(task.Depends) > 0 {
-		dependency = "*"
-	}
-
 	// Build line dynamically based on displayColumns
-	columnValues := map[string]string{
-		"id":          id,
-		"project":     project,
-		"priority":    priorityText,
-		"due":         dueText,
-		"tags":        tags,
-		"annotation":  annotation,
-		"dependency":  dependency,
-		"description": description,
-	}
-
 	parts := []string{cursor + " "}
 	for _, col := range t.displayColumns {
-		value := columnValues[col]
+		value, exists := task.GetProperty(col)
 		width := cols.widths[col]
 
-		// Priority, annotation, and dependency don't need padding, just add with space
+		// If property doesn't exist, show empty value and log warning
+		if !exists {
+			log.Printf("Warning: unknown column '%s' - property not found in task", col)
+			value = "-"
+		}
+
+		// Apply special formatting and styling for specific columns
+		switch col {
+		case "priority":
+			// Apply color coding for priority (only when not multi-selected)
+			if !isMultiSelected && task.Priority != "" {
+				priorityStyle := lipgloss.NewStyle()
+				switch task.Priority {
+				case "H":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityHigh)
+				case "M":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityMedium)
+				case "L":
+					priorityStyle = priorityStyle.Foreground(t.styles.PriorityLow)
+				}
+				value = priorityStyle.Render(value)
+			}
+			parts = append(parts, value+" ")
+			continue
+
+		case "due":
+			// Apply color coding for overdue tasks (only when not multi-selected)
+			if !isMultiSelected && task.IsOverdue() {
+				dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
+				value = dueStyle.Render(value)
+			}
+
+		case "description":
+			// Add status icon prefix for description
+			statusIcon := ""
+			if task.Start != nil {
+				statusIcon = "▶ "
+			} else if task.Status == "waiting" {
+				statusIcon = "⏸ "
+			}
+			value = statusIcon + task.Description
+		}
+
+		// Truncate value if it exceeds column width
+		if len(value) > width && width > 3 {
+			value = value[:width-3] + "..."
+		} else if len(value) > width {
+			value = value[:width]
+		}
+
+		// Single-character columns don't need padding
 		if col == "priority" || col == "annotation" || col == "dependency" {
 			parts = append(parts, value+" ")
 		} else {
