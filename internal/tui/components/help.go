@@ -94,6 +94,65 @@ func NewHelpWithKeybindings(width, height int, styles HelpStyles, keybindings ma
 	}
 }
 
+// NewHelpWithCustomCommands creates a new help component with custom keybindings and custom commands
+func NewHelpWithCustomCommands(width, height int, styles HelpStyles, keybindings map[string]string, customCommands map[string]CustomCommand) Help {
+	groups := keybindingGroupsFromConfig(keybindings)
+
+	// Add custom commands as a separate group if any exist
+	if len(customCommands) > 0 {
+		customGroup := KeybindingGroup{
+			Title:    "Custom Commands",
+			Bindings: []Keybinding{},
+		}
+
+		// Sort keys for consistent display
+		var keys []string
+		for k := range customCommands {
+			keys = append(keys, k)
+		}
+		// Simple sort (bubble sort)
+		for i := 0; i < len(keys); i++ {
+			for j := i + 1; j < len(keys); j++ {
+				if keys[i] > keys[j] {
+					keys[i], keys[j] = keys[j], keys[i]
+				}
+			}
+		}
+
+		for _, key := range keys {
+			cmd := customCommands[key]
+			description := cmd.Description
+			if description == "" {
+				description = cmd.Name
+			}
+			customGroup.Bindings = append(customGroup.Bindings, Keybinding{
+				Keys:        []string{key},
+				Description: description,
+			})
+		}
+
+		groups = append(groups, customGroup)
+	}
+
+	vp := viewport.New(width-4, height-4) // Account for border padding
+	vp.SetContent(renderHelpContent(groups, styles))
+
+	return Help{
+		viewport: vp,
+		groups:   groups,
+		width:    width,
+		height:   height,
+		styles:   styles,
+	}
+}
+
+// CustomCommand represents a user-configured custom command (mirrors config.CustomCommand)
+type CustomCommand struct {
+	Name        string
+	Command     string
+	Description string
+}
+
 // defaultKeybindingGroups returns the default keybinding groups
 func defaultKeybindingGroups() []KeybindingGroup {
 	return []KeybindingGroup{

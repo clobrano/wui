@@ -222,10 +222,31 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		initialSectionIndex = 0 // Fallback to first section if only Search exists
 	}
 
-	// Create help component with keybindings from config
+	// Create help component with keybindings and custom commands from config
 	var helpComponent components.Help
-	if cfg.TUI != nil && cfg.TUI.Keybindings != nil {
-		helpComponent = components.NewHelpWithKeybindings(80, 24, components.DefaultHelpStyles(), cfg.TUI.Keybindings)
+	if cfg.TUI != nil {
+		// Convert config.CustomCommand to components.CustomCommand
+		var customCmds map[string]components.CustomCommand
+		if len(cfg.TUI.CustomCommands) > 0 {
+			customCmds = make(map[string]components.CustomCommand)
+			fmt.Fprintf(os.Stderr, "[DEBUG] Loading %d custom commands\n", len(cfg.TUI.CustomCommands))
+			for key, cmd := range cfg.TUI.CustomCommands {
+				fmt.Fprintf(os.Stderr, "[DEBUG] Custom command: key=%s name=%s\n", key, cmd.Name)
+				customCmds[key] = components.CustomCommand{
+					Name:        cmd.Name,
+					Command:     cmd.Command,
+					Description: cmd.Description,
+				}
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "[DEBUG] No custom commands found in config\n")
+		}
+
+		if cfg.TUI.Keybindings != nil || len(customCmds) > 0 {
+			helpComponent = components.NewHelpWithCustomCommands(80, 24, components.DefaultHelpStyles(), cfg.TUI.Keybindings, customCmds)
+		} else {
+			helpComponent = components.NewHelp(80, 24, components.DefaultHelpStyles())
+		}
 	} else {
 		helpComponent = components.NewHelp(80, 24, components.DefaultHelpStyles())
 	}
@@ -1138,6 +1159,22 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// Check for custom commands (user-configured in config)
+	if m.config.TUI != nil && m.config.TUI.CustomCommands != nil {
+		if customCmd, exists := m.config.TUI.CustomCommands[keyPressed]; exists {
+			// Skip if in group view
+			if !m.inGroupView {
+				selectedTask := m.taskList.SelectedTask()
+				if selectedTask != nil {
+					return m, executeCustomCommand(customCmd, selectedTask)
+				} else {
+					m.statusMessage = "No task selected"
+				}
+			}
+			return m, nil
+		}
+	}
+
 	// Navigation keys - check both configured keys and arrow keys
 	if m.keyMatches(keyPressed, "up") || m.keyMatches(keyPressed, "down") ||
 		m.keyMatches(keyPressed, "first") || m.keyMatches(keyPressed, "last") ||
@@ -1960,4 +1997,135 @@ func loadAllProjectsAndTagsCmd(service core.TaskService) tea.Cmd {
 			Err:      nil,
 		}
 	}
+}
+
+// expandCommandTemplate expands a command template with task data
+// Template format: "xdg-open {{.url}}" or "echo {{.description}} {{.project}}"
+// Supports any task field accessible via GetProperty()
+func expandCommandTemplate(template string, task *core.Task) (string, error) {
+	if task == nil {
+		return "", fmt.Errorf("no task selected")
+	}
+
+	result := template
+
+	// Find all {{.field}} patterns
+	start := 0
+	for {
+		// Find opening {{
+		openIdx := strings.Index(result[start:], "{{.")
+		if openIdx == -1 {
+			break
+		}
+		openIdx += start
+
+		// Find closing }}
+		closeIdx := strings.Index(result[openIdx:], "}}")
+		if closeIdx == -1 {
+			return "", fmt.Errorf("unclosed template placeholder in command")
+		}
+		closeIdx += openIdx
+
+		// Extract field name (without {{. and }})
+		fieldName := result[openIdx+3 : closeIdx]
+
+		// Get field value from task
+		value, exists := task.GetProperty(fieldName)
+		if !exists {
+			return "", fmt.Errorf("field '%s' not found in task", fieldName)
+		}
+
+		// Replace {{.field}} with value
+		placeholder := result[openIdx : closeIdx+2]
+		result = strings.Replace(result, placeholder, value, 1)
+
+		// Continue searching after the replacement
+		start = openIdx + len(value)
+	}
+
+	return result, nil
+}
+
+// executeCustomCommand executes a custom command with template expansion
+func executeCustomCommand(cmd config.CustomCommand, task *core.Task) tea.Cmd {
+	return func() tea.Msg {
+		// Expand template
+		expandedCmd, err := expandCommandTemplate(cmd.Command, task)
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Command expansion failed: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		// Parse command into parts (handle quoted arguments properly)
+		parts, err := parseCommandLine(expandedCmd)
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Command parsing failed: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		if len(parts) == 0 {
+			return StatusMsg{
+				Message: "Empty command after expansion",
+				IsError: true,
+			}
+		}
+
+		// Execute command
+		execCmd := exec.Command(parts[0], parts[1:]...)
+		err = execCmd.Start()
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Command execution failed: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		return StatusMsg{
+			Message: fmt.Sprintf("Executed: %s", cmd.Name),
+			IsError: false,
+		}
+	}
+}
+
+// parseCommandLine parses a command line string into parts, respecting quotes
+// Simple parser that handles: cmd arg1 "arg with spaces" arg3
+func parseCommandLine(cmdLine string) ([]string, error) {
+	var parts []string
+	var current strings.Builder
+	inQuote := false
+	escaped := false
+
+	for i, r := range cmdLine {
+		switch {
+		case escaped:
+			current.WriteRune(r)
+			escaped = false
+		case r == '\\':
+			escaped = true
+		case r == '"':
+			inQuote = !inQuote
+		case r == ' ' && !inQuote:
+			if current.Len() > 0 {
+				parts = append(parts, current.String())
+				current.Reset()
+			}
+		default:
+			current.WriteRune(r)
+		}
+
+		// Check for unterminated quote at end
+		if i == len(cmdLine)-1 && inQuote {
+			return nil, fmt.Errorf("unterminated quote in command")
+		}
+	}
+
+	if current.Len() > 0 {
+		parts = append(parts, current.String())
+	}
+
+	return parts, nil
 }

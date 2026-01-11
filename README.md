@@ -10,8 +10,9 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
 - **Rich task metadata** - Full support for priorities, dates, dependencies, and recurrence
+- **Custom commands** - Execute system commands with task data using flexible templates (e.g., open URLs, copy to clipboard)
 - **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
-- **Configurable** - Customize keybindings, colors, columns, and fully customize tabs/sections
+- **Highly configurable** - Customize keybindings, colors, columns, tabs/sections, and custom commands
 - **Respects Taskwarrior config** - Reads your `.taskrc` for contexts and settings
 
 ## Installation
@@ -169,6 +170,32 @@ tui:
     filter: "/"
     refresh: r
 
+  # Custom commands - execute system commands with task data
+  # Use {{.fieldname}} to insert any task field into the command
+  # Supports standard fields (id, description, project, priority, tags, due, etc.)
+  # and custom UDAs (url, github, contact, etc.)
+  custom_commands:
+    o:  # Press 'o' to trigger this command
+      name: "Open URL"
+      command: "xdg-open {{.url}}"
+      description: "Opens the task's URL in default browser"
+
+    # Platform-specific examples:
+    # Linux/macOS: "xdg-open {{.url}}" or "open {{.url}}"
+    # Termux: "termux-open-url {{.url}}"
+    # Windows: "cmd /c start {{.url}}"
+    #
+    # More examples:
+    # "1":
+    #   name: "Copy Description"
+    #   command: "echo {{.description}} | xclip -selection clipboard"
+    #   description: "Copy task description to clipboard"
+    #
+    # c:
+    #   name: "Git Clone"
+    #   command: "git clone {{.url}} ~/projects/{{.project}}"
+    #   description: "Clone repository to projects folder"
+
   # Theme customization
   theme:
     # Theme name determines which base color palette to start from:
@@ -258,6 +285,85 @@ theme:
 - Standard colors: 0-15 work across all terminals
 - Extended colors: 16-255 require 256-color terminal support
 - See [ANSI color codes](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) for reference
+
+## Custom Commands
+
+Custom commands allow you to execute system commands with task data. Use the `{{.fieldname}}` template syntax to insert any task field into your command.
+
+### Quick Example
+
+```yaml
+tui:
+  custom_commands:
+    o:  # Press 'o' to open URL
+      name: "Open URL"
+      command: "xdg-open {{.url}}"
+      description: "Opens the task's URL in browser"
+```
+
+### Supported Fields
+
+All task fields are available via `{{.fieldname}}`:
+- **Standard fields**: `{{.id}}`, `{{.description}}`, `{{.project}}`, `{{.priority}}`, `{{.tags}}`, `{{.due}}`, `{{.uuid}}`, etc.
+- **Custom UDAs**: `{{.url}}`, `{{.github}}`, `{{.contact}}`, or any field you've defined in Taskwarrior
+
+### Platform-Specific Examples
+
+**Linux:**
+```yaml
+custom_commands:
+  o:
+    name: "Open URL"
+    command: "xdg-open {{.url}}"
+```
+
+**Termux (Android):**
+```yaml
+custom_commands:
+  o:
+    name: "Open URL"
+    command: "termux-open-url {{.url}}"
+```
+
+**macOS:**
+```yaml
+custom_commands:
+  o:
+    name: "Open URL"
+    command: "open {{.url}}"
+```
+
+**Windows:**
+```yaml
+custom_commands:
+  o:
+    name: "Open URL"
+    command: "cmd /c start {{.url}}"
+```
+
+### Advanced Examples
+
+**Multiple fields:**
+```yaml
+custom_commands:
+  c:
+    name: "Git Clone"
+    command: "git clone {{.url}} ~/projects/{{.project}}"
+    description: "Clone repository to project folder"
+```
+
+**Copy to clipboard:**
+```yaml
+custom_commands:
+  "1":
+    name: "Copy Description"
+    command: "echo {{.description}} | xclip -selection clipboard"
+    description: "Copy task description to clipboard"
+```
+
+Custom commands appear automatically in the help screen (`?`) under "Custom Commands" section.
+
+For complete documentation and more examples, see [`docs/custom-commands.md`](docs/custom-commands.md).
 
 ## CLI Flags
 
