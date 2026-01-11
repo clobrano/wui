@@ -94,10 +94,9 @@ func DefaultColumns() Columns {
 
 // DefaultNarrowViewFields returns the default fields to display in narrow view
 // These fields are shown below the description when terminal width < 80
+// Returns empty by default - users must explicitly configure narrow view fields
 func DefaultNarrowViewFields() Columns {
-	return Columns{
-		{Name: "due", Label: "Due"},
-	}
+	return Columns{}
 }
 
 // DefaultKeybindings returns the default key mappings

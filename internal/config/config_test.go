@@ -254,12 +254,9 @@ func TestConfigMergeWithDefaults(t *testing.T) {
 		t.Error("Expected default SidebarWidth")
 	}
 
-	// NarrowViewFields should have default value
-	if len(cfg.TUI.NarrowViewFields) == 0 {
-		t.Error("Expected default NarrowViewFields to be set")
-	}
-	if len(cfg.TUI.NarrowViewFields) > 0 && cfg.TUI.NarrowViewFields[0].Name != "due" {
-		t.Errorf("Expected default NarrowViewFields to contain 'due', got %s", cfg.TUI.NarrowViewFields[0].Name)
+	// NarrowViewFields should be empty by default (user must explicitly configure)
+	if len(cfg.TUI.NarrowViewFields) != 0 {
+		t.Errorf("Expected default NarrowViewFields to be empty, got %d fields", len(cfg.TUI.NarrowViewFields))
 	}
 }
 
