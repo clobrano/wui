@@ -896,8 +896,8 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 			value += " ⚠"
 		}
 
-		// Format: "    Label: value"
-		fieldLine := fmt.Sprintf("    %s: %s", label, value)
+		// Format: "       Label: value" (7 spaces to align with description)
+		fieldLine := fmt.Sprintf("       %s: %s", label, value)
 
 		// Apply length limit if configured
 		maxLength := t.narrowViewLengths[fieldName]
