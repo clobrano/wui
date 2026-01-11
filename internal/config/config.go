@@ -146,6 +146,9 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 		if len(loaded.TUI.Columns) > 0 {
 			result.TUI.Columns = loaded.TUI.Columns
 		}
+		if len(loaded.TUI.NarrowViewFields) > 0 {
+			result.TUI.NarrowViewFields = loaded.TUI.NarrowViewFields
+		}
 		if len(loaded.TUI.Keybindings) > 0 {
 			// Merge keybindings (loaded overrides defaults)
 			for k, v := range loaded.TUI.Keybindings {
