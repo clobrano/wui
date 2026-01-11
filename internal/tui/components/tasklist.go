@@ -814,8 +814,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 }
 
 // renderSmallScreenTaskLines renders a task as multiple lines for small screens
-// Line 1: ID + Description (2 space indent)
-// Line 2+: Configured fields (2 space indent)
+// Line 1: Cursor (1) + Space (1) + ID field (2, left-aligned) + Indent (2) + Description
+// Line 2+: Configured fields (6 space indent to align with description)
 func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMultiSelected bool) []string {
 	// Cursor indicator
 	cursor := " "
@@ -831,8 +831,8 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 	id := fmt.Sprintf("%d", task.ID)
 	if task.ID == 0 {
 		id = task.UUID
-		if len(id) > 4 {
-			id = id[:4]
+		if len(id) > 2 {
+			id = id[:2]
 		}
 	}
 
@@ -846,14 +846,14 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 
 	// Line 1: ID + Description with 2 space indent
 	// Format: "■ 1  Description text here..."
-	availableWidth := t.width - 8 // cursor(2) + id(4) + indent(2)
+	availableWidth := t.width - 6 // cursor(2) + id(2) + indent(2)
 	description := statusIcon + task.Description
 	if len(description) > availableWidth && availableWidth > 3 {
 		description = description[:availableWidth-3] + "..."
 	} else if len(description) > availableWidth {
 		description = description[:availableWidth]
 	}
-	line1 := fmt.Sprintf("%s %-4s  %s", cursor, id, description)
+	line1 := fmt.Sprintf("%s %-2s  %s", cursor, id, description)
 
 	// Apply status-based styling to all lines
 	var lineStyle lipgloss.Style
@@ -896,8 +896,8 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 			value += " ⚠"
 		}
 
-		// Format: "  Label: value" (2 spaces to save space)
-		fieldLine := fmt.Sprintf("  %s: %s", label, value)
+		// Format: "      Label: value" (6 spaces to align with description)
+		fieldLine := fmt.Sprintf("      %s: %s", label, value)
 
 		// Apply length limit if configured
 		maxLength := t.narrowViewLengths[fieldName]
