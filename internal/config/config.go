@@ -152,6 +152,9 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 				result.TUI.Keybindings[k] = v
 			}
 		}
+		if len(loaded.TUI.CustomCommands) > 0 {
+			result.TUI.CustomCommands = loaded.TUI.CustomCommands
+		}
 		if loaded.TUI.Theme != nil {
 			result.TUI.Theme = mergeThem(result.TUI.Theme, loaded.TUI.Theme)
 		}
