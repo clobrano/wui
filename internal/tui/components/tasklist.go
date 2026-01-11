@@ -814,8 +814,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 }
 
 // renderSmallScreenTaskLines renders a task as multiple lines for small screens
-// Line 1: ID + Description
-// Line 2+: Configured fields (indented)
+// Line 1: ID + Description (2 space indent)
+// Line 2+: Configured fields (2 space indent)
 func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMultiSelected bool) []string {
 	// Cursor indicator
 	cursor := " "
@@ -844,16 +844,16 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 		statusIcon = "⏸ "
 	}
 
-	// Line 1: ID + Description
-	// Format: "■ 1 Description text here..."
-	availableWidth := t.width - 7 // cursor(2) + id(4) + space(1)
+	// Line 1: ID + Description with 2 space indent
+	// Format: "■ 1  Description text here..."
+	availableWidth := t.width - 8 // cursor(2) + id(4) + indent(2)
 	description := statusIcon + task.Description
 	if len(description) > availableWidth && availableWidth > 3 {
 		description = description[:availableWidth-3] + "..."
 	} else if len(description) > availableWidth {
 		description = description[:availableWidth]
 	}
-	line1 := fmt.Sprintf("%s %-4s %s", cursor, id, description)
+	line1 := fmt.Sprintf("%s %-4s  %s", cursor, id, description)
 
 	// Apply status-based styling to all lines
 	var lineStyle lipgloss.Style
@@ -896,8 +896,8 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 			value += " ⚠"
 		}
 
-		// Format: "       Label: value" (7 spaces to align with description)
-		fieldLine := fmt.Sprintf("       %s: %s", label, value)
+		// Format: "  Label: value" (2 spaces to save space)
+		fieldLine := fmt.Sprintf("  %s: %s", label, value)
 
 		// Apply length limit if configured
 		maxLength := t.narrowViewLengths[fieldName]
