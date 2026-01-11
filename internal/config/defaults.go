@@ -36,13 +36,14 @@ func DefaultCalendarSync() *CalendarSync {
 // DefaultTUIConfig returns TUI configuration with defaults
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
-		SidebarWidth: 33,         // Percentage of terminal width (33%)
-		ScrollBuffer: 1,          // Number of tasks to keep visible above/below cursor
-		InputMode:    "floating", // Default to floating window for input prompts
-		Tabs:         DefaultTabs(),
-		Columns:      DefaultColumns(),
-		Keybindings:  DefaultKeybindings(),
-		Theme:        DefaultTheme(),
+		SidebarWidth:     33,         // Percentage of terminal width (33%)
+		ScrollBuffer:     1,          // Number of tasks to keep visible above/below cursor
+		InputMode:        "floating", // Default to floating window for input prompts
+		Tabs:             DefaultTabs(),
+		Columns:          DefaultColumns(),
+		NarrowViewFields: DefaultNarrowViewFields(),
+		Keybindings:      DefaultKeybindings(),
+		Theme:            DefaultTheme(),
 	}
 }
 
@@ -89,6 +90,13 @@ func DefaultColumns() Columns {
 		{Name: "dependency", Label: "D"},
 		{Name: "description", Label: "DESCRIPTION"},
 	}
+}
+
+// DefaultNarrowViewFields returns the default fields to display in narrow view
+// These fields are shown below the description when terminal width < 80
+// Returns empty by default - users must explicitly configure narrow view fields
+func DefaultNarrowViewFields() Columns {
+	return Columns{}
 }
 
 // DefaultKeybindings returns the default key mappings

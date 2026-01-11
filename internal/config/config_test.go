@@ -253,4 +253,44 @@ func TestConfigMergeWithDefaults(t *testing.T) {
 	if cfg.TUI.SidebarWidth == 0 {
 		t.Error("Expected default SidebarWidth")
 	}
+
+	// NarrowViewFields should be empty by default (user must explicitly configure)
+	if len(cfg.TUI.NarrowViewFields) != 0 {
+		t.Errorf("Expected default NarrowViewFields to be empty, got %d fields", len(cfg.TUI.NarrowViewFields))
+	}
+}
+
+func TestConfigMergeNarrowViewFields(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	// Create config with custom narrow_view_fields
+	customYAML := `tui:
+  narrow_view_fields:
+    - name: "project"
+      label: "Project"
+    - name: "priority"
+      label: "Priority"
+`
+
+	err := os.WriteFile(configPath, []byte(customYAML), 0644)
+	if err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Custom narrow_view_fields should be set
+	if len(cfg.TUI.NarrowViewFields) != 2 {
+		t.Errorf("Expected 2 narrow view fields, got %d", len(cfg.TUI.NarrowViewFields))
+	}
+	if len(cfg.TUI.NarrowViewFields) > 0 && cfg.TUI.NarrowViewFields[0].Name != "project" {
+		t.Errorf("Expected first field to be 'project', got %s", cfg.TUI.NarrowViewFields[0].Name)
+	}
+	if len(cfg.TUI.NarrowViewFields) > 1 && cfg.TUI.NarrowViewFields[1].Name != "priority" {
+		t.Errorf("Expected second field to be 'priority', got %s", cfg.TUI.NarrowViewFields[1].Name)
+	}
 }
