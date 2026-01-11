@@ -207,7 +207,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		allSections = append(allSections, core.DefaultSections()...)
 	}
 
-	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, styles.ToTaskListStyles())
+	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, cfg.TUI.NarrowViewFields, styles.ToTaskListStyles())
 	taskList.SetScrollBuffer(cfg.TUI.ScrollBuffer)
 
 	// Determine initial section: Search tab if --search flag provided, otherwise "Next" tab

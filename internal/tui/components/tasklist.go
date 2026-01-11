@@ -37,24 +37,27 @@ type TaskListStyles struct {
 
 // TaskList is a component for displaying and navigating a list of tasks or groups
 type TaskList struct {
-	tasks          []core.Task
-	groups         []core.TaskGroup // For displaying groups (Projects/Tags)
-	displayMode    DisplayMode      // What to display: tasks or groups
-	cursor         int              // Selected task/group index
-	selectedUUIDs  map[string]bool  // Multi-select: UUIDs of selected tasks
-	width          int
-	height         int
-	displayColumns []string          // Column names to display
-	columnLabels   map[string]string // Map of column name to display label
-	columnLengths  map[string]int    // Map of column name to custom max length (0 = use default)
-	offset         int               // Scroll offset for viewport
-	scrollBuffer   int               // Number of tasks to keep visible above/below cursor
-	styles         TaskListStyles
-	emptyMessage   string // Custom message to show when list is empty
+	tasks               []core.Task
+	groups              []core.TaskGroup // For displaying groups (Projects/Tags)
+	displayMode         DisplayMode      // What to display: tasks or groups
+	cursor              int              // Selected task/group index
+	selectedUUIDs       map[string]bool  // Multi-select: UUIDs of selected tasks
+	width               int
+	height              int
+	displayColumns      []string          // Column names to display
+	columnLabels        map[string]string // Map of column name to display label
+	columnLengths       map[string]int    // Map of column name to custom max length (0 = use default)
+	narrowViewFields    []string          // Field names to display in narrow view (below description)
+	narrowViewLabels    map[string]string // Map of field name to display label for narrow view
+	narrowViewLengths   map[string]int    // Map of field name to custom max length for narrow view
+	offset              int               // Scroll offset for viewport
+	scrollBuffer        int               // Number of tasks to keep visible above/below cursor
+	styles              TaskListStyles
+	emptyMessage        string // Custom message to show when list is empty
 }
 
 // NewTaskList creates a new task list component
-func NewTaskList(width, height int, columns config.Columns, styles TaskListStyles) TaskList {
+func NewTaskList(width, height int, columns config.Columns, narrowViewFields config.Columns, styles TaskListStyles) TaskList {
 	// Default columns if none provided
 	if len(columns) == 0 {
 		columns = config.DefaultColumns()
@@ -76,20 +79,39 @@ func NewTaskList(width, height int, columns config.Columns, styles TaskListStyle
 		columnLengths[normalizedName] = col.Length
 	}
 
+	// Default narrow view fields if none provided
+	if len(narrowViewFields) == 0 {
+		narrowViewFields = config.DefaultNarrowViewFields()
+	}
+
+	// Build narrow view field names, labels, and lengths maps
+	normalizedNarrowViewFields := make([]string, len(narrowViewFields))
+	narrowViewLabels := make(map[string]string)
+	narrowViewLengths := make(map[string]int)
+	for i, field := range narrowViewFields {
+		normalizedName := strings.ToLower(field.Name)
+		normalizedNarrowViewFields[i] = normalizedName
+		narrowViewLabels[normalizedName] = field.Label
+		narrowViewLengths[normalizedName] = field.Length
+	}
+
 	return TaskList{
-		tasks:          []core.Task{},
-		groups:         []core.TaskGroup{},
-		displayMode:    DisplayModeTasks,
-		cursor:         0,
-		selectedUUIDs:  make(map[string]bool),
-		width:          width,
-		height:         height,
-		displayColumns: normalizedColumns,
-		columnLabels:   columnLabels,
-		columnLengths:  columnLengths,
-		offset:         0,
-		scrollBuffer:   1, // Default: keep 1 task visible above/below cursor
-		styles:         styles,
+		tasks:             []core.Task{},
+		groups:            []core.TaskGroup{},
+		displayMode:       DisplayModeTasks,
+		cursor:            0,
+		selectedUUIDs:     make(map[string]bool),
+		width:             width,
+		height:            height,
+		displayColumns:    normalizedColumns,
+		columnLabels:      columnLabels,
+		columnLengths:     columnLengths,
+		narrowViewFields:  normalizedNarrowViewFields,
+		narrowViewLabels:  narrowViewLabels,
+		narrowViewLengths: narrowViewLengths,
+		offset:            0,
+		scrollBuffer:      1, // Default: keep 1 task visible above/below cursor
+		styles:            styles,
 	}
 }
 
@@ -791,9 +813,9 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	return lineStyle.Width(t.width).Render(line)
 }
 
-// renderSmallScreenTaskLines renders a task as 2 lines for small screens
+// renderSmallScreenTaskLines renders a task as multiple lines for small screens
 // Line 1: ID + Description
-// Line 2: Due date (indented)
+// Line 2+: Configured fields (indented)
 func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMultiSelected bool) []string {
 	// Cursor indicator
 	cursor := " "
@@ -833,20 +855,7 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 	}
 	line1 := fmt.Sprintf("%s %-4s %s", cursor, id, description)
 
-	// Line 2: Due date (indented)
-	// Format: "    Due: 2025-01-05" or "    Due: -" if no due date
-	dueText := "-"
-	var dueLine string
-	if task.Due != nil {
-		dueText = task.FormatDueDate()
-		// Add overdue indicator
-		if task.IsOverdue() {
-			dueText += " ⚠"
-		}
-	}
-	dueLine = fmt.Sprintf("    Due: %s", dueText)
-
-	// Apply status-based styling to both lines
+	// Apply status-based styling to all lines
 	var lineStyle lipgloss.Style
 	if isCursor || isMultiSelected {
 		lineStyle = t.styles.Selection
@@ -866,10 +875,44 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 		}
 	}
 
-	styledLine1 := lineStyle.Width(t.width).Render(line1)
-	styledLine2 := lineStyle.Width(t.width).Render(dueLine)
+	// Start building the result with line 1
+	lines := []string{lineStyle.Width(t.width).Render(line1)}
 
-	return []string{styledLine1, styledLine2}
+	// Add configured narrow view fields
+	for _, fieldName := range t.narrowViewFields {
+		label := t.narrowViewLabels[fieldName]
+		if label == "" {
+			label = strings.Title(fieldName)
+		}
+
+		// Get the field value
+		value, exists := task.GetProperty(fieldName)
+		if !exists {
+			value = "-"
+		}
+
+		// Special handling for due dates: add overdue indicator
+		if fieldName == "due" && task.Due != nil && task.IsOverdue() {
+			value += " ⚠"
+		}
+
+		// Format: "    Label: value"
+		fieldLine := fmt.Sprintf("    %s: %s", label, value)
+
+		// Apply length limit if configured
+		maxLength := t.narrowViewLengths[fieldName]
+		if maxLength > 0 && len(fieldLine) > maxLength {
+			if maxLength > 3 {
+				fieldLine = fieldLine[:maxLength-3] + "..."
+			} else {
+				fieldLine = fieldLine[:maxLength]
+			}
+		}
+
+		lines = append(lines, lineStyle.Width(t.width).Render(fieldLine))
+	}
+
+	return lines
 }
 
 // renderGroupHeader renders the header for group list view
