@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -162,7 +163,7 @@ type Model struct {
 	confirmAction string // "delete", "done", etc.
 
 	// Calendar sync state
-	syncingBeforeQuit bool                  // true when syncing before quit
+	syncingBeforeQuit bool                 // true when syncing before quit
 	syncWarnings      *calendar.SyncResult // warnings to print after quit
 }
 
@@ -2074,12 +2075,36 @@ func executeCustomCommand(cmd config.CustomCommand, task *core.Task) tea.Cmd {
 			}
 		}
 
-		// Execute command
+		// Execute command and capture output
 		execCmd := exec.Command(parts[0], parts[1:]...)
-		err = execCmd.Start()
+
+		// Ensure command inherits the environment (including PATH)
+		execCmd.Env = os.Environ()
+
+		// Capture stderr for error reporting
+		var stderr bytes.Buffer
+		execCmd.Stderr = &stderr
+
+		// Run the command and wait for it to complete
+		err = execCmd.Run()
 		if err != nil {
+			// Command failed - report exit code and stderr
+			errMsg := fmt.Sprintf("Command '%s' failed", cmd.Name)
+
+			// Add exit code if available
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				errMsg += fmt.Sprintf(" (exit code %d)", exitErr.ExitCode())
+			} else {
+				errMsg += fmt.Sprintf(": %s", err.Error())
+			}
+
+			// Add stderr if available
+			if stderrStr := strings.TrimSpace(stderr.String()); stderrStr != "" {
+				errMsg += fmt.Sprintf(": %s", stderrStr)
+			}
+
 			return StatusMsg{
-				Message: fmt.Sprintf("Command execution failed: %s", err.Error()),
+				Message: errMsg,
 				IsError: true,
 			}
 		}

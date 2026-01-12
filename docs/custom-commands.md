@@ -72,14 +72,16 @@ tui:
   custom_commands:
     o:
       name: "Open URL"
-      command: "termux-open-url {{.url}}"
+      command: "/data/data/com.termux/files/usr/bin/termux-open-url {{.url}}"
       description: "Open URL in browser"
 
     s:
       name: "Share Task"
-      command: "termux-share -a send '{{.description}}'"
+      command: "/data/data/com.termux/files/usr/bin/termux-share -a send '{{.description}}'"
       description: "Share task via Android"
 ```
+
+**Termux Note:** If you get "cannot open" errors, use full paths to Termux commands. Find the path with `which termux-open-url`.
 
 ### macOS
 
@@ -156,11 +158,32 @@ Press `?` in wui to see your configured custom commands in the help screen.
 
 ## Error Handling
 
-If a command fails, wui will show an error message:
-- "Field not found" - The field doesn't exist in the task
-- "No task selected" - You're not on a task (e.g., in group view)
-- "Command execution failed" - The system command couldn't run
-- "Command parsing failed" - Invalid command syntax
+wui provides comprehensive error reporting when custom commands fail:
+
+### Error Types
+
+- **"Field not found"** - The field doesn't exist in the task (e.g., referencing `{{.url}}` when task has no URL field)
+- **"No task selected"** - You're not on a task (e.g., in group view)
+- **"Command parsing failed"** - Invalid command syntax (e.g., unterminated quotes)
+- **"Command failed (exit code N)"** - Command ran but exited with non-zero status, includes:
+  - Exit code number
+  - Error output (stderr) from the command
+
+### Examples
+
+```
+✗ Command 'Open URL' failed (exit code 127): command not found: xdg-open
+✗ Command expansion failed: field 'url' not found in task
+✗ Command parsing failed: unterminated quote in command
+✗ Command 'Git Clone' failed (exit code 128): fatal: repository not found
+```
+
+### What Gets Reported
+
+When a command fails:
+1. **Exit code**: Shows the numeric exit status (if the command ran)
+2. **Error message**: Shows stderr output from the command
+3. **Context**: Shows which custom command failed by name
 
 ## Tips
 
