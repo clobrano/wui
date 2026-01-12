@@ -18,10 +18,11 @@ type SyncClient struct {
 	taskClient      *taskwarrior.Client
 	calendarName    string
 	taskFilter      string
+	eventDuration   int // Duration in minutes for timed events
 }
 
 // NewSyncClient creates a new sync client
-func NewSyncClient(ctx context.Context, taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string) (*SyncClient, error) {
+func NewSyncClient(ctx context.Context, taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string, eventDuration int) (*SyncClient, error) {
 	// Get authenticated calendar service
 	calService, err := GetOAuth2Client(ctx, credentialsPath, tokenPath)
 	if err != nil {
@@ -33,6 +34,7 @@ func NewSyncClient(ctx context.Context, taskClient *taskwarrior.Client, credenti
 		taskClient:      taskClient,
 		calendarName:    calendarName,
 		taskFilter:      taskFilter,
+		eventDuration:   eventDuration,
 	}, nil
 }
 
@@ -323,8 +325,8 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		event.Start = &calendar.EventDateTime{
 			DateTime: eventTime.Format(time.RFC3339),
 		}
-		// Default to 15 minutes duration for timed events
-		endTime := eventTime.Add(15 * time.Minute)
+		// Use configured duration for timed events
+		endTime := eventTime.Add(time.Duration(s.eventDuration) * time.Minute)
 		event.End = &calendar.EventDateTime{
 			DateTime: endTime.Format(time.RFC3339),
 		}

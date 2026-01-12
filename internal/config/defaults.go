@@ -30,6 +30,7 @@ func DefaultCalendarSync() *CalendarSync {
 		CredentialsPath: filepath.Join(configDir, "credentials.json"),
 		TokenPath:       filepath.Join(configDir, "token.json"),
 		AutoSyncOnQuit:  false,
+		EventDuration:   30, // Default to 30 minutes for timed events
 	}
 }
 

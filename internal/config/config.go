@@ -17,6 +17,7 @@ type CalendarSync struct {
 	CredentialsPath string `yaml:"credentials_path"`
 	TokenPath       string `yaml:"token_path"`
 	AutoSyncOnQuit  bool   `yaml:"auto_sync_on_quit"`
+	EventDuration   int    `yaml:"event_duration"` // Duration in minutes for timed events
 }
 
 // Config represents the wui configuration

@@ -1862,6 +1862,7 @@ func calendarSyncCmd(cfg *config.Config, service core.TaskService) tea.Cmd {
 		taskFilter := cfg.CalendarSync.TaskFilter
 		credentialsPath := cfg.CalendarSync.CredentialsPath
 		tokenPath := cfg.CalendarSync.TokenPath
+		eventDuration := cfg.CalendarSync.EventDuration
 
 		// Validate required fields
 		if calendarName == "" {
@@ -1887,7 +1888,7 @@ func calendarSyncCmd(cfg *config.Config, service core.TaskService) tea.Cmd {
 		}
 
 		// Perform the calendar sync
-		result, err := performCalendarSync(taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+		result, err := performCalendarSync(taskClient, credentialsPath, tokenPath, calendarName, taskFilter, eventDuration)
 		return CalendarSyncCompletedMsg{
 			Result: result,
 			Err:    err,
@@ -1901,11 +1902,11 @@ func createTaskClient(cfg *config.Config) (*taskwarrior.Client, error) {
 }
 
 // Helper function to perform calendar sync
-func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string) (*calendar.SyncResult, error) {
+func performCalendarSync(taskClient *taskwarrior.Client, credentialsPath, tokenPath, calendarName, taskFilter string, eventDuration int) (*calendar.SyncResult, error) {
 	ctx := context.Background()
 
 	// Create sync client
-	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter, eventDuration)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create sync client: %w", err)
 	}

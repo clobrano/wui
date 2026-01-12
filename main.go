@@ -299,12 +299,13 @@ func runSync() error {
 	// Get credentials and token paths from config
 	credentialsPath := cfg.CalendarSync.CredentialsPath
 	tokenPath := cfg.CalendarSync.TokenPath
+	eventDuration := cfg.CalendarSync.EventDuration
 
 	slog.Info("Using credentials", "path", credentialsPath, "token_path", tokenPath)
 
 	// Create sync client
 	ctx := context.Background()
-	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
+	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter, eventDuration)
 	if err != nil {
 		slog.Error("Failed to create sync client", "error", err)
 		return fmt.Errorf("failed to create sync client: %w", err)
