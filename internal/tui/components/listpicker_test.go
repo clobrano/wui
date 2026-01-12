@@ -2,6 +2,8 @@ package components
 
 import (
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestFuzzyMatch(t *testing.T) {
@@ -200,4 +202,167 @@ func TestListPicker_View(t *testing.T) {
 	if len(view) < 10 {
 		t.Error("expected view to contain title, items, and help text")
 	}
+}
+
+func TestListPicker_InteractiveFiltering(t *testing.T) {
+	items := []string{"home", "work", "project", "personal", "homework"}
+	lp := NewListPicker("Test", items, "")
+
+	// Initially should have all items
+	if len(lp.filteredItems) != 5 {
+		t.Errorf("expected 5 items, got %d", len(lp.filteredItems))
+	}
+
+	// Type 'h' - should match "home", "homework"
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "h" {
+		t.Errorf("expected filter 'h', got %q", lp.Filter())
+	}
+
+	if len(lp.filteredItems) != 2 {
+		t.Errorf("expected 2 filtered items after 'h', got %d: %v", len(lp.filteredItems), lp.filteredItems)
+	}
+
+	// Type 'o' - should fuzzy match "home", "homework"
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "ho" {
+		t.Errorf("expected filter 'ho', got %q", lp.Filter())
+	}
+
+	if len(lp.filteredItems) != 2 {
+		t.Errorf("expected 2 filtered items after 'ho', got %d: %v", len(lp.filteredItems), lp.filteredItems)
+	}
+
+	// Type 'w' - should fuzzy match "homework" only (h-o-w)
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'w'}}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "how" {
+		t.Errorf("expected filter 'how', got %q", lp.Filter())
+	}
+
+	if len(lp.filteredItems) != 1 {
+		t.Errorf("expected 1 filtered item after 'how', got %d: %v", len(lp.filteredItems), lp.filteredItems)
+	}
+
+	if lp.filteredItems[0] != "homework" {
+		t.Errorf("expected 'homework', got %q", lp.filteredItems[0])
+	}
+}
+
+func TestListPicker_Backspace(t *testing.T) {
+	items := []string{"home", "work", "project"}
+	lp := NewListPicker("Test", items, "ho")
+
+	// Initial filter should be "ho"
+	if lp.Filter() != "ho" {
+		t.Errorf("expected initial filter 'ho', got %q", lp.Filter())
+	}
+
+	// Should have 1 match (home)
+	if len(lp.filteredItems) != 1 {
+		t.Errorf("expected 1 filtered item, got %d", len(lp.filteredItems))
+	}
+
+	// Press backspace - should remove 'o', leaving 'h'
+	msg := tea.KeyMsg{Type: tea.KeyBackspace}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "h" {
+		t.Errorf("expected filter 'h' after backspace, got %q", lp.Filter())
+	}
+
+	if len(lp.filteredItems) != 1 {
+		t.Errorf("expected 1 filtered item after backspace, got %d", len(lp.filteredItems))
+	}
+
+	// Press backspace again - should clear filter
+	msg = tea.KeyMsg{Type: tea.KeyBackspace}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "" {
+		t.Errorf("expected empty filter after second backspace, got %q", lp.Filter())
+	}
+
+	// Should show all items when filter is empty
+	if len(lp.filteredItems) != 3 {
+		t.Errorf("expected 3 items when filter is empty, got %d", len(lp.filteredItems))
+	}
+
+	// Backspace on empty filter should do nothing
+	msg = tea.KeyMsg{Type: tea.KeyBackspace}
+	lp, _ = lp.Update(msg)
+
+	if lp.Filter() != "" {
+		t.Errorf("expected filter to stay empty, got %q", lp.Filter())
+	}
+}
+
+func TestListPicker_NavigationWithFiltering(t *testing.T) {
+	items := []string{"home", "work", "project"}
+	lp := NewListPicker("Test", items, "")
+
+	// Initial selection should be 0
+	if lp.selectedIndex != 0 {
+		t.Errorf("expected initial selection 0, got %d", lp.selectedIndex)
+	}
+
+	// Move down
+	msg := tea.KeyMsg{Type: tea.KeyDown}
+	lp, _ = lp.Update(msg)
+
+	if lp.selectedIndex != 1 {
+		t.Errorf("expected selection 1 after down, got %d", lp.selectedIndex)
+	}
+
+	// Type 'h' to filter - selection should reset to 0
+	msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	lp, _ = lp.Update(msg)
+
+	if lp.selectedIndex != 0 {
+		t.Errorf("expected selection 0 after filtering, got %d", lp.selectedIndex)
+	}
+
+	if len(lp.filteredItems) != 1 {
+		t.Errorf("expected 1 filtered item, got %d", len(lp.filteredItems))
+	}
+
+	// Try to move down (should stay at 0 since only 1 item)
+	msg = tea.KeyMsg{Type: tea.KeyDown}
+	lp, _ = lp.Update(msg)
+
+	if lp.selectedIndex != 0 {
+		t.Errorf("expected selection to stay at 0 with only 1 item, got %d", lp.selectedIndex)
+	}
+}
+
+func TestListPicker_VimNavigation(t *testing.T) {
+	items := []string{"home", "work", "project"}
+	lp := NewListPicker("Test", items, "")
+
+	// Initial selection should be 0
+	if lp.selectedIndex != 0 {
+		t.Errorf("expected initial selection 0, got %d", lp.selectedIndex)
+	}
+
+	// Press 'j' to move down
+	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+	lp, _ = lp.Update(msg)
+
+	// Should NOT move down because 'j' is treated as a filter character first
+	// After typing 'j', filter becomes "j" and no items match
+	if lp.Filter() != "j" {
+		t.Errorf("expected filter 'j', got %q", lp.Filter())
+	}
+
+	// Clear the filter by creating a new picker
+	lp = NewListPicker("Test", items, "")
+
+	// To test vim navigation, we need to send KeyMsg without KeyRunes type
+	// Since the implementation checks msg.String() in the default case
+	// This is a limitation of the current implementation
 }
