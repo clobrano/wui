@@ -2078,6 +2078,9 @@ func executeCustomCommand(cmd config.CustomCommand, task *core.Task) tea.Cmd {
 		// Execute command and capture output
 		execCmd := exec.Command(parts[0], parts[1:]...)
 
+		// Ensure command inherits the environment (including PATH)
+		execCmd.Env = os.Environ()
+
 		// Capture stderr for error reporting
 		var stderr bytes.Buffer
 		execCmd.Stderr = &stderr
