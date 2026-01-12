@@ -72,14 +72,16 @@ tui:
   custom_commands:
     o:
       name: "Open URL"
-      command: "termux-open-url {{.url}}"
+      command: "/data/data/com.termux/files/usr/bin/termux-open-url {{.url}}"
       description: "Open URL in browser"
 
     s:
       name: "Share Task"
-      command: "termux-share -a send '{{.description}}'"
+      command: "/data/data/com.termux/files/usr/bin/termux-share -a send '{{.description}}'"
       description: "Share task via Android"
 ```
+
+**Termux Note:** If you get "cannot open" errors, use full paths to Termux commands. Find the path with `which termux-open-url`.
 
 ### macOS
 
