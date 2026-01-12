@@ -743,8 +743,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		// Apply styling for specific columns AFTER padding
 		switch col {
 		case "priority":
-			// Apply color coding for priority (only when not multi-selected)
-			if !isMultiSelected && task.Priority != "" {
+			// Apply color coding for priority (only when not highlighted)
+			if !isCursor && !isMultiSelected && task.Priority != "" {
 				priorityStyle := lipgloss.NewStyle()
 				switch task.Priority {
 				case "H":
@@ -760,8 +760,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 			continue
 
 		case "due":
-			// Apply color coding for overdue tasks (only when not multi-selected)
-			if !isMultiSelected && task.IsOverdue() {
+			// Apply color coding for overdue tasks (only when not highlighted)
+			if !isCursor && !isMultiSelected && task.IsOverdue() {
 				dueStyle := lipgloss.NewStyle().Foreground(t.styles.DueOverdue)
 				value = dueStyle.Render(value)
 			}
