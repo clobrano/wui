@@ -34,15 +34,29 @@ func NewListPicker(title string, items []string, filter string) ListPicker {
 	return lp
 }
 
-// updateFilteredItems filters the items based on current filter
+// fuzzyMatch checks if all characters in filter appear in order in target (case-insensitive)
+func fuzzyMatch(filter, target string) bool {
+	filterLower := strings.ToLower(filter)
+	targetLower := strings.ToLower(target)
+
+	filterIdx := 0
+	for targetIdx := 0; targetIdx < len(targetLower) && filterIdx < len(filterLower); targetIdx++ {
+		if targetLower[targetIdx] == filterLower[filterIdx] {
+			filterIdx++
+		}
+	}
+
+	return filterIdx == len(filterLower)
+}
+
+// updateFilteredItems filters the items based on current filter using fuzzy matching
 func (lp *ListPicker) updateFilteredItems() {
 	if lp.filter == "" {
 		lp.filteredItems = lp.allItems
 	} else {
 		lp.filteredItems = []string{}
-		filterLower := strings.ToLower(lp.filter)
 		for _, item := range lp.allItems {
-			if strings.HasPrefix(strings.ToLower(item), filterLower) {
+			if fuzzyMatch(lp.filter, item) {
 				lp.filteredItems = append(lp.filteredItems, item)
 			}
 		}
