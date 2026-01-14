@@ -31,7 +31,8 @@ Use `{{.fieldname}}` to insert task field values into commands. All fields acces
 
 ### Standard Fields
 - `{{.id}}` - Task ID
-- `{{.uuid}}` - Task UUID
+- `{{.uuid}}` - Task UUID (full)
+- `{{.short_uuid}}` - Task UUID (first 8 characters)
 - `{{.description}}` - Task description
 - `{{.project}}` - Project name
 - `{{.priority}}` - Priority (H/M/L)
@@ -132,6 +133,11 @@ tui:
       name: "Create Note"
       command: "echo '# {{.description}}' > ~/notes/{{.id}}.md && vim ~/notes/{{.id}}.md"
       description: "Create markdown note from task"
+
+    f:
+      name: "Format for Notes"
+      command: "sh -c \"echo '{{.description}} ({{.short_uuid}})' | xclip -selection clipboard\""
+      description: "Copy task description with short UUID to clipboard"
 ```
 
 ### Quoted Arguments
@@ -185,6 +191,30 @@ When a command fails:
 2. **Error message**: Shows stderr output from the command
 3. **Context**: Shows which custom command failed by name
 
+## Shell Features (Pipes, Redirects, etc.)
+
+Custom commands are executed directly without invoking a shell. This means shell features like pipes (`|`), redirections (`>`), and command substitution (`$()`) won't work by default.
+
+### Using Shell Features
+
+To use shell features, wrap your command with `sh -c "..."`:
+
+```yaml
+tui:
+  custom_commands:
+    c:
+      name: "Copy to Clipboard"
+      command: "sh -c \"echo '{{.description}}' | xclip -selection clipboard\""
+      description: "Pipe output to clipboard"
+
+    l:
+      name: "Log Task"
+      command: "sh -c \"echo '{{.description}}' >> ~/tasks.log\""
+      description: "Redirect output to log file"
+```
+
+**Note**: Without `sh -c`, the pipe or redirect operators will be treated as literal arguments, not as shell operators.
+
 ## Tips
 
 1. **Test commands first**: Run commands manually in your terminal before adding to config
@@ -192,3 +222,4 @@ When a command fails:
 3. **Platform detection**: Create different configs per platform or use a script wrapper
 4. **Security**: Be careful with commands that modify or delete data
 5. **Quotes**: Use single quotes `'` to protect special characters in shell commands
+6. **Shell features**: Wrap commands needing pipes or redirects with `sh -c "..."`

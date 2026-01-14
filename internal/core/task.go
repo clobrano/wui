@@ -66,6 +66,12 @@ func (t *Task) GetProperty(name string) (string, bool) {
 		return fmt.Sprintf("%d", t.ID), true
 	case "uuid":
 		return t.UUID, true
+	case "short_uuid":
+		// Return first 8 characters of UUID
+		if len(t.UUID) > 8 {
+			return t.UUID[:8], true
+		}
+		return t.UUID, true
 	case "description":
 		return t.Description, true
 	case "project":
