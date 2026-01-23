@@ -325,6 +325,8 @@ func (m Model) renderConfirm() string {
 		if selectedTask != nil {
 			message = fmt.Sprintf("Delete task '%s'? (y/N)", selectedTask.Description)
 		}
+	} else if m.confirmAction == "quit_during_command" {
+		message = fmt.Sprintf("Custom command '%s' is still running.\nQuit anyway and interrupt the command? (y/N)", m.runningCustomCommand)
 	}
 
 	return lipgloss.NewStyle().
@@ -336,8 +338,11 @@ func (m Model) renderConfirm() string {
 func (m Model) renderFooter() string {
 	var parts []string
 
-	// Show loading indicator if loading
-	if m.isLoading {
+	// Show custom command running indicator
+	if m.runningCustomCommand != "" {
+		parts = append(parts, m.styles.LoadingIndicator.Render(fmt.Sprintf("⏳ Running: %s...", m.runningCustomCommand)))
+	} else if m.isLoading {
+		// Show loading indicator if loading
 		parts = append(parts, m.styles.LoadingIndicator.Render("⣾ Loading..."))
 	} else if m.errorMessage != "" {
 		// Show error message if present
