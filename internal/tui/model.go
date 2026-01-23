@@ -167,9 +167,9 @@ type Model struct {
 	syncWarnings      *calendar.SyncResult // warnings to print after quit
 
 	// Custom command execution state
-	runningCustomCommand       string // name of the running custom command (empty if none)
-	customCommandStatusMessage string // status message from last custom command
-	customCommandErrorMessage  string // error message from last custom command
+	runningCustomCommands      map[string]bool // map of running custom command names
+	customCommandStatusMessage string          // status message from last custom command
+	customCommandErrorMessage  string          // error message from last custom command
 }
 
 // NewModel creates a new TUI model
@@ -258,29 +258,30 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	m := Model{
-		service:         service,
-		config:          cfg,
-		styles:          styles,
-		tasks:           []core.Task{},
-		viewMode:        ViewModeList,
-		state:           StateNormal,
-		currentSection:  &allSections[initialSectionIndex],
-		activeFilter:    allSections[initialSectionIndex].Filter,
-		searchTabFilter: initialSearchFilter, // Set from --search flag if provided
-		groups:          []core.TaskGroup{},
-		selectedGroup:   nil,
-		inGroupView:     false,
-		statusMessage:   "",
-		errorMessage:    "",
-		taskList:        taskList,
-		sidebar:         components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
-		filter:          components.NewFilter(),
-		modifyInput:     components.NewFilter(),
-		annotateInput:   components.NewFilter(),
-		newTaskInput:    components.NewFilter(),
-		sections:        components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
-		help:            helpComponent,                                                                                    // Initial size, will be updated
-		confirmAction:   "",
+		service:               service,
+		config:                cfg,
+		styles:                styles,
+		tasks:                 []core.Task{},
+		viewMode:              ViewModeList,
+		state:                 StateNormal,
+		currentSection:        &allSections[initialSectionIndex],
+		activeFilter:          allSections[initialSectionIndex].Filter,
+		searchTabFilter:       initialSearchFilter, // Set from --search flag if provided
+		groups:                []core.TaskGroup{},
+		selectedGroup:         nil,
+		inGroupView:           false,
+		statusMessage:         "",
+		errorMessage:          "",
+		taskList:              taskList,
+		sidebar:               components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
+		filter:                components.NewFilter(),
+		modifyInput:           components.NewFilter(),
+		annotateInput:         components.NewFilter(),
+		newTaskInput:          components.NewFilter(),
+		sections:              components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
+		help:                  helpComponent,                                                                                    // Initial size, will be updated
+		confirmAction:         "",
+		runningCustomCommands: make(map[string]bool), // Initialize map for tracking concurrent commands
 	}
 
 	// Set custom empty message for Search tab if starting there
@@ -451,8 +452,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case CustomCommandCompletedMsg:
-		// Clear running state
-		m.runningCustomCommand = ""
+		// Remove command from running set
+		delete(m.runningCustomCommands, msg.CommandName)
 		// Display result message in dedicated custom command fields
 		if msg.IsError {
 			m.customCommandErrorMessage = msg.Message
@@ -943,8 +944,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Check configured keybindings
 	if m.keyMatches(keyPressed, "quit") {
-		// Check if a custom command is running
-		if m.runningCustomCommand != "" {
+		// Check if any custom commands are running
+		if len(m.runningCustomCommands) > 0 {
 			// Show confirmation dialog
 			m.state = StateConfirm
 			m.confirmAction = "quit_during_command"
@@ -1192,8 +1193,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !m.inGroupView {
 				selectedTask := m.taskList.SelectedTask()
 				if selectedTask != nil {
-					// Set running state before executing
-					m.runningCustomCommand = customCmd.Name
+					// Add command to running set
+					m.runningCustomCommands[customCmd.Name] = true
 					// Clear previous custom command messages
 					m.customCommandStatusMessage = ""
 					m.customCommandErrorMessage = ""

@@ -326,7 +326,22 @@ func (m Model) renderConfirm() string {
 			message = fmt.Sprintf("Delete task '%s'? (y/N)", selectedTask.Description)
 		}
 	} else if m.confirmAction == "quit_during_command" {
-		message = fmt.Sprintf("Custom command '%s' is still running.\nQuit anyway and interrupt the command? (y/N)", m.runningCustomCommand)
+		count := len(m.runningCustomCommands)
+		if count == 1 {
+			// Single command - show its name
+			for name := range m.runningCustomCommands {
+				message = fmt.Sprintf("Custom command '%s' is still running.\nQuit anyway and interrupt the command? (y/N)", name)
+				break
+			}
+		} else if count > 1 {
+			// Multiple commands - show count and list
+			var commandNames []string
+			for name := range m.runningCustomCommands {
+				commandNames = append(commandNames, name)
+			}
+			message = fmt.Sprintf("%d custom commands are still running:\n  • %s\n\nQuit anyway and interrupt all commands? (y/N)",
+				count, strings.Join(commandNames, "\n  • "))
+		}
 	}
 
 	return lipgloss.NewStyle().
@@ -339,8 +354,19 @@ func (m Model) renderFooter() string {
 	var parts []string
 
 	// Custom command status (dedicated space - always checked first)
-	if m.runningCustomCommand != "" {
-		parts = append(parts, m.styles.LoadingIndicator.Render(fmt.Sprintf("⏳ Running: %s...", m.runningCustomCommand)))
+	if len(m.runningCustomCommands) > 0 {
+		var cmdMsg string
+		if len(m.runningCustomCommands) == 1 {
+			// Single command - show its name
+			for name := range m.runningCustomCommands {
+				cmdMsg = fmt.Sprintf("⏳ Running: %s...", name)
+				break
+			}
+		} else {
+			// Multiple commands - show count
+			cmdMsg = fmt.Sprintf("⏳ Running %d commands...", len(m.runningCustomCommands))
+		}
+		parts = append(parts, m.styles.LoadingIndicator.Render(cmdMsg))
 	} else if m.customCommandErrorMessage != "" {
 		parts = append(parts, m.styles.Error.Render("✗ "+m.customCommandErrorMessage))
 	} else if m.customCommandStatusMessage != "" {
