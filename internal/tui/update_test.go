@@ -304,7 +304,7 @@ func TestMarkTaskDoneCmd(t *testing.T) {
 		},
 	}
 
-	cmd := markTaskDoneCmd(service, "test-uuid")
+	cmd := markTaskDoneCmd(service, "test-uuid", "test-task")
 	if cmd == nil {
 		t.Fatal("Expected markTaskDoneCmd to return a command")
 	}
@@ -660,7 +660,7 @@ func TestDoneErrorHandling(t *testing.T) {
 		},
 	}
 
-	cmd := markTaskDoneCmd(service, "test-uuid")
+	cmd := markTaskDoneCmd(service, "test-uuid", "test-task")
 	msg := cmd()
 
 	modMsg, ok := msg.(TaskModifiedMsg)
@@ -743,7 +743,11 @@ func TestTaskModifiedMsgErrorHandling(t *testing.T) {
 	model := createTestModel(service)
 
 	// Test TaskModifiedMsg with error
-	msg := TaskModifiedMsg{Err: errors.New("operation failed")}
+	msg := TaskModifiedMsg{
+		UUID:        "test-uuid",
+		Description: "test task",
+		Err:         errors.New("operation failed"),
+	}
 	updatedModel, cmd := model.Update(msg)
 
 	m := updatedModel.(Model)
@@ -771,7 +775,11 @@ func TestTaskModifiedMsgSuccess(t *testing.T) {
 	model.activeFilter = "status:pending"
 
 	// Test TaskModifiedMsg with success
-	msg := TaskModifiedMsg{Err: nil}
+	msg := TaskModifiedMsg{
+		UUID:        "test-uuid",
+		Description: "test task",
+		Err:         nil,
+	}
 	updatedModel, cmd := model.Update(msg)
 
 	m := updatedModel.(Model)

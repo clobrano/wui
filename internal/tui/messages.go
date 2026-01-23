@@ -13,8 +13,9 @@ type TasksLoadedMsg struct {
 
 // TaskModifiedMsg is sent when a task has been modified
 type TaskModifiedMsg struct {
-	UUID string
-	Err  error
+	UUID        string
+	Description string
+	Err         error
 }
 
 // ErrorMsg is sent when an error occurs

@@ -49,6 +49,7 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 
 	args = c.buildArgs(args...)
 
+	slog.Info("Starting task extraction", "filter", filter)
 	slog.Debug("Exporting tasks", "filter", filter)
 
 	output, err := c.runCommand(args...)
@@ -75,6 +76,10 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 	coreTasks := make([]core.Task, len(tasks))
 	for i, t := range tasks {
 		coreTasks[i] = MapToCore(t)
+		// Log each task being processed with job id (UUID) and description
+		slog.Debug("Processing task",
+			"job_id", coreTasks[i].UUID,
+			"description", coreTasks[i].Description)
 	}
 
 	return coreTasks, nil
@@ -82,6 +87,7 @@ func (c *Client) Export(filter string) ([]core.Task, error) {
 
 // Modify updates a task with the given modifications
 func (c *Client) Modify(uuid, modifications string) error {
+	slog.Info("Modifying task", "job_id", uuid, "modifications", modifications)
 	// Split modifications into separate arguments so taskwarrior parses them correctly
 	// e.g., "project:home +duties" becomes ["project:home", "+duties"]
 	modArgs := strings.Fields(modifications)
@@ -89,38 +95,49 @@ func (c *Client) Modify(uuid, modifications string) error {
 	args = c.buildArgs(args...)
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to modify task", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to modify task %s: %w", uuid, err)
 	}
+	slog.Info("Task modified successfully", "job_id", uuid)
 	return nil
 }
 
 // Annotate adds an annotation to a task
 func (c *Client) Annotate(uuid, text string) error {
+	slog.Info("Annotating task", "job_id", uuid, "text", text)
 	args := c.buildArgs(uuid, "annotate", text)
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to annotate task", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to annotate task %s: %w", uuid, err)
 	}
+	slog.Info("Task annotated successfully", "job_id", uuid)
 	return nil
 }
 
 // Done marks a task as completed
 func (c *Client) Done(uuid string) error {
+	slog.Info("Marking task as done", "job_id", uuid)
 	args := c.buildArgs(uuid, "done")
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to mark task as done", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to mark task %s as done: %w", uuid, err)
 	}
+	slog.Info("Task marked as done successfully", "job_id", uuid)
 	return nil
 }
 
 // Delete removes a task
 func (c *Client) Delete(uuid string) error {
+	slog.Info("Deleting task", "job_id", uuid)
 	args := c.buildArgs(uuid, "delete", "rc.confirmation=off")
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to delete task", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to delete task %s: %w", uuid, err)
 	}
+	slog.Info("Task deleted successfully", "job_id", uuid)
 	return nil
 }
 
@@ -185,21 +202,27 @@ func (c *Client) Edit(uuid string) error {
 
 // Start marks a task as started (active)
 func (c *Client) Start(uuid string) error {
+	slog.Info("Starting task", "job_id", uuid)
 	args := c.buildArgs(uuid, "start")
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to start task", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to start task %s: %w", uuid, err)
 	}
+	slog.Info("Task started successfully", "job_id", uuid)
 	return nil
 }
 
 // Stop marks a task as stopped (pending)
 func (c *Client) Stop(uuid string) error {
+	slog.Info("Stopping task", "job_id", uuid)
 	args := c.buildArgs(uuid, "stop")
 	_, err := c.runCommand(args...)
 	if err != nil {
+		slog.Error("Failed to stop task", "job_id", uuid, "error", err)
 		return fmt.Errorf("failed to stop task %s: %w", uuid, err)
 	}
+	slog.Info("Task stopped successfully", "job_id", uuid)
 	return nil
 }
 

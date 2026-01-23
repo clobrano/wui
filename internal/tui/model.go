@@ -320,7 +320,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Section changed - load tasks with new filter
 		m.currentSection = &msg.Section
 		m.errorMessage = ""
-		m.statusMessage = ""
 		m.isLoading = true
 
 		// Reset grouping state when switching sections
@@ -346,6 +345,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.taskList.SetEmptyMessage("") // Reset to default message
 		}
 
+		m.statusMessage = "Starting task extraction..."
 		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
 	case TasksLoadedMsg:
@@ -420,7 +420,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.errorMessage = "" // Clear any previous error
-		m.statusMessage = "Task updated successfully"
+		// Show filename (description without extension) in status message
+		filename := stripFileExtension(msg.Description)
+		if filename != "" {
+			m.statusMessage = fmt.Sprintf("Task updated: %s", filename)
+		} else {
+			m.statusMessage = "Task updated successfully"
+		}
 		m.isLoading = true
 		// Refresh tasks and autocomplete data
 		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
@@ -434,6 +440,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case RefreshMsg:
+		m.statusMessage = "Starting task extraction..."
 		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
 		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 
@@ -997,6 +1004,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.keyMatches(keyPressed, "refresh") {
 		m.isLoading = true
+		m.statusMessage = "Starting task extraction..."
 		isSearchTab := m.currentSection != nil && m.currentSection.Name == "Search"
 		return m, loadTasksCmd(m.service, m.activeFilter, isSearchTab)
 	}
@@ -1317,6 +1325,7 @@ func (m Model) handleFilterKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filter.Blur()
 		m.activeFilter = filterText
 		m.isLoading = true
+		m.statusMessage = "Starting task extraction..."
 		m.updateComponentSizes()
 
 		// Check if we're in the Search tab
@@ -1639,21 +1648,25 @@ func loadProjectSummaryCmd(service core.TaskService) tea.Cmd {
 }
 
 // markTaskDoneCmd creates a command to mark a task as done
-func markTaskDoneCmd(service core.TaskService, uuid string) tea.Cmd {
+func markTaskDoneCmd(service core.TaskService, uuid, description string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Done(uuid)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
 
 // deleteTaskCmd creates a command to delete a task
-func deleteTaskCmd(service core.TaskService, uuid string) tea.Cmd {
+func deleteTaskCmd(service core.TaskService, uuid, description string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Delete(uuid)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
@@ -1663,27 +1676,33 @@ func undoCmd(service core.TaskService) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Undo()
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        "",
+			Description: "",
+			Err:         err,
 		}
 	}
 }
 
 // modifyTaskCmd creates a command to modify a task
-func modifyTaskCmd(service core.TaskService, uuid, modifications string) tea.Cmd {
+func modifyTaskCmd(service core.TaskService, uuid, description, modifications string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Modify(uuid, modifications)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
 
 // annotateTaskCmd creates a command to add an annotation to a task
-func annotateTaskCmd(service core.TaskService, uuid, text string) tea.Cmd {
+func annotateTaskCmd(service core.TaskService, uuid, description, text string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Annotate(uuid, text)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
@@ -1693,10 +1712,18 @@ func addTaskCmd(service core.TaskService, description string) tea.Cmd {
 	return func() tea.Msg {
 		_, err := service.Add(description)
 		if err != nil {
-			return TaskModifiedMsg{Err: err}
+			return TaskModifiedMsg{
+				UUID:        "",
+				Description: description,
+				Err:         err,
+			}
 		}
 		// Return success
-		return TaskModifiedMsg{Err: nil}
+		return TaskModifiedMsg{
+			UUID:        "",
+			Description: description,
+			Err:         nil,
+		}
 	}
 }
 
@@ -1709,29 +1736,41 @@ func editTaskCmd(taskBin, taskrcPath, uuid string) tea.Cmd {
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		if err != nil {
-			return TaskModifiedMsg{Err: err}
+			return TaskModifiedMsg{
+				UUID:        uuid,
+				Description: "",
+				Err:         err,
+			}
 		}
 		// Return success - will trigger refresh
-		return TaskModifiedMsg{Err: nil}
+		return TaskModifiedMsg{
+			UUID:        uuid,
+			Description: "",
+			Err:         nil,
+		}
 	})
 }
 
 // startTaskCmd creates a command to start a task
-func startTaskCmd(service core.TaskService, uuid string) tea.Cmd {
+func startTaskCmd(service core.TaskService, uuid, description string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Start(uuid)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
 
 // stopTaskCmd creates a command to stop a task
-func stopTaskCmd(service core.TaskService, uuid string) tea.Cmd {
+func stopTaskCmd(service core.TaskService, uuid, description string) tea.Cmd {
 	return func() tea.Msg {
 		err := service.Stop(uuid)
 		return TaskModifiedMsg{
-			Err: err,
+			UUID:        uuid,
+			Description: description,
+			Err:         err,
 		}
 	}
 }
@@ -1747,7 +1786,9 @@ func markTasksDoneCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
 			}
 		}
 		return TaskModifiedMsg{
-			Err: firstErr,
+			UUID:        "",
+			Description: fmt.Sprintf("%d tasks", len(tasks)),
+			Err:         firstErr,
 		}
 	}
 }
@@ -1763,7 +1804,9 @@ func deleteTasksCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
 			}
 		}
 		return TaskModifiedMsg{
-			Err: firstErr,
+			UUID:        "",
+			Description: fmt.Sprintf("%d tasks", len(tasks)),
+			Err:         firstErr,
 		}
 	}
 }
@@ -1779,7 +1822,9 @@ func modifyTasksCmd(service core.TaskService, tasks []core.Task, modifications s
 			}
 		}
 		return TaskModifiedMsg{
-			Err: firstErr,
+			UUID:        "",
+			Description: fmt.Sprintf("%d tasks", len(tasks)),
+			Err:         firstErr,
 		}
 	}
 }
@@ -1795,7 +1840,9 @@ func annotateTasksCmd(service core.TaskService, tasks []core.Task, text string) 
 			}
 		}
 		return TaskModifiedMsg{
-			Err: firstErr,
+			UUID:        "",
+			Description: fmt.Sprintf("%d tasks", len(tasks)),
+			Err:         firstErr,
 		}
 	}
 }
@@ -2153,4 +2200,19 @@ func parseCommandLine(cmdLine string) ([]string, error) {
 	}
 
 	return parts, nil
+}
+
+// stripFileExtension removes the file extension from a filename/description
+// Examples: "report.pdf" -> "report", "task.txt" -> "task", "no-extension" -> "no-extension"
+func stripFileExtension(filename string) string {
+	if filename == "" {
+		return ""
+	}
+	// Find the last dot
+	lastDot := strings.LastIndex(filename, ".")
+	if lastDot == -1 || lastDot == 0 {
+		// No extension or dot at start (hidden file)
+		return filename
+	}
+	return filename[:lastDot]
 }
