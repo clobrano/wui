@@ -167,7 +167,9 @@ type Model struct {
 	syncWarnings      *calendar.SyncResult // warnings to print after quit
 
 	// Custom command execution state
-	runningCustomCommand string // name of the running custom command (empty if none)
+	runningCustomCommand       string // name of the running custom command (empty if none)
+	customCommandStatusMessage string // status message from last custom command
+	customCommandErrorMessage  string // error message from last custom command
 }
 
 // NewModel creates a new TUI model
@@ -451,11 +453,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case CustomCommandCompletedMsg:
 		// Clear running state
 		m.runningCustomCommand = ""
-		// Display result message
+		// Display result message in dedicated custom command fields
 		if msg.IsError {
-			m.errorMessage = msg.Message
+			m.customCommandErrorMessage = msg.Message
+			m.customCommandStatusMessage = ""
 		} else {
-			m.statusMessage = msg.Message
+			m.customCommandStatusMessage = msg.Message
+			m.customCommandErrorMessage = ""
 		}
 		return m, nil
 
@@ -1190,8 +1194,9 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if selectedTask != nil {
 					// Set running state before executing
 					m.runningCustomCommand = customCmd.Name
-					m.statusMessage = ""
-					m.errorMessage = ""
+					// Clear previous custom command messages
+					m.customCommandStatusMessage = ""
+					m.customCommandErrorMessage = ""
 					return m, executeCustomCommand(customCmd, selectedTask)
 				} else {
 					m.statusMessage = "No task selected"

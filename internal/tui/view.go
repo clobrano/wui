@@ -338,14 +338,19 @@ func (m Model) renderConfirm() string {
 func (m Model) renderFooter() string {
 	var parts []string
 
-	// Show custom command running indicator
+	// Custom command status (dedicated space - always checked first)
 	if m.runningCustomCommand != "" {
 		parts = append(parts, m.styles.LoadingIndicator.Render(fmt.Sprintf("⏳ Running: %s...", m.runningCustomCommand)))
-	} else if m.isLoading {
-		// Show loading indicator if loading
+	} else if m.customCommandErrorMessage != "" {
+		parts = append(parts, m.styles.Error.Render("✗ "+m.customCommandErrorMessage))
+	} else if m.customCommandStatusMessage != "" {
+		parts = append(parts, m.styles.Success.Render("✓ "+m.customCommandStatusMessage))
+	}
+
+	// General application status (separate from custom commands)
+	if m.isLoading {
 		parts = append(parts, m.styles.LoadingIndicator.Render("⣾ Loading..."))
 	} else if m.errorMessage != "" {
-		// Show error message if present
 		parts = append(parts, m.styles.Error.Render("✗ "+m.errorMessage))
 	} else if m.statusMessage != "" {
 		parts = append(parts, m.styles.Success.Render("✓ "+m.statusMessage))
