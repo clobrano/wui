@@ -117,19 +117,37 @@ func NewTaskList(width, height int, columns config.Columns, narrowViewFields con
 
 // SetTasks updates the task list and switches to task display mode
 func (t *TaskList) SetTasks(tasks []core.Task) {
+	t.SetTasksWithSort(tasks, "", false)
+}
+
+// SetTasksWithSort updates the task list with custom sorting
+func (t *TaskList) SetTasksWithSort(tasks []core.Task, sortMethod string, reverse bool) {
 	// Sort tasks: non-completed tasks first, completed tasks last
 	// Use stable sort to maintain original order within each group
 	sortedTasks := make([]core.Task, len(tasks))
 	copy(sortedTasks, tasks)
 
 	sort.SliceStable(sortedTasks, func(i, j int) bool {
-		// Completed tasks should come after non-completed tasks
-		isCompletedI := sortedTasks[i].Status == "completed"
-		isCompletedJ := sortedTasks[j].Status == "completed"
+		taskI := sortedTasks[i]
+		taskJ := sortedTasks[j]
 
-		// If one is completed and the other is not, non-completed comes first
+		// First priority: Completed tasks should come after non-completed tasks
+		isCompletedI := taskI.Status == "completed"
+		isCompletedJ := taskJ.Status == "completed"
+
 		if isCompletedI != isCompletedJ {
 			return !isCompletedI // true if i is not completed (i comes first)
+		}
+
+		// Second priority: Apply custom sorting if specified
+		if sortMethod != "" {
+			result := compareTasks(taskI, taskJ, sortMethod)
+			if result != 0 {
+				if reverse {
+					return result > 0
+				}
+				return result < 0
+			}
 		}
 
 		// Otherwise maintain original order (stable sort)
@@ -143,6 +161,88 @@ func (t *TaskList) SetTasks(tasks []core.Task) {
 		t.cursor = 0
 	}
 	t.updateScroll()
+}
+
+// compareTasks compares two tasks based on the specified sort method
+// Returns: -1 if taskI < taskJ, 0 if equal, 1 if taskI > taskJ
+func compareTasks(taskI, taskJ core.Task, sortMethod string) int {
+	switch sortMethod {
+	case "alphabetic", "alpha", "description":
+		// Sort by description alphabetically
+		if taskI.Description < taskJ.Description {
+			return -1
+		} else if taskI.Description > taskJ.Description {
+			return 1
+		}
+		return 0
+
+	case "due":
+		// Sort by due date (tasks without due date go last)
+		if taskI.Due == nil && taskJ.Due == nil {
+			return 0
+		}
+		if taskI.Due == nil {
+			return 1 // taskI goes after taskJ
+		}
+		if taskJ.Due == nil {
+			return -1 // taskI goes before taskJ
+		}
+		if taskI.Due.Before(*taskJ.Due) {
+			return -1
+		} else if taskI.Due.After(*taskJ.Due) {
+			return 1
+		}
+		return 0
+
+	case "scheduled":
+		// Sort by scheduled date (tasks without scheduled date go last)
+		if taskI.Scheduled == nil && taskJ.Scheduled == nil {
+			return 0
+		}
+		if taskI.Scheduled == nil {
+			return 1
+		}
+		if taskJ.Scheduled == nil {
+			return -1
+		}
+		if taskI.Scheduled.Before(*taskJ.Scheduled) {
+			return -1
+		} else if taskI.Scheduled.After(*taskJ.Scheduled) {
+			return 1
+		}
+		return 0
+
+	case "created", "entry":
+		// Sort by creation date (Entry is always set, non-pointer)
+		if taskI.Entry.Before(taskJ.Entry) {
+			return -1
+		} else if taskI.Entry.After(taskJ.Entry) {
+			return 1
+		}
+		return 0
+
+	case "modified":
+		// Sort by modified date (tasks without modified date go last)
+		if taskI.Modified == nil && taskJ.Modified == nil {
+			return 0
+		}
+		if taskI.Modified == nil {
+			return 1
+		}
+		if taskJ.Modified == nil {
+			return -1
+		}
+		if taskI.Modified.Before(*taskJ.Modified) {
+			return -1
+		} else if taskI.Modified.After(*taskJ.Modified) {
+			return 1
+		}
+		return 0
+
+	default:
+		// Unknown sort method, maintain original order
+		return 0
+	}
 }
 
 // SetGroups updates the groups and switches to group display mode

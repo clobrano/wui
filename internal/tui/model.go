@@ -199,8 +199,10 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 				continue
 			}
 			coreTabs = append(coreTabs, core.Tab{
-				Name:   t.Name,
-				Filter: t.Filter,
+				Name:    t.Name,
+				Filter:  t.Filter,
+				Sort:    t.Sort,
+				Reverse: t.Reverse,
 			})
 		}
 		allSections = append(allSections, core.TabsToSections(coreTabs)...)
@@ -383,7 +385,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			// Normal view or drilling into a group
 			// Update task list component with actual tasks
-			m.taskList.SetTasks(m.tasks)
+			sortMethod := ""
+			reverse := false
+			if m.currentSection != nil {
+				sortMethod = m.currentSection.Sort
+				reverse = m.currentSection.Reverse
+			}
+			m.taskList.SetTasksWithSort(m.tasks, sortMethod, reverse)
 		}
 
 		// Update task count in sections component
@@ -1011,7 +1019,13 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selectedGroup = &m.groups[selectedIndex]
 				m.inGroupView = false
 				// Set tasks to the tasks in this group
-				m.taskList.SetTasks(m.selectedGroup.Tasks)
+				sortMethod := ""
+				reverse := false
+				if m.currentSection != nil {
+					sortMethod = m.currentSection.Sort
+					reverse = m.currentSection.Reverse
+				}
+				m.taskList.SetTasksWithSort(m.selectedGroup.Tasks, sortMethod, reverse)
 				m.updateSidebar()
 			}
 			return m, nil
