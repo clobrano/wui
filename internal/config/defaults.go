@@ -13,6 +13,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		TaskBin:      "task", // Assumes task is in PATH
 		TaskrcPath:   taskrcPath,
+		LogLevel:     "error",
 		TUI:          DefaultTUIConfig(),
 		CalendarSync: DefaultCalendarSync(),
 	}

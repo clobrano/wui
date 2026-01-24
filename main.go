@@ -108,21 +108,23 @@ func main() {
 
 // runTUI initializes and runs the TUI application
 func runTUI() error {
-	// Initialize logging
-	initLogging()
-
-	slog.Info("Starting wui", "version", version.GetVersion())
-
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
-	slog.Debug("Using config path", "path", cfgPath)
 
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
+		// Use basic logging before config is loaded
+		initLogging(nil)
 		slog.Error("Failed to load config", "error", err, "path", cfgPath)
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+
+	// Initialize logging with config (priority: flag > env > config)
+	initLogging(cfg)
+
+	slog.Info("Starting wui", "version", version.GetVersion())
+	slog.Debug("Using config path", "path", cfgPath)
 
 	// Override with CLI flags if provided
 	if taskBinPath != "" {
@@ -161,11 +163,30 @@ func runTUI() error {
 	return tui.Run(client, cfg)
 }
 
-// initLogging initializes the logging system based on CLI flags
-func initLogging() {
+// initLogging initializes the logging system with priority: flag > env > config
+func initLogging(cfg *config.Config) {
+	// Determine log level with priority: CLI flag > env variable > config file
+	effectiveLogLevel := "error" // fallback default
+
+	// Start with config value if available
+	if cfg != nil && cfg.LogLevel != "" {
+		effectiveLogLevel = cfg.LogLevel
+	}
+
+	// Override with environment variable if set
+	if envLogLevel := os.Getenv("WUI_LOG_LEVEL"); envLogLevel != "" {
+		effectiveLogLevel = envLogLevel
+	}
+
+	// Override with CLI flag if provided (non-default)
+	// Note: We check if it's different from the default value
+	if logLevel != "" {
+		effectiveLogLevel = logLevel
+	}
+
 	// Parse log level
 	var level slog.Level
-	switch logLevel {
+	switch effectiveLogLevel {
 	case "debug":
 		level = slog.LevelDebug
 	case "info":
@@ -235,21 +256,23 @@ Visit https://taskwarrior.org for more information.`, err)
 
 // runSync performs the Google Calendar sync operation
 func runSync() error {
-	// Initialize logging
-	initLogging()
-
-	slog.Info("Starting Google Calendar sync", "version", version.GetVersion())
-
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
-	slog.Debug("Using config path", "path", cfgPath)
 
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
+		// Use basic logging before config is loaded
+		initLogging(nil)
 		slog.Error("Failed to load config", "error", err, "path", cfgPath)
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+
+	// Initialize logging with config (priority: flag > env > config)
+	initLogging(cfg)
+
+	slog.Info("Starting Google Calendar sync", "version", version.GetVersion())
+	slog.Debug("Using config path", "path", cfgPath)
 
 	// Override with CLI flags if provided
 	if taskBinPath != "" {

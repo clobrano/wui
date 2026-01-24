@@ -107,6 +107,11 @@ task_bin: /usr/local/bin/task
 # Taskwarrior config file
 taskrc_path: ~/.taskrc
 
+# Logging level (debug, info, warn, error)
+# Can be overridden by WUI_LOG_LEVEL env variable or --log-level flag
+# Priority: CLI flag > env variable > config file
+log_level: error
+
 # TUI-specific settings
 tui:
   # Sidebar width (percentage of terminal width, 1-100)
@@ -392,10 +397,23 @@ For complete documentation and more examples, see [`docs/custom-commands.md`](do
   --log-format string  Log format: text, json (default: text)
 ```
 
+### Logging Configuration
+
+Logging level can be configured in three ways with the following priority:
+1. **CLI flag** (highest): `--log-level debug`
+2. **Environment variable**: `export WUI_LOG_LEVEL=info`
+3. **Config file** (lowest): `log_level: debug` in `config.yaml`
+
+Logs are written to `/tmp/wui.log` by default. You can change the log file location with the `WUI_LOG_FILE` environment variable.
+
 Examples:
 ```bash
 # Open with custom taskrc and debug logging
 wui --taskrc ~/work/.taskrc --log-level debug
+
+# Use environment variable for logging
+export WUI_LOG_LEVEL=info
+wui
 
 # Open in Search tab with a pre-applied filter (useful in pipelines)
 wui --search "project:Home +urgent"
@@ -406,8 +424,6 @@ wui --search "due:today"
 # Search for completed tasks
 wui --search "status:completed"
 ```
-
-Logs are written to `/tmp/wui.log` by default (or `$WUI_LOG_FILE`).
 
 ## Google Calendar Sync
 
