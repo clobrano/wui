@@ -6,13 +6,14 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 
 - **Intuitive keyboard-driven interface** - Navigate and manage tasks efficiently without touching the mouse
 - **Multiple views** - Next, Waiting, Projects, Tags, and custom filtered views
+- **Flexible sorting** - Sort tasks by due date, creation date, alphabetically, and more with per-tab configuration
 - **Detailed task sidebar** - View all task metadata, annotations, and dependencies
 - **Quick task modifications** - Add tags, change due dates, annotate, and more with simple commands
 - **Grouped views** - Browse tasks by project or tag with task counts
 - **Rich task metadata** - Full support for priorities, dates, dependencies, and recurrence
 - **Custom commands** - Execute system commands with task data using flexible templates (e.g., open URLs, copy to clipboard)
 - **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
-- **Highly configurable** - Customize keybindings, colors, columns, tabs/sections, and custom commands
+- **Highly configurable** - Customize keybindings, colors, columns, tabs/sections, sorting, and custom commands
 - **Respects Taskwarrior config** - Reads your `.taskrc` for contexts and settings
 
 ## Installation
@@ -131,21 +132,36 @@ tui:
   #
   # Note: Renaming "Projects" or "Tags" will change their behavior to show
   # a regular flat task list instead of the grouped view.
+  #
+  # SORTING:
+  # Each tab can have custom sorting using the 'sort' and 'reverse' fields:
+  # - sort: "alphabetic" (or "alpha", "description") - Sort by description (case-insensitive)
+  # - sort: "due" - Sort by due date (tasks without due date appear last)
+  # - sort: "scheduled" - Sort by scheduled date (tasks without date appear last)
+  # - sort: "created" (or "entry") - Sort by creation date
+  # - sort: "modified" - Sort by modification date (tasks without date appear last)
+  # - reverse: true - Reverse the sort order (newest/latest first)
+  #
+  # Note: Completed tasks always appear last, regardless of sorting
   tabs:
     - name: "Next"
       filter: "( status:pending or status:active ) -WAITING"
     - name: "Today"
       filter: "due:today"
+      sort: "due"  # Sort by due date, earliest first
     - name: "Urgent"
       filter: "+urgent"
     - name: "Work"
       filter: "+work -someday"
+      sort: "alphabetic"  # Sort alphabetically by description
     - name: "Projects"
       filter: "status:pending or status:active"
     - name: "Tags"
       filter: "status:pending or status:active"
     - name: "All"
       filter: "status:pending or status:active"
+      sort: "modified"  # Sort by last modified
+      reverse: true     # Most recently modified first
 
   # Keybindings - customize keyboard shortcuts
   # All keybindings are optional; omitted keys use defaults
@@ -494,6 +510,55 @@ status:completed       # Only completed tasks
 - Press `Esc` to go back to the group list
 
 **Important**: If you rename these tabs (e.g., "Projects" → "My Projects"), they will behave like regular tabs and show a flat task list instead of the grouped view. The exact names "Projects" and "Tags" are required for the special grouping behavior.
+
+## Tab Sorting
+
+Each tab can have custom sorting to display tasks in a specific order. Configure sorting using the `sort` and `reverse` fields in your tab configuration:
+
+### Sort Methods
+
+- **`alphabetic`** (aliases: `alpha`, `description`) - Sort tasks alphabetically by description (case-insensitive)
+- **`due`** - Sort by due date (tasks without due date appear last)
+- **`scheduled`** - Sort by scheduled date (tasks without scheduled date appear last)
+- **`created`** (alias: `entry`) - Sort by creation date
+- **`modified`** - Sort by modification date (tasks without modified date appear last)
+
+### Reverse Order
+
+Add `reverse: true` to invert the sort order (e.g., show newest/latest first instead of oldest/earliest).
+
+### Examples
+
+```yaml
+tabs:
+  # Sort by due date, earliest deadlines first
+  - name: "Deadlines"
+    filter: "status:pending +urgent"
+    sort: "due"
+
+  # Sort alphabetically
+  - name: "All Tasks"
+    filter: "status:pending"
+    sort: "alphabetic"
+
+  # Sort by creation date, newest first
+  - name: "Recent"
+    filter: "status:pending"
+    sort: "created"
+    reverse: true
+
+  # Sort by last modified, most recent first
+  - name: "Updated"
+    filter: "status:pending"
+    sort: "modified"
+    reverse: true
+
+  # No sorting (default behavior - uses Taskwarrior's order)
+  - name: "Next"
+    filter: "status:pending -WAITING"
+```
+
+**Note**: Completed tasks always appear after non-completed tasks, regardless of the sort method. Sorting is applied within each status group.
 
 ## Default Tabs
 
