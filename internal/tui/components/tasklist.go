@@ -169,14 +169,7 @@ func compareTasks(taskI, taskJ core.Task, sortMethod string) int {
 	switch sortMethod {
 	case "alphabetic", "alpha", "description":
 		// Sort by description alphabetically (case-insensitive)
-		descI := strings.ToLower(taskI.Description)
-		descJ := strings.ToLower(taskJ.Description)
-		if descI < descJ {
-			return -1
-		} else if descI > descJ {
-			return 1
-		}
-		return 0
+		return strings.Compare(strings.ToLower(taskI.Description), strings.ToLower(taskJ.Description))
 
 	case "due":
 		// Sort by due date (tasks without due date go last)
