@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -34,15 +33,29 @@ func NewListPicker(title string, items []string, filter string) ListPicker {
 	return lp
 }
 
-// updateFilteredItems filters the items based on current filter
+// fuzzyMatch checks if all characters in filter appear in order in target (case-insensitive)
+func fuzzyMatch(filter, target string) bool {
+	filterLower := strings.ToLower(filter)
+	targetLower := strings.ToLower(target)
+
+	filterIdx := 0
+	for targetIdx := 0; targetIdx < len(targetLower) && filterIdx < len(filterLower); targetIdx++ {
+		if targetLower[targetIdx] == filterLower[filterIdx] {
+			filterIdx++
+		}
+	}
+
+	return filterIdx == len(filterLower)
+}
+
+// updateFilteredItems filters the items based on current filter using fuzzy matching
 func (lp *ListPicker) updateFilteredItems() {
 	if lp.filter == "" {
 		lp.filteredItems = lp.allItems
 	} else {
 		lp.filteredItems = []string{}
-		filterLower := strings.ToLower(lp.filter)
 		for _, item := range lp.allItems {
-			if strings.HasPrefix(strings.ToLower(item), filterLower) {
+			if fuzzyMatch(lp.filter, item) {
 				lp.filteredItems = append(lp.filteredItems, item)
 			}
 		}
@@ -66,19 +79,47 @@ func (lp *ListPicker) updateFilteredItems() {
 func (lp ListPicker) Update(msg tea.Msg) (ListPicker, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch {
-		case key.Matches(msg, key.NewBinding(key.WithKeys("up", "k"))):
+		switch msg.Type {
+		case tea.KeyUp:
 			if lp.selectedIndex > 0 {
 				lp.selectedIndex--
 				if lp.selectedIndex < lp.scrollOffset {
 					lp.scrollOffset = lp.selectedIndex
 				}
 			}
-		case key.Matches(msg, key.NewBinding(key.WithKeys("down", "j"))):
+		case tea.KeyDown:
 			if lp.selectedIndex < len(lp.filteredItems)-1 {
 				lp.selectedIndex++
 				if lp.selectedIndex >= lp.scrollOffset+lp.maxVisible {
 					lp.scrollOffset = lp.selectedIndex - lp.maxVisible + 1
+				}
+			}
+		case tea.KeyBackspace:
+			// Remove last character from filter
+			if len(lp.filter) > 0 {
+				lp.filter = lp.filter[:len(lp.filter)-1]
+				lp.updateFilteredItems()
+			}
+		case tea.KeyRunes:
+			// Add typed characters to filter
+			lp.filter += string(msg.Runes)
+			lp.updateFilteredItems()
+		default:
+			// Handle vim-style navigation (j/k)
+			switch msg.String() {
+			case "k":
+				if lp.selectedIndex > 0 {
+					lp.selectedIndex--
+					if lp.selectedIndex < lp.scrollOffset {
+						lp.scrollOffset = lp.selectedIndex
+					}
+				}
+			case "j":
+				if lp.selectedIndex < len(lp.filteredItems)-1 {
+					lp.selectedIndex++
+					if lp.selectedIndex >= lp.scrollOffset+lp.maxVisible {
+						lp.scrollOffset = lp.selectedIndex - lp.maxVisible + 1
+					}
 				}
 			}
 		}
@@ -188,4 +229,9 @@ func (lp ListPicker) SelectedItem() string {
 // HasItems returns true if there are any filtered items to select from
 func (lp ListPicker) HasItems() bool {
 	return len(lp.filteredItems) > 0
+}
+
+// Filter returns the current filter text
+func (lp ListPicker) Filter() string {
+	return lp.filter
 }
