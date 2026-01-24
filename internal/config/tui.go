@@ -24,8 +24,10 @@ type CustomCommand struct {
 
 // Tab represents a section/tab in the UI
 type Tab struct {
-	Name   string `yaml:"name"`
-	Filter string `yaml:"filter"`
+	Name    string `yaml:"name"`
+	Filter  string `yaml:"filter"`
+	Sort    string `yaml:"sort,omitempty"`    // Sorting method: "alphabetic", "due", "scheduled", "created", "modified" (default: none)
+	Reverse bool   `yaml:"reverse,omitempty"` // Reverse sort order
 }
 
 // Column represents a table column configuration

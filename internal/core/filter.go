@@ -11,12 +11,16 @@ type Section struct {
 	Name        string
 	Filter      string
 	Description string
+	Sort        string // Sorting method: "alphabetic", "due", "scheduled", "created", "modified" (default: none)
+	Reverse     bool   // Reverse sort order
 }
 
 // Tab represents a tab/section configuration
 type Tab struct {
-	Name   string
-	Filter string
+	Name    string
+	Filter  string
+	Sort    string // Sorting method: "alphabetic", "due", "scheduled", "created", "modified" (default: none)
+	Reverse bool   // Reverse sort order
 }
 
 // TabsToSections converts Tab configs to Section objects
@@ -28,6 +32,8 @@ func TabsToSections(tabs []Tab) []Section {
 			Name:        tab.Name,
 			Filter:      tab.Filter,
 			Description: tab.Name + " tasks",
+			Sort:        tab.Sort,
+			Reverse:     tab.Reverse,
 		})
 	}
 
