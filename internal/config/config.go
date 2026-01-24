@@ -23,6 +23,7 @@ type CalendarSync struct {
 type Config struct {
 	TaskBin             string        `yaml:"task_bin"`
 	TaskrcPath          string        `yaml:"taskrc_path"`
+	LogLevel            string        `yaml:"log_level,omitempty"`
 	TUI                 *TUIConfig    `yaml:"tui"`
 	CalendarSync        *CalendarSync `yaml:"calendar_sync,omitempty"`
 	InitialSearchFilter string        `yaml:"-"` // Not persisted to config file, set via CLI flag
@@ -127,6 +128,9 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 	}
 	if loaded.TaskrcPath != "" {
 		result.TaskrcPath = loaded.TaskrcPath
+	}
+	if loaded.LogLevel != "" {
+		result.LogLevel = loaded.LogLevel
 	}
 
 	// Merge TUI config
