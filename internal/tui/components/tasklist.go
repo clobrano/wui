@@ -215,6 +215,15 @@ func compareTasks(taskI, taskJ core.Task, sortMethod string) int {
 		// Sort by modified date (tasks without modified date go last)
 		return compareDates(taskI.Modified, taskJ.Modified)
 
+	case "urgency":
+		// Sort by urgency (higher urgency first)
+		if taskI.Urgency > taskJ.Urgency {
+			return -1
+		} else if taskI.Urgency < taskJ.Urgency {
+			return 1
+		}
+		return 0
+
 	default:
 		// Unknown sort method, maintain original order
 		return 0

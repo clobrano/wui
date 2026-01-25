@@ -61,22 +61,27 @@ func DefaultTabs() []Tab {
 		{
 			Name:   "Next",
 			Filter: "( status:pending or status:active ) -WAITING",
+			Sort:   "urgency",
 		},
 		{
 			Name:   "Waiting",
 			Filter: "status:waiting",
+			Sort:   "urgency",
 		},
 		{
 			Name:   "Projects",
 			Filter: "status:pending or status:active",
+			Sort:   "urgency",
 		},
 		{
 			Name:   "Tags",
 			Filter: "status:pending or status:active",
+			Sort:   "urgency",
 		},
 		{
 			Name:   "All",
 			Filter: "status:pending or status:waiting or status:active",
+			Sort:   "urgency",
 		},
 	}
 }
