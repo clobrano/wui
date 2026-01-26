@@ -49,3 +49,10 @@ type AutocompleteDataLoadedMsg struct {
 	Tags     []string
 	Err      error
 }
+
+// CustomCommandCompletedMsg is sent when a custom command has finished executing
+type CustomCommandCompletedMsg struct {
+	CommandName string
+	Message     string
+	IsError     bool
+}

@@ -165,6 +165,11 @@ type Model struct {
 	// Calendar sync state
 	syncingBeforeQuit bool                 // true when syncing before quit
 	syncWarnings      *calendar.SyncResult // warnings to print after quit
+
+	// Custom command execution state
+	runningCustomCommands      map[string]bool // map of running custom command names
+	customCommandStatusMessage string          // status message from last custom command
+	customCommandErrorMessage  string          // error message from last custom command
 }
 
 // NewModel creates a new TUI model
@@ -255,29 +260,30 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	m := Model{
-		service:         service,
-		config:          cfg,
-		styles:          styles,
-		tasks:           []core.Task{},
-		viewMode:        ViewModeList,
-		state:           StateNormal,
-		currentSection:  &allSections[initialSectionIndex],
-		activeFilter:    allSections[initialSectionIndex].Filter,
-		searchTabFilter: initialSearchFilter, // Set from --search flag if provided
-		groups:          []core.TaskGroup{},
-		selectedGroup:   nil,
-		inGroupView:     false,
-		statusMessage:   "",
-		errorMessage:    "",
-		taskList:        taskList,
-		sidebar:         components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
-		filter:          components.NewFilter(),
-		modifyInput:     components.NewFilter(),
-		annotateInput:   components.NewFilter(),
-		newTaskInput:    components.NewFilter(),
-		sections:        components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
-		help:            helpComponent,                                                                                    // Initial size, will be updated
-		confirmAction:   "",
+		service:               service,
+		config:                cfg,
+		styles:                styles,
+		tasks:                 []core.Task{},
+		viewMode:              ViewModeList,
+		state:                 StateNormal,
+		currentSection:        &allSections[initialSectionIndex],
+		activeFilter:          allSections[initialSectionIndex].Filter,
+		searchTabFilter:       initialSearchFilter, // Set from --search flag if provided
+		groups:                []core.TaskGroup{},
+		selectedGroup:         nil,
+		inGroupView:           false,
+		statusMessage:         "",
+		errorMessage:          "",
+		taskList:              taskList,
+		sidebar:               components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
+		filter:                components.NewFilter(),
+		modifyInput:           components.NewFilter(),
+		annotateInput:         components.NewFilter(),
+		newTaskInput:          components.NewFilter(),
+		sections:              components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
+		help:                  helpComponent,                                                                                    // Initial size, will be updated
+		confirmAction:         "",
+		runningCustomCommands: make(map[string]bool), // Initialize map for tracking concurrent commands
 	}
 
 	// Set custom empty message for Search tab if starting there
@@ -450,6 +456,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.errorMessage = msg.Message
 		} else {
 			m.statusMessage = msg.Message
+		}
+		return m, nil
+
+	case CustomCommandCompletedMsg:
+		// Remove command from running set
+		delete(m.runningCustomCommands, msg.CommandName)
+		// Display result message in dedicated custom command fields
+		if msg.IsError {
+			m.customCommandErrorMessage = msg.Message
+			m.customCommandStatusMessage = ""
+		} else {
+			m.customCommandStatusMessage = msg.Message
+			m.customCommandErrorMessage = ""
 		}
 		return m, nil
 
@@ -941,6 +960,13 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Check configured keybindings
 	if m.keyMatches(keyPressed, "quit") {
+		// Check if any custom commands are running
+		if len(m.runningCustomCommands) > 0 {
+			// Show confirmation dialog
+			m.state = StateConfirm
+			m.confirmAction = "quit_during_command"
+			return m, nil
+		}
 		// Check if auto-sync before quit is enabled
 		if m.config.CalendarSync != nil &&
 			m.config.CalendarSync.Enabled &&
@@ -1189,6 +1215,11 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if !m.inGroupView {
 				selectedTask := m.taskList.SelectedTask()
 				if selectedTask != nil {
+					// Add command to running set
+					m.runningCustomCommands[customCmd.Name] = true
+					// Clear previous custom command messages
+					m.customCommandStatusMessage = ""
+					m.customCommandErrorMessage = ""
 					return m, executeCustomCommand(customCmd, selectedTask)
 				} else {
 					m.statusMessage = "No task selected"
@@ -1438,6 +1469,12 @@ func (m Model) handleConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.confirmAction = ""
 			m.taskList.ClearSelection()
 			return m, deleteTasksCmd(m.service, selectedTasks)
+		}
+
+		if m.confirmAction == "quit_during_command" {
+			m.confirmAction = ""
+			// User confirmed quit during custom command execution
+			return m, tea.Quit
 		}
 
 		m.confirmAction = ""
@@ -2075,25 +2112,28 @@ func executeCustomCommand(cmd config.CustomCommand, task *core.Task) tea.Cmd {
 		// Expand template
 		expandedCmd, err := expandCommandTemplate(cmd.Command, task)
 		if err != nil {
-			return StatusMsg{
-				Message: fmt.Sprintf("Command expansion failed: %s", err.Error()),
-				IsError: true,
+			return CustomCommandCompletedMsg{
+				CommandName: cmd.Name,
+				Message:     fmt.Sprintf("Command expansion failed: %s", err.Error()),
+				IsError:     true,
 			}
 		}
 
 		// Parse command into parts (handle quoted arguments properly)
 		parts, err := parseCommandLine(expandedCmd)
 		if err != nil {
-			return StatusMsg{
-				Message: fmt.Sprintf("Command parsing failed: %s", err.Error()),
-				IsError: true,
+			return CustomCommandCompletedMsg{
+				CommandName: cmd.Name,
+				Message:     fmt.Sprintf("Command parsing failed: %s", err.Error()),
+				IsError:     true,
 			}
 		}
 
 		if len(parts) == 0 {
-			return StatusMsg{
-				Message: "Empty command after expansion",
-				IsError: true,
+			return CustomCommandCompletedMsg{
+				CommandName: cmd.Name,
+				Message:     "Empty command after expansion",
+				IsError:     true,
 			}
 		}
 
@@ -2125,15 +2165,17 @@ func executeCustomCommand(cmd config.CustomCommand, task *core.Task) tea.Cmd {
 				errMsg += fmt.Sprintf(": %s", stderrStr)
 			}
 
-			return StatusMsg{
-				Message: errMsg,
-				IsError: true,
+			return CustomCommandCompletedMsg{
+				CommandName: cmd.Name,
+				Message:     errMsg,
+				IsError:     true,
 			}
 		}
 
-		return StatusMsg{
-			Message: fmt.Sprintf("Executed: %s", cmd.Name),
-			IsError: false,
+		return CustomCommandCompletedMsg{
+			CommandName: cmd.Name,
+			Message:     fmt.Sprintf("Executed: %s", cmd.Name),
+			IsError:     false,
 		}
 	}
 }
