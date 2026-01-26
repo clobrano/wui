@@ -9,8 +9,8 @@ import (
 
 // URLMatch represents a URL found in an annotation with optional display text
 type URLMatch struct {
-	URL         string // The actual URL
-	DisplayText string // Display text (for markdown links) or the URL itself
+	URL        string // The actual URL
+	Annotation string // The full annotation text containing this URL
 }
 
 // ExtractURLsFromAnnotations extracts all URLs from a task's annotations
@@ -27,11 +27,14 @@ func ExtractURLsFromAnnotations(task *core.Task) []URLMatch {
 	seen := make(map[string]bool) // Deduplicate URLs
 
 	for _, annotation := range task.Annotations {
-		matches := extractURLsFromText(annotation.Description)
-		for _, match := range matches {
-			if !seen[match.URL] {
-				seen[match.URL] = true
-				urls = append(urls, match)
+		extractedURLs := extractURLsFromText(annotation.Description)
+		for _, url := range extractedURLs {
+			if !seen[url] {
+				seen[url] = true
+				urls = append(urls, URLMatch{
+					URL:        url,
+					Annotation: annotation.Description,
+				})
 			}
 		}
 	}
@@ -40,25 +43,23 @@ func ExtractURLsFromAnnotations(task *core.Task) []URLMatch {
 }
 
 // extractURLsFromText extracts URLs from a text string
-func extractURLsFromText(text string) []URLMatch {
-	var urls []URLMatch
+// Returns a slice of URL strings (deduplicated)
+func extractURLsFromText(text string) []string {
+	var urls []string
+	seen := make(map[string]bool)
 
 	// First, extract markdown links: [text](url)
 	// This regex matches [any text](url) where url starts with http/https/ftp
 	markdownLinkRegex := regexp.MustCompile(`\[([^\]]+)\]\(((?:https?|ftp)://[^\s\)]+)\)`)
 	markdownMatches := markdownLinkRegex.FindAllStringSubmatch(text, -1)
 
-	// Track positions of markdown links to avoid double-matching their URLs
-	markdownURLs := make(map[string]bool)
 	for _, match := range markdownMatches {
 		if len(match) >= 3 {
-			displayText := match[1]
 			url := match[2]
-			markdownURLs[url] = true
-			urls = append(urls, URLMatch{
-				URL:         url,
-				DisplayText: displayText,
-			})
+			if !seen[url] {
+				seen[url] = true
+				urls = append(urls, url)
+			}
 		}
 	}
 
@@ -76,15 +77,13 @@ func extractURLsFromText(text string) []URLMatch {
 		// Clean up trailing punctuation that's likely not part of the URL
 		url = cleanURLTrailingPunctuation(url)
 
-		// Skip if this URL was already captured as part of a markdown link
-		if markdownURLs[url] {
+		// Skip if this URL was already captured
+		if seen[url] {
 			continue
 		}
 
-		urls = append(urls, URLMatch{
-			URL:         url,
-			DisplayText: url,
-		})
+		seen[url] = true
+		urls = append(urls, url)
 	}
 
 	return urls
@@ -120,19 +119,8 @@ func cleanURLTrailingPunctuation(url string) string {
 	return url
 }
 
-// FormatURLForDisplay formats a URLMatch for display in the picker
-// Shows "Display Text (url)" for markdown links, or just the URL for plain links
+// FormatForDisplay formats a URLMatch for display in the picker
+// Shows the full annotation text so users can recognize which URL they want
 func (u URLMatch) FormatForDisplay() string {
-	if u.DisplayText != u.URL {
-		return u.DisplayText + " (" + truncateURL(u.URL, 50) + ")"
-	}
-	return u.URL
-}
-
-// truncateURL truncates a URL to maxLen characters, adding "..." if truncated
-func truncateURL(url string, maxLen int) string {
-	if len(url) <= maxLen {
-		return url
-	}
-	return url[:maxLen-3] + "..."
+	return u.Annotation
 }
