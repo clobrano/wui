@@ -235,3 +235,8 @@ func (lp ListPicker) HasItems() bool {
 func (lp ListPicker) Filter() string {
 	return lp.filter
 }
+
+// SelectedIndex returns the index of the currently selected item in the filtered list
+func (lp ListPicker) SelectedIndex() int {
+	return lp.selectedIndex
+}
