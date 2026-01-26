@@ -690,19 +690,27 @@ func detectProjectFieldContext(input string, cursorPos int) (string, int, bool) 
 	return "", 0, false
 }
 
-// detectTagFieldContext checks if cursor is positioned after a tag prefix "+"
+// detectTagFieldContext checks if cursor is positioned after a tag prefix "+" or "-"
 // Returns (filterPrefix, insertPosition, found) where filterPrefix is what user already typed
 func detectTagFieldContext(input string, cursorPos int) (string, int, bool) {
 	// Get text before cursor
 	textBefore := input[:cursorPos]
 
-	// Find the last "+" in the text
-	idx := strings.LastIndex(textBefore, "+")
+	// Find the last "+" or "-" in the text (use whichever is closer to cursor)
+	plusIdx := strings.LastIndex(textBefore, "+")
+	minusIdx := strings.LastIndex(textBefore, "-")
+
+	// Use the index that is closest to cursor (largest index value)
+	idx := plusIdx
+	if minusIdx > idx {
+		idx = minusIdx
+	}
+
 	if idx == -1 {
 		return "", 0, false
 	}
 
-	// Check if "+" is at a word boundary (start or after space)
+	// Check if the prefix is at a word boundary (start or after space)
 	if idx > 0 {
 		charBefore := textBefore[idx-1]
 		if charBefore != ' ' && charBefore != '\t' {
@@ -710,16 +718,16 @@ func detectTagFieldContext(input string, cursorPos int) (string, int, bool) {
 		}
 	}
 
-	// Extract text after the "+" up to cursor
-	afterPlus := textBefore[idx+1:]
+	// Extract text after the prefix up to cursor
+	afterPrefix := textBefore[idx+1:]
 
 	// Check if there's only valid tag characters (no spaces or other separators)
-	if strings.ContainsAny(afterPlus, " \t") {
+	if strings.ContainsAny(afterPrefix, " \t") {
 		return "", 0, false
 	}
 
 	// Return the filter prefix (what user already typed) and insert position
-	return afterPlus, idx + 1, true
+	return afterPrefix, idx + 1, true
 }
 
 // activateCalendar activates the calendar picker for date selection
