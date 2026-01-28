@@ -385,7 +385,7 @@ custom_commands:
 
 Custom commands appear automatically in the help screen (`?`) under "Custom Commands" section.
 
-**Note:** If a custom command uses a shortcut key that conflicts with a built-in internal shortcut (like `o` for opening annotation links, `s` for start/stop, etc.), wui will display a warning when exiting. The custom command will override the internal shortcut, but you'll be notified about this conflict.
+**Note:** If a custom command uses a shortcut key that conflicts with a built-in internal shortcut (like `o` for opening annotation links, `s` for start/stop, etc.), wui will display a warning when exiting. The custom command will override the internal shortcut, but you'll be notified about this conflict. To silence these warnings, add `silence_shortcut_override_warnings: true` to your TUI config.
 
 For complete documentation and more examples, see [`docs/custom-commands.md`](docs/custom-commands.md).
 

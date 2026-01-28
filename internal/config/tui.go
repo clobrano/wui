@@ -4,15 +4,16 @@ import "gopkg.in/yaml.v3"
 
 // TUIConfig contains TUI-specific configuration
 type TUIConfig struct {
-	SidebarWidth     int                      `yaml:"sidebar_width"`
-	ScrollBuffer     int                      `yaml:"scroll_buffer"`
-	InputMode        string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
-	Tabs             []Tab                    `yaml:"tabs"`
-	Columns          Columns                  `yaml:"columns"`
-	NarrowViewFields Columns                  `yaml:"narrow_view_fields"` // Fields to display below description in narrow view (terminal width < 80)
-	Keybindings      map[string]string        `yaml:"keybindings"`
-	Theme            *Theme                   `yaml:"theme"`
-	CustomCommands   map[string]CustomCommand `yaml:"custom_commands,omitempty"`
+	SidebarWidth                    int                      `yaml:"sidebar_width"`
+	ScrollBuffer                    int                      `yaml:"scroll_buffer"`
+	InputMode                       string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
+	SilenceShortcutOverrideWarnings bool                     `yaml:"silence_shortcut_override_warnings,omitempty"`
+	Tabs                            []Tab                    `yaml:"tabs"`
+	Columns                         Columns                  `yaml:"columns"`
+	NarrowViewFields                Columns                  `yaml:"narrow_view_fields"` // Fields to display below description in narrow view (terminal width < 80)
+	Keybindings                     map[string]string        `yaml:"keybindings"`
+	Theme                           *Theme                   `yaml:"theme"`
+	CustomCommands                  map[string]CustomCommand `yaml:"custom_commands,omitempty"`
 }
 
 // CustomCommand represents a user-defined command that can be executed with task data

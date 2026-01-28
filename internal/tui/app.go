@@ -25,8 +25,9 @@ func Run(service core.TaskService, cfg *config.Config) error {
 
 	// Print warnings after TUI has exited (if any)
 	if m, ok := finalModel.(Model); ok {
-		// Print shortcut override warnings
-		if len(m.shortcutWarnings) > 0 {
+		// Print shortcut override warnings (unless silenced in config)
+		silenceWarnings := m.config != nil && m.config.TUI != nil && m.config.TUI.SilenceShortcutOverrideWarnings
+		if len(m.shortcutWarnings) > 0 && !silenceWarnings {
 			fmt.Println("\n========================================")
 			fmt.Printf("Shortcut override warnings (%d):\n", len(m.shortcutWarnings))
 			fmt.Println("========================================")

@@ -238,6 +238,19 @@ Shortcut override warnings (1):
 ========================================
 ```
 
+### Silencing Warnings
+
+To silence shortcut override warnings, add `silence_shortcut_override_warnings: true` to your TUI config:
+
+```yaml
+tui:
+  silence_shortcut_override_warnings: true
+  custom_commands:
+    o:
+      name: "Open URL"
+      command: "xdg-open {{.url}}"
+```
+
 ## Tips
 
 1. **Test commands first**: Run commands manually in your terminal before adding to config
