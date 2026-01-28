@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"time"
 
@@ -66,6 +67,8 @@ const (
 	StateAnnotateInput
 	// StateNewTaskInput is active when user is creating a new task
 	StateNewTaskInput
+	// StateURLPicker is active when user is selecting a URL to open
+	StateURLPicker
 )
 
 // String returns the string representation of AppState
@@ -85,6 +88,8 @@ func (s AppState) String() string {
 		return "annotate_input"
 	case StateNewTaskInput:
 		return "new_task_input"
+	case StateURLPicker:
+		return "url_picker"
 	default:
 		return "unknown"
 	}
@@ -158,6 +163,11 @@ type Model struct {
 	listPickerInputState   AppState // which input state triggered the list picker
 	availableProjects      []string // all unique projects from loaded tasks
 	availableTags          []string // all unique tags from loaded tasks
+
+	// URL picker (for opening URLs from annotations)
+	urlPicker       components.ListPicker
+	urlPickerActive bool       // true when URL picker is shown
+	urlPickerURLs   []URLMatch // URLs extracted from current task's annotations
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -576,6 +586,36 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// If URL picker is active, handle URL picker input
+	if m.urlPickerActive {
+		var cmd tea.Cmd
+
+		switch msg.String() {
+		case "enter":
+			// Open selected URL
+			if m.urlPicker.HasItems() {
+				selectedIdx := m.urlPicker.SelectedIndex()
+				if selectedIdx >= 0 && selectedIdx < len(m.urlPickerURLs) {
+					url := m.urlPickerURLs[selectedIdx].URL
+					m.deactivateURLPicker()
+					return m, openURLCmd(url)
+				}
+			}
+			m.deactivateURLPicker()
+			return m, nil
+
+		case "esc":
+			// Cancel URL picker
+			m.deactivateURLPicker()
+			return m, nil
+
+		default:
+			// Delegate to URL picker component
+			m.urlPicker, cmd = m.urlPicker.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// State-specific handling
 	switch m.state {
 	case StateNormal:
@@ -934,6 +974,62 @@ func (m *Model) insertSelectionFromListPicker() {
 	inputComponent.SetCursor(m.listPickerInsertPos + len(selectedItem))
 }
 
+// activateURLPicker activates the URL picker for selecting a URL to open
+func (m *Model) activateURLPicker(urls []URLMatch) {
+	// Build display items for the picker
+	items := make([]string, len(urls))
+	for i, url := range urls {
+		items[i] = url.FormatForDisplay()
+	}
+
+	m.urlPicker = components.NewListPicker("Select URL to open", items, "")
+	m.urlPickerActive = true
+	m.urlPickerURLs = urls
+	m.state = StateURLPicker
+}
+
+// deactivateURLPicker closes the URL picker
+func (m *Model) deactivateURLPicker() {
+	m.urlPickerActive = false
+	m.urlPickerURLs = nil
+	m.state = StateNormal
+}
+
+// openURLCmd creates a command to open a URL in the default browser
+// Works on Linux, macOS, and Windows
+func openURLCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		var cmd *exec.Cmd
+
+		switch runtime.GOOS {
+		case "linux":
+			cmd = exec.Command("xdg-open", url)
+		case "darwin":
+			cmd = exec.Command("open", url)
+		case "windows":
+			cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+		default:
+			return StatusMsg{
+				Message: fmt.Sprintf("Unsupported platform: %s", runtime.GOOS),
+				IsError: true,
+			}
+		}
+
+		err := cmd.Start()
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Failed to open URL: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		return StatusMsg{
+			Message: "Opening URL in browser...",
+			IsError: false,
+		}
+	}
+}
+
 // handleNormalKeys handles keys in normal state
 func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -1134,6 +1230,30 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.annotateInput.SetValue("")
 			m.updateComponentSizes()
 			return m, m.annotateInput.Focus()
+		}
+		return m, nil
+	}
+
+	if m.keyMatches(keyPressed, "open_url") {
+		// Open URL from task annotations
+		if !m.inGroupView {
+			selectedTask := m.taskList.SelectedTask()
+			if selectedTask != nil {
+				urls := ExtractURLsFromAnnotations(selectedTask)
+				if len(urls) == 0 {
+					m.statusMessage = "No URLs found in task annotations"
+					return m, nil
+				} else if len(urls) == 1 {
+					// Single URL - open directly
+					return m, openURLCmd(urls[0].URL)
+				} else {
+					// Multiple URLs - show picker
+					m.activateURLPicker(urls)
+					return m, nil
+				}
+			} else {
+				m.statusMessage = "No task selected"
+			}
 		}
 		return m, nil
 	}

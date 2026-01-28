@@ -131,6 +131,7 @@ func DefaultKeybindings() map[string]string {
 		"annotate": "a",
 		"new":      "n",
 		"undo":     "u",
+		"open_url": "o",
 
 		// Filtering
 		"filter":  "/",
