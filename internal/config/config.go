@@ -144,6 +144,8 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 		if loaded.TUI.InputMode != "" {
 			result.TUI.InputMode = loaded.TUI.InputMode
 		}
+		// Boolean field - always copy from loaded config
+		result.TUI.SilenceShortcutOverrideWarnings = loaded.TUI.SilenceShortcutOverrideWarnings
 		if len(loaded.TUI.Tabs) > 0 {
 			result.TUI.Tabs = loaded.TUI.Tabs
 		}
