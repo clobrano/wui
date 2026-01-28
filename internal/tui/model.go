@@ -165,6 +165,9 @@ type Model struct {
 	// Calendar sync state
 	syncingBeforeQuit bool                 // true when syncing before quit
 	syncWarnings      *calendar.SyncResult // warnings to print after quit
+
+	// Shortcut override warnings (custom commands overriding internal shortcuts)
+	shortcutWarnings []string
 }
 
 // NewModel creates a new TUI model
@@ -227,22 +230,30 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 
 	// Create help component with keybindings and custom commands from config
 	var helpComponent components.Help
+	var shortcutWarnings []string
 	if cfg.TUI != nil {
 		// Convert config.CustomCommand to components.CustomCommand
 		var customCmds map[string]components.CustomCommand
 		if len(cfg.TUI.CustomCommands) > 0 {
 			customCmds = make(map[string]components.CustomCommand)
-			fmt.Fprintf(os.Stderr, "[DEBUG] Loading %d custom commands\n", len(cfg.TUI.CustomCommands))
+
+			// Get all internal shortcuts to detect conflicts
+			internalShortcuts := config.GetInternalShortcuts(cfg.TUI.Keybindings)
+
 			for key, cmd := range cfg.TUI.CustomCommands {
-				fmt.Fprintf(os.Stderr, "[DEBUG] Custom command: key=%s name=%s\n", key, cmd.Name)
 				customCmds[key] = components.CustomCommand{
 					Name:        cmd.Name,
 					Command:     cmd.Command,
 					Description: cmd.Description,
 				}
+
+				// Check if custom command overrides an internal shortcut
+				if internalAction, exists := internalShortcuts[key]; exists {
+					warning := fmt.Sprintf("Custom command '%s' (key: %s) overrides internal shortcut for '%s'",
+						cmd.Name, key, internalAction)
+					shortcutWarnings = append(shortcutWarnings, warning)
+				}
 			}
-		} else {
-			fmt.Fprintf(os.Stderr, "[DEBUG] No custom commands found in config\n")
 		}
 
 		if cfg.TUI.Keybindings != nil || len(customCmds) > 0 {
@@ -255,29 +266,30 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	m := Model{
-		service:         service,
-		config:          cfg,
-		styles:          styles,
-		tasks:           []core.Task{},
-		viewMode:        ViewModeList,
-		state:           StateNormal,
-		currentSection:  &allSections[initialSectionIndex],
-		activeFilter:    allSections[initialSectionIndex].Filter,
-		searchTabFilter: initialSearchFilter, // Set from --search flag if provided
-		groups:          []core.TaskGroup{},
-		selectedGroup:   nil,
-		inGroupView:     false,
-		statusMessage:   "",
-		errorMessage:    "",
-		taskList:        taskList,
-		sidebar:         components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
-		filter:          components.NewFilter(),
-		modifyInput:     components.NewFilter(),
-		annotateInput:   components.NewFilter(),
-		newTaskInput:    components.NewFilter(),
-		sections:        components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
-		help:            helpComponent,                                                                                    // Initial size, will be updated
-		confirmAction:   "",
+		service:          service,
+		config:           cfg,
+		styles:           styles,
+		tasks:            []core.Task{},
+		viewMode:         ViewModeList,
+		state:            StateNormal,
+		currentSection:   &allSections[initialSectionIndex],
+		activeFilter:     allSections[initialSectionIndex].Filter,
+		searchTabFilter:  initialSearchFilter, // Set from --search flag if provided
+		groups:           []core.TaskGroup{},
+		selectedGroup:    nil,
+		inGroupView:      false,
+		statusMessage:    "",
+		errorMessage:     "",
+		taskList:         taskList,
+		sidebar:          components.NewSidebar(40, 24, styles.ToSidebarStyles()), // Initial size, will be updated
+		filter:           components.NewFilter(),
+		modifyInput:      components.NewFilter(),
+		annotateInput:    components.NewFilter(),
+		newTaskInput:     components.NewFilter(),
+		sections:         components.NewSectionsWithIndex(allSections, 80, styles.ToSectionsStyles(), initialSectionIndex), // Initial size, will be updated
+		help:             helpComponent,                                                                                    // Initial size, will be updated
+		confirmAction:    "",
+		shortcutWarnings: shortcutWarnings,
 	}
 
 	// Set custom empty message for Search tab if starting there

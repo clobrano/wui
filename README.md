@@ -76,6 +76,7 @@ Press `?` for help and keybinding reference.
 - `m` - Quick modify task(s) (e.g., `due:tomorrow +urgent` or `due:2025-10-20T14:30`)
 - `M` - Export task(s) as markdown to clipboard (format: `* [ ] Description (uuid)`)
 - `a` - Add annotation to task(s)
+- `o` - Open link from annotation (when sidebar is visible)
 - `u` - Undo last operation
 
 **Note:** Dates with time can be set using `due:YYYY-MM-DDTHH:MM` or `scheduled:YYYY-MM-DDTHH:MM` format. Times are displayed only when not midnight.
@@ -196,7 +197,7 @@ tui:
   # Supports standard fields (id, description, project, priority, tags, due, etc.)
   # and custom UDAs (url, github, contact, etc.)
   custom_commands:
-    o:  # Press 'o' to trigger this command
+    O:  # Press 'O' (uppercase) to trigger this command
       name: "Open URL"
       command: "xdg-open {{.url}}"
       description: "Opens the task's URL in default browser"
@@ -316,7 +317,7 @@ Custom commands allow you to execute system commands with task data. Use the `{{
 ```yaml
 tui:
   custom_commands:
-    o:  # Press 'o' to open URL
+    O:  # Press 'O' (uppercase) to open URL
       name: "Open URL"
       command: "xdg-open {{.url}}"
       description: "Opens the task's URL in browser"
@@ -333,7 +334,7 @@ All task fields are available via `{{.fieldname}}`:
 **Linux:**
 ```yaml
 custom_commands:
-  o:
+  O:
     name: "Open URL"
     command: "xdg-open {{.url}}"
 ```
@@ -341,7 +342,7 @@ custom_commands:
 **Termux (Android):**
 ```yaml
 custom_commands:
-  o:
+  O:
     name: "Open URL"
     command: "termux-open-url {{.url}}"
 ```
@@ -349,7 +350,7 @@ custom_commands:
 **macOS:**
 ```yaml
 custom_commands:
-  o:
+  O:
     name: "Open URL"
     command: "open {{.url}}"
 ```
@@ -357,7 +358,7 @@ custom_commands:
 **Windows:**
 ```yaml
 custom_commands:
-  o:
+  O:
     name: "Open URL"
     command: "cmd /c start {{.url}}"
 ```
@@ -383,6 +384,8 @@ custom_commands:
 ```
 
 Custom commands appear automatically in the help screen (`?`) under "Custom Commands" section.
+
+**Note:** If a custom command uses a shortcut key that conflicts with a built-in internal shortcut (like `o` for opening annotation links, `s` for start/stop, etc.), wui will display a warning when exiting. The custom command will override the internal shortcut, but you'll be notified about this conflict.
 
 For complete documentation and more examples, see [`docs/custom-commands.md`](docs/custom-commands.md).
 

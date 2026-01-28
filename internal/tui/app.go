@@ -23,8 +23,20 @@ func Run(service core.TaskService, cfg *config.Config) error {
 		return err
 	}
 
-	// Print sync warnings after TUI has exited (if any)
+	// Print warnings after TUI has exited (if any)
 	if m, ok := finalModel.(Model); ok {
+		// Print shortcut override warnings
+		if len(m.shortcutWarnings) > 0 {
+			fmt.Println("\n========================================")
+			fmt.Printf("Shortcut override warnings (%d):\n", len(m.shortcutWarnings))
+			fmt.Println("========================================")
+			for _, warning := range m.shortcutWarnings {
+				fmt.Printf("⚠️  %s\n", warning)
+			}
+			fmt.Println("========================================")
+		}
+
+		// Print sync warnings
 		if m.syncWarnings != nil && len(m.syncWarnings.Warnings) > 0 {
 			fmt.Println("\n========================================")
 			fmt.Printf("Calendar sync completed with %d warnings:\n", len(m.syncWarnings.Warnings))

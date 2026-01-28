@@ -138,6 +138,52 @@ func DefaultKeybindings() map[string]string {
 	}
 }
 
+// GetInternalShortcuts returns a map of all internal shortcuts and their descriptions.
+// This includes both configurable keybindings and hardcoded shortcuts.
+// Used to detect when custom commands override internal functionality.
+func GetInternalShortcuts(keybindings map[string]string) map[string]string {
+	shortcuts := make(map[string]string)
+
+	// Get configured keybindings (or defaults)
+	getKey := func(action, defaultKey string) string {
+		if keybindings != nil {
+			if key, exists := keybindings[action]; exists {
+				return key
+			}
+		}
+		return defaultKey
+	}
+
+	// Configurable keybindings
+	shortcuts[getKey("quit", "q")] = "quit"
+	shortcuts[getKey("help", "?")] = "toggle help"
+	shortcuts[getKey("up", "k")] = "move up"
+	shortcuts[getKey("down", "j")] = "move down"
+	shortcuts[getKey("page_up", "ctrl+u")] = "page up"
+	shortcuts[getKey("page_down", "ctrl+d")] = "page down"
+	shortcuts[getKey("first", "g")] = "jump to first"
+	shortcuts[getKey("last", "G")] = "jump to last"
+	shortcuts[getKey("toggle_sidebar", "tab")] = "toggle sidebar"
+	shortcuts[getKey("next_section", "L")] = "next section"
+	shortcuts[getKey("prev_section", "H")] = "previous section"
+	shortcuts[getKey("done", "d")] = "mark done"
+	shortcuts[getKey("delete", "x")] = "delete"
+	shortcuts[getKey("edit", "e")] = "edit"
+	shortcuts[getKey("modify", "m")] = "modify"
+	shortcuts[getKey("annotate", "a")] = "annotate"
+	shortcuts[getKey("new", "n")] = "new task"
+	shortcuts[getKey("undo", "u")] = "undo"
+	shortcuts[getKey("filter", "/")] = "filter"
+	shortcuts[getKey("refresh", "r")] = "refresh"
+
+	// Hardcoded shortcuts (not configurable)
+	shortcuts["s"] = "start/stop task"
+	shortcuts["M"] = "export markdown"
+	shortcuts["o"] = "open annotation link"
+
+	return shortcuts
+}
+
 // DefaultTheme returns the default color theme (dark theme)
 func DefaultTheme() *Theme {
 	return &Theme{

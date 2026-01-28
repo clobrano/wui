@@ -9,7 +9,7 @@ Add custom commands to your `~/.config/wui/config.yaml`:
 ```yaml
 tui:
   custom_commands:
-    o:  # Key to press
+    O:  # Key to press (uppercase 'O')
       name: "Open URL"
       command: "xdg-open {{.url}}"
       description: "Opens the task's URL field in the default browser"
@@ -55,7 +55,7 @@ Any custom field you've defined in taskwarrior:
 ```yaml
 tui:
   custom_commands:
-    o:
+    O:
       name: "Open URL"
       command: "xdg-open {{.url}}"
       description: "Open URL in default browser"
@@ -71,12 +71,12 @@ tui:
 ```yaml
 tui:
   custom_commands:
-    o:
+    O:
       name: "Open URL"
       command: "/data/data/com.termux/files/usr/bin/termux-open-url {{.url}}"
       description: "Open URL in browser"
 
-    s:
+    S:
       name: "Share Task"
       command: "/data/data/com.termux/files/usr/bin/termux-share -a send '{{.description}}'"
       description: "Share task via Android"
@@ -89,7 +89,7 @@ tui:
 ```yaml
 tui:
   custom_commands:
-    o:
+    O:
       name: "Open URL"
       command: "open {{.url}}"
       description: "Open URL in default browser"
@@ -105,7 +105,7 @@ tui:
 ```yaml
 tui:
   custom_commands:
-    o:
+    O:
       name: "Open URL"
       command: "cmd /c start {{.url}}"
       description: "Open URL in default browser"
@@ -156,7 +156,7 @@ tui:
 ## Usage
 
 1. Navigate to a task
-2. Press the configured key (e.g., `o`)
+2. Press the configured key (e.g., `O`)
 3. The command executes with task data substituted
 4. Status message shows success/failure
 
@@ -215,6 +215,29 @@ tui:
 
 **Note**: Without `sh -c`, the pipe or redirect operators will be treated as literal arguments, not as shell operators.
 
+## Shortcut Override Warnings
+
+If you configure a custom command with a shortcut key that conflicts with a built-in internal shortcut, wui will display a warning when you exit. The custom command will still work and override the internal functionality, but you'll be notified about the conflict.
+
+Reserved internal shortcuts include:
+- `q` - Quit
+- `?` - Help
+- `j`/`k` - Navigation
+- `d` - Mark done
+- `s` - Start/Stop task
+- `o` - Open annotation link
+- `M` - Export markdown
+- And more (see full keyboard shortcuts in README)
+
+Example warning:
+```
+========================================
+Shortcut override warnings (1):
+========================================
+⚠️  Custom command 'Open URL' (key: o) overrides internal shortcut for 'open annotation link'
+========================================
+```
+
 ## Tips
 
 1. **Test commands first**: Run commands manually in your terminal before adding to config
@@ -223,3 +246,4 @@ tui:
 4. **Security**: Be careful with commands that modify or delete data
 5. **Quotes**: Use single quotes `'` to protect special characters in shell commands
 6. **Shell features**: Wrap commands needing pipes or redirects with `sh -c "..."`
+7. **Avoid conflicts**: Use uppercase letters (like `O` instead of `o`) to avoid overriding internal shortcuts
