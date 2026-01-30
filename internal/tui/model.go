@@ -1014,12 +1014,14 @@ func isTermux() bool {
 }
 
 // openURLCmd creates a command to open a URL in the default browser
-// Works on Linux (including Termux on Android), macOS, and Windows
+// Works on Android/Termux, Linux, macOS, and Windows
 func openURLCmd(url string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
 
 		switch runtime.GOOS {
+		case "android":
+			cmd = exec.Command("termux-open-url", url)
 		case "linux":
 			if isTermux() {
 				cmd = exec.Command("termux-open-url", url)
