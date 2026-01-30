@@ -1007,15 +1007,25 @@ func (m *Model) deactivateURLPicker() {
 	m.state = StateNormal
 }
 
+// isTermux returns true if running in Termux on Android
+func isTermux() bool {
+	_, exists := os.LookupEnv("TERMUX_VERSION")
+	return exists
+}
+
 // openURLCmd creates a command to open a URL in the default browser
-// Works on Linux, macOS, and Windows
+// Works on Linux (including Termux on Android), macOS, and Windows
 func openURLCmd(url string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
 
 		switch runtime.GOOS {
 		case "linux":
-			cmd = exec.Command("xdg-open", url)
+			if isTermux() {
+				cmd = exec.Command("termux-open-url", url)
+			} else {
+				cmd = exec.Command("xdg-open", url)
+			}
 		case "darwin":
 			cmd = exec.Command("open", url)
 		case "windows":
