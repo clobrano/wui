@@ -1018,13 +1018,16 @@ func isTermux() bool {
 func openURLCmd(url string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
+		var useRun bool // Use Run() instead of Start() to capture errors
 
 		switch runtime.GOOS {
 		case "android":
 			cmd = exec.Command("termux-open-url", url)
+			useRun = true
 		case "linux":
 			if isTermux() {
 				cmd = exec.Command("termux-open-url", url)
+				useRun = true
 			} else {
 				cmd = exec.Command("xdg-open", url)
 			}
@@ -1039,7 +1042,23 @@ func openURLCmd(url string) tea.Cmd {
 			}
 		}
 
-		err := cmd.Start()
+		var err error
+		if useRun {
+			// For termux-open-url, use CombinedOutput to capture any errors
+			output, runErr := cmd.CombinedOutput()
+			if runErr != nil {
+				errMsg := strings.TrimSpace(string(output))
+				if errMsg != "" {
+					err = fmt.Errorf("%s: %s", runErr.Error(), errMsg)
+				} else {
+					err = runErr
+				}
+			}
+		} else {
+			// For other platforms, use Start() to not block on browser
+			err = cmd.Start()
+		}
+
 		if err != nil {
 			return StatusMsg{
 				Message: fmt.Sprintf("Failed to open URL: %s", err.Error()),
