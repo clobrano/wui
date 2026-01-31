@@ -1020,13 +1020,15 @@ func openURLCmd(url string) tea.Cmd {
 		var cmd *exec.Cmd
 		var useRun bool // Use Run() instead of Start() to capture errors
 
+		const termuxOpenURL = "/data/data/com.termux/files/usr/bin/termux-open-url"
+
 		switch runtime.GOOS {
 		case "android":
-			cmd = exec.Command("termux-open-url", url)
+			cmd = exec.Command(termuxOpenURL, url)
 			useRun = true
 		case "linux":
 			if isTermux() {
-				cmd = exec.Command("termux-open-url", url)
+				cmd = exec.Command(termuxOpenURL, url)
 				useRun = true
 			} else {
 				cmd = exec.Command("xdg-open", url)
