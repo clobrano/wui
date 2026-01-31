@@ -1007,15 +1007,32 @@ func (m *Model) deactivateURLPicker() {
 	m.state = StateNormal
 }
 
+// isTermux returns true if running in Termux on Android
+func isTermux() bool {
+	_, exists := os.LookupEnv("TERMUX_VERSION")
+	return exists
+}
+
 // openURLCmd creates a command to open a URL in the default browser
-// Works on Linux, macOS, and Windows
+// Works on Android/Termux, Linux, macOS, and Windows
 func openURLCmd(url string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
+		var useRun bool // Use Run() instead of Start() to capture errors
+
+		const termuxOpenURL = "/data/data/com.termux/files/usr/bin/termux-open-url"
 
 		switch runtime.GOOS {
+		case "android":
+			cmd = exec.Command(termuxOpenURL, url)
+			useRun = true
 		case "linux":
-			cmd = exec.Command("xdg-open", url)
+			if isTermux() {
+				cmd = exec.Command(termuxOpenURL, url)
+				useRun = true
+			} else {
+				cmd = exec.Command("xdg-open", url)
+			}
 		case "darwin":
 			cmd = exec.Command("open", url)
 		case "windows":
@@ -1027,7 +1044,23 @@ func openURLCmd(url string) tea.Cmd {
 			}
 		}
 
-		err := cmd.Start()
+		var err error
+		if useRun {
+			// For termux-open-url, use CombinedOutput to capture any errors
+			output, runErr := cmd.CombinedOutput()
+			if runErr != nil {
+				errMsg := strings.TrimSpace(string(output))
+				if errMsg != "" {
+					err = fmt.Errorf("%s: %s", runErr.Error(), errMsg)
+				} else {
+					err = runErr
+				}
+			}
+		} else {
+			// For other platforms, use Start() to not block on browser
+			err = cmd.Start()
+		}
+
 		if err != nil {
 			return StatusMsg{
 				Message: fmt.Sprintf("Failed to open URL: %s", err.Error()),
