@@ -145,9 +145,9 @@ func (m Model) View() string {
 		)
 	}
 
-	// If in TODO validation state, overlay the popup
-	if m.state == StateTodoValidation {
-		baseView = m.renderTodoValidationPopup(baseView)
+	// If in task validation state, overlay the popup
+	if m.state == StateTaskValidation {
+		baseView = m.renderTaskValidationPopup(baseView)
 	}
 
 	return baseView
@@ -353,56 +353,105 @@ func (m Model) renderConfirm() string {
 		Render(message)
 }
 
-// renderTodoValidationPopup renders the TODO validation popup as an overlay
-func (m Model) renderTodoValidationPopup(baseView string) string {
+// renderTaskValidationPopup renders the task validation popup as an overlay
+// Shows blocking tasks and/or outstanding TODOs that prevent task completion
+func (m Model) renderTaskValidationPopup(baseView string) string {
 	// Build the content
 	var content strings.Builder
 
-	// Title
+	// Determine what we're showing
+	hasBlockingTasks := len(m.blockingTasks) > 0
+	hasOutstandingTodos := len(m.outstandingTodos) > 0
+
+	// Title - dynamic based on what issues were found
 	titleStyle := lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color("11")). // Yellow for warning
 		MarginBottom(1)
-	content.WriteString(titleStyle.Render("Outstanding TODOs Found"))
+
+	var title string
+	if hasBlockingTasks && hasOutstandingTodos {
+		title = "Task Completion Blocked"
+	} else if hasBlockingTasks {
+		title = "Blocking Tasks Found"
+	} else {
+		title = "Outstanding TODOs Found"
+	}
+	content.WriteString(titleStyle.Render(title))
 	content.WriteString("\n\n")
 
-	// Instruction
 	instructionStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("252"))
-	content.WriteString(instructionStyle.Render("The following TODO items are not marked as DONE:"))
-	content.WriteString("\n")
-	content.WriteString(instructionStyle.Render("Mark them as DONE: to allow task completion."))
-	content.WriteString("\n\n")
-
-	// List of TODOs
-	todoStyle := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("9")). // Red for pending TODOs
+	itemStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("9")). // Red for pending items
 		PaddingLeft(2)
+	moreStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8")).
+		Italic(true).
+		PaddingLeft(2)
+	sectionHeaderStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("12")). // Blue for section headers
+		MarginTop(1)
 
-	// Limit the number of TODOs shown to avoid overflow
-	maxTodos := 10
-	todosToShow := m.outstandingTodos
-	if len(todosToShow) > maxTodos {
-		todosToShow = todosToShow[:maxTodos]
-	}
+	maxItems := 5 // Reduce max items per section when showing both
 
-	for _, todo := range todosToShow {
-		// Truncate long TODOs
-		displayTodo := todo
-		if len(displayTodo) > 60 {
-			displayTodo = displayTodo[:57] + "..."
+	// Show blocking tasks section
+	if hasBlockingTasks {
+		content.WriteString(sectionHeaderStyle.Render("Blocking Tasks:"))
+		content.WriteString("\n")
+		content.WriteString(instructionStyle.Render("Complete these tasks first to unblock:"))
+		content.WriteString("\n\n")
+
+		blockedToShow := m.blockingTasks
+		if len(blockedToShow) > maxItems {
+			blockedToShow = blockedToShow[:maxItems]
 		}
-		content.WriteString(todoStyle.Render("• " + displayTodo))
-		content.WriteString("\n")
+
+		for _, task := range blockedToShow {
+			displayTask := task
+			if len(displayTask) > 60 {
+				displayTask = displayTask[:57] + "..."
+			}
+			content.WriteString(itemStyle.Render("• " + displayTask))
+			content.WriteString("\n")
+		}
+
+		if len(m.blockingTasks) > maxItems {
+			content.WriteString(moreStyle.Render(fmt.Sprintf("... and %d more", len(m.blockingTasks)-maxItems)))
+			content.WriteString("\n")
+		}
+
+		if hasOutstandingTodos {
+			content.WriteString("\n")
+		}
 	}
 
-	if len(m.outstandingTodos) > maxTodos {
-		moreStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8")).
-			Italic(true).
-			PaddingLeft(2)
-		content.WriteString(moreStyle.Render(fmt.Sprintf("... and %d more", len(m.outstandingTodos)-maxTodos)))
+	// Show outstanding TODOs section
+	if hasOutstandingTodos {
+		content.WriteString(sectionHeaderStyle.Render("Outstanding TODOs:"))
 		content.WriteString("\n")
+		content.WriteString(instructionStyle.Render("Mark these as DONE: to allow completion:"))
+		content.WriteString("\n\n")
+
+		todosToShow := m.outstandingTodos
+		if len(todosToShow) > maxItems {
+			todosToShow = todosToShow[:maxItems]
+		}
+
+		for _, todo := range todosToShow {
+			displayTodo := todo
+			if len(displayTodo) > 60 {
+				displayTodo = displayTodo[:57] + "..."
+			}
+			content.WriteString(itemStyle.Render("• " + displayTodo))
+			content.WriteString("\n")
+		}
+
+		if len(m.outstandingTodos) > maxItems {
+			content.WriteString(moreStyle.Render(fmt.Sprintf("... and %d more", len(m.outstandingTodos)-maxItems)))
+			content.WriteString("\n")
+		}
 	}
 
 	content.WriteString("\n")
@@ -488,7 +537,7 @@ func (m Model) renderFooter() string {
 			keybindings = "enter: apply | esc: cancel"
 		case StateConfirm:
 			keybindings = "y: confirm | n: cancel"
-		case StateTodoValidation:
+		case StateTaskValidation:
 			keybindings = "y: complete anyway | n/esc: cancel"
 		case StateModifyInput:
 			keybindings = "enter: apply | esc: cancel | tab: date+time picker"

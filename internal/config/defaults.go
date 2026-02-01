@@ -42,7 +42,8 @@ func DefaultTUIConfig() *TUIConfig {
 		SidebarWidth:            33,           // Percentage of terminal width (33%)
 		ScrollBuffer:            1,            // Number of tasks to keep visible above/below cursor
 		InputMode:               "floating",   // Default to floating window for input prompts
-		ValidateTodosOnComplete: ptr.To(true), // Prevent completing tasks with TODO: annotations
+		ValidateTodosOnComplete:   ptr.To(true), // Prevent completing tasks with TODO: annotations
+		ValidateBlockedOnComplete: ptr.To(true), // Prevent completing tasks blocked by other tasks
 		Tabs:                    DefaultTabs(),
 		Columns:                 DefaultColumns(),
 		NarrowViewFields:        DefaultNarrowViewFields(),

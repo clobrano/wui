@@ -69,8 +69,8 @@ const (
 	StateNewTaskInput
 	// StateURLPicker is active when user is selecting a URL to open
 	StateURLPicker
-	// StateTodoValidation is active when user is shown outstanding TODOs
-	StateTodoValidation
+	// StateTaskValidation is active when user is shown task validation warnings (TODOs or blocking tasks)
+	StateTaskValidation
 )
 
 // String returns the string representation of AppState
@@ -92,8 +92,8 @@ func (s AppState) String() string {
 		return "new_task_input"
 	case StateURLPicker:
 		return "url_picker"
-	case StateTodoValidation:
-		return "todo_validation"
+	case StateTaskValidation:
+		return "task_validation"
 	default:
 		return "unknown"
 	}
@@ -176,9 +176,10 @@ type Model struct {
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
 
-	// TODO validation state
-	pendingDoneTasks []core.Task // Tasks pending completion (waiting for TODO validation)
+	// Task validation state (TODOs and blocking tasks)
+	pendingDoneTasks []core.Task // Tasks pending completion (waiting for validation)
 	outstandingTodos []string    // Outstanding TODO: annotations found in tasks
+	blockingTasks    []string    // Descriptions of tasks blocking the selected tasks
 
 	// Calendar sync state
 	syncingBeforeQuit bool                 // true when syncing before quit
@@ -652,8 +653,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleAnnotateKeys(msg)
 	case StateNewTaskInput:
 		return m.handleNewTaskKeys(msg)
-	case StateTodoValidation:
-		return m.handleTodoValidationKeys(msg)
+	case StateTaskValidation:
+		return m.handleTaskValidationKeys(msg)
 	}
 
 	return m, nil
@@ -1213,17 +1214,28 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Mark task(s) done
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
+			var todos []string
+			var blocking []string
+
+			// Check for blocking tasks if validation is enabled
+			if m.hasBlockedValidationEnabled() {
+				blocking = m.findBlockingTasks(selectedTasks)
+			}
+
 			// Check for outstanding TODOs if validation is enabled
 			if m.hasTodoValidationEnabled() {
-				todos := extractOutstandingTodos(selectedTasks)
-				if len(todos) > 0 {
-					// Show TODO validation popup
-					m.pendingDoneTasks = selectedTasks
-					m.outstandingTodos = todos
-					m.state = StateTodoValidation
-					return m, nil
-				}
+				todos = extractOutstandingTodos(selectedTasks)
 			}
+
+			// If any validation issues, show popup
+			if len(blocking) > 0 || len(todos) > 0 {
+				m.pendingDoneTasks = selectedTasks
+				m.blockingTasks = blocking
+				m.outstandingTodos = todos
+				m.state = StateTaskValidation
+				return m, nil
+			}
+
 			m.taskList.ClearSelection()
 			return m, markTasksDoneCmd(m.service, selectedTasks)
 		}
@@ -1825,22 +1837,76 @@ func (m Model) hasTodoValidationEnabled() bool {
 	return *m.config.TUI.ValidateTodosOnComplete
 }
 
-// handleTodoValidationKeys handles keys in TODO validation state
-func (m Model) handleTodoValidationKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+// hasBlockedValidationEnabled checks if blocked task validation is enabled in config
+func (m Model) hasBlockedValidationEnabled() bool {
+	if m.config == nil || m.config.TUI == nil {
+		return true // Default to enabled
+	}
+	if m.config.TUI.ValidateBlockedOnComplete == nil {
+		return true // Default to enabled
+	}
+	return *m.config.TUI.ValidateBlockedOnComplete
+}
+
+// findBlockingTasks finds incomplete tasks that block the given tasks
+// Returns descriptions of blocking tasks (e.g., "#42: Task description")
+func (m Model) findBlockingTasks(tasks []core.Task) []string {
+	var blocking []string
+	seen := make(map[string]bool) // Track seen UUIDs to avoid duplicates
+
+	for _, task := range tasks {
+		for _, depUUID := range task.Depends {
+			if seen[depUUID] {
+				continue
+			}
+			seen[depUUID] = true
+
+			// First, try to find the task in the currently loaded tasks
+			var depTask *core.Task
+			for i := range m.tasks {
+				if m.tasks[i].UUID == depUUID {
+					depTask = &m.tasks[i]
+					break
+				}
+			}
+
+			// If not found in loaded tasks, try to fetch from service
+			if depTask == nil {
+				fetchedTasks, err := m.service.Export("uuid:" + depUUID)
+				if err == nil && len(fetchedTasks) > 0 {
+					depTask = &fetchedTasks[0]
+				}
+			}
+
+			// If we found the task and it's not completed, it's blocking
+			if depTask != nil && depTask.Status != "completed" && depTask.Status != "deleted" {
+				desc := fmt.Sprintf("#%d: %s", depTask.ID, depTask.Description)
+				blocking = append(blocking, desc)
+			}
+		}
+	}
+
+	return blocking
+}
+
+// handleTaskValidationKeys handles keys in task validation state
+func (m Model) handleTaskValidationKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "n", "N":
 		// Cancel - don't mark tasks as done
 		m.state = StateNormal
 		m.pendingDoneTasks = nil
 		m.outstandingTodos = nil
-		m.statusMessage = "Task completion cancelled - outstanding TODOs remain"
+		m.blockingTasks = nil
+		m.statusMessage = "Task completion cancelled"
 		return m, nil
 	case "y", "Y":
-		// Force complete despite TODOs
+		// Force complete despite validation issues
 		m.state = StateNormal
 		tasks := m.pendingDoneTasks
 		m.pendingDoneTasks = nil
 		m.outstandingTodos = nil
+		m.blockingTasks = nil
 		m.taskList.ClearSelection()
 		return m, markTasksDoneCmd(m.service, tasks)
 	}
