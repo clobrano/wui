@@ -69,6 +69,8 @@ const (
 	StateNewTaskInput
 	// StateURLPicker is active when user is selecting a URL to open
 	StateURLPicker
+	// StateTodoValidation is active when user is shown outstanding TODOs
+	StateTodoValidation
 )
 
 // String returns the string representation of AppState
@@ -90,6 +92,8 @@ func (s AppState) String() string {
 		return "new_task_input"
 	case StateURLPicker:
 		return "url_picker"
+	case StateTodoValidation:
+		return "todo_validation"
 	default:
 		return "unknown"
 	}
@@ -171,6 +175,10 @@ type Model struct {
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
+
+	// TODO validation state
+	pendingDoneTasks []core.Task // Tasks pending completion (waiting for TODO validation)
+	outstandingTodos []string    // Outstanding TODO: annotations found in tasks
 
 	// Calendar sync state
 	syncingBeforeQuit bool                 // true when syncing before quit
@@ -644,6 +652,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleAnnotateKeys(msg)
 	case StateNewTaskInput:
 		return m.handleNewTaskKeys(msg)
+	case StateTodoValidation:
+		return m.handleTodoValidationKeys(msg)
 	}
 
 	return m, nil
@@ -1203,6 +1213,17 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Mark task(s) done
 		selectedTasks := m.taskList.GetSelectedTasks()
 		if len(selectedTasks) > 0 {
+			// Check for outstanding TODOs if validation is enabled
+			if m.hasTodoValidationEnabled() {
+				todos := extractOutstandingTodos(selectedTasks)
+				if len(todos) > 0 {
+					// Show TODO validation popup
+					m.pendingDoneTasks = selectedTasks
+					m.outstandingTodos = todos
+					m.state = StateTodoValidation
+					return m, nil
+				}
+			}
 			m.taskList.ClearSelection()
 			return m, markTasksDoneCmd(m.service, selectedTasks)
 		}
@@ -1775,6 +1796,55 @@ func (m Model) handleNewTaskKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.newTaskInput, cmd = m.newTaskInput.Update(msg)
 		return m, cmd
 	}
+}
+
+// extractOutstandingTodos extracts TODO: annotations from tasks that are not marked as DONE:
+// Returns a slice of outstanding TODO items (the annotation text)
+func extractOutstandingTodos(tasks []core.Task) []string {
+	var todos []string
+	for _, task := range tasks {
+		for _, annotation := range task.Annotations {
+			desc := annotation.Description
+			// Check if annotation starts with "TODO:" (case-sensitive)
+			if strings.HasPrefix(desc, "TODO:") {
+				todos = append(todos, strings.TrimSpace(desc))
+			}
+		}
+	}
+	return todos
+}
+
+// hasTodoValidationEnabled checks if TODO validation is enabled in config
+func (m Model) hasTodoValidationEnabled() bool {
+	if m.config == nil || m.config.TUI == nil {
+		return true // Default to enabled
+	}
+	if m.config.TUI.ValidateTodosOnComplete == nil {
+		return true // Default to enabled
+	}
+	return *m.config.TUI.ValidateTodosOnComplete
+}
+
+// handleTodoValidationKeys handles keys in TODO validation state
+func (m Model) handleTodoValidationKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "n", "N":
+		// Cancel - don't mark tasks as done
+		m.state = StateNormal
+		m.pendingDoneTasks = nil
+		m.outstandingTodos = nil
+		m.statusMessage = "Task completion cancelled - outstanding TODOs remain"
+		return m, nil
+	case "y", "Y":
+		// Force complete despite TODOs
+		m.state = StateNormal
+		tasks := m.pendingDoneTasks
+		m.pendingDoneTasks = nil
+		m.outstandingTodos = nil
+		m.taskList.ClearSelection()
+		return m, markTasksDoneCmd(m.service, tasks)
+	}
+	return m, nil
 }
 
 // loadTasksCmd creates a command to load tasks asynchronously

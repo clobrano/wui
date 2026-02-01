@@ -8,6 +8,7 @@ type TUIConfig struct {
 	ScrollBuffer                    int                      `yaml:"scroll_buffer"`
 	InputMode                       string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
 	SilenceShortcutOverrideWarnings bool                     `yaml:"silence_shortcut_override_warnings,omitempty"`
+	ValidateTodosOnComplete         *bool                    `yaml:"validate_todos_on_complete,omitempty"` // Prevent completing tasks with TODO: annotations (default: true)
 	Tabs                            []Tab                    `yaml:"tabs"`
 	Columns                         Columns                  `yaml:"columns"`
 	NarrowViewFields                Columns                  `yaml:"narrow_view_fields"` // Fields to display below description in narrow view (terminal width < 80)
@@ -33,8 +34,8 @@ type Tab struct {
 
 // Column represents a table column configuration
 type Column struct {
-	Name   string `yaml:"name"`           // Taskwarrior property name (e.g., "id", "project", "priority")
-	Label  string `yaml:"label"`          // Display label for the column header
+	Name   string `yaml:"name"`             // Taskwarrior property name (e.g., "id", "project", "priority")
+	Label  string `yaml:"label"`            // Display label for the column header
 	Length int    `yaml:"length,omitempty"` // Maximum width in characters (0 = use default/dynamic)
 }
 

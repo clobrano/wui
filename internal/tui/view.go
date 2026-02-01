@@ -145,6 +145,11 @@ func (m Model) View() string {
 		)
 	}
 
+	// If in TODO validation state, overlay the popup
+	if m.state == StateTodoValidation {
+		baseView = m.renderTodoValidationPopup(baseView)
+	}
+
 	return baseView
 }
 
@@ -348,6 +353,107 @@ func (m Model) renderConfirm() string {
 		Render(message)
 }
 
+// renderTodoValidationPopup renders the TODO validation popup as an overlay
+func (m Model) renderTodoValidationPopup(baseView string) string {
+	// Build the content
+	var content strings.Builder
+
+	// Title
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("11")). // Yellow for warning
+		MarginBottom(1)
+	content.WriteString(titleStyle.Render("Outstanding TODOs Found"))
+	content.WriteString("\n\n")
+
+	// Instruction
+	instructionStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("252"))
+	content.WriteString(instructionStyle.Render("The following TODO items are not marked as DONE:"))
+	content.WriteString("\n")
+	content.WriteString(instructionStyle.Render("Mark them as DONE: to allow task completion."))
+	content.WriteString("\n\n")
+
+	// List of TODOs
+	todoStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("9")). // Red for pending TODOs
+		PaddingLeft(2)
+
+	// Limit the number of TODOs shown to avoid overflow
+	maxTodos := 10
+	todosToShow := m.outstandingTodos
+	if len(todosToShow) > maxTodos {
+		todosToShow = todosToShow[:maxTodos]
+	}
+
+	for _, todo := range todosToShow {
+		// Truncate long TODOs
+		displayTodo := todo
+		if len(displayTodo) > 60 {
+			displayTodo = displayTodo[:57] + "..."
+		}
+		content.WriteString(todoStyle.Render("• " + displayTodo))
+		content.WriteString("\n")
+	}
+
+	if len(m.outstandingTodos) > maxTodos {
+		moreStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8")).
+			Italic(true).
+			PaddingLeft(2)
+		content.WriteString(moreStyle.Render(fmt.Sprintf("... and %d more", len(m.outstandingTodos)-maxTodos)))
+		content.WriteString("\n")
+	}
+
+	content.WriteString("\n")
+
+	// Hint
+	hintStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("8"))
+	content.WriteString(hintStyle.Render("Press Y to complete anyway, N or Esc to cancel"))
+
+	// Create the bordered window
+	windowWidth := max(50, min(80, m.width*60/100))
+	windowBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("11")). // Yellow border
+		Padding(1, 2).
+		Width(windowWidth - 4).
+		Render(content.String())
+
+	// Calculate position (center)
+	baseHeight := lipgloss.Height(baseView)
+	windowHeight := lipgloss.Height(windowBox)
+	windowWidthActual := lipgloss.Width(windowBox)
+
+	verticalPos := max(0, (baseHeight-windowHeight)/2-2)
+
+	// Split base view into lines
+	baseLines := strings.Split(baseView, "\n")
+
+	// Overlay the floating window
+	windowLines := strings.Split(windowBox, "\n")
+
+	for i, windowLine := range windowLines {
+		lineIndex := verticalPos + i
+		if lineIndex < len(baseLines) {
+			// Center the window line horizontally
+			padding := max(0, (m.width-windowWidthActual)/2)
+			baseLines[lineIndex] = strings.Repeat(" ", padding) + windowLine
+		}
+	}
+
+	return strings.Join(baseLines, "\n")
+}
+
+// min returns the minimum of two integers
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // renderFooter renders the footer with keybindings
 func (m Model) renderFooter() string {
 	var parts []string
@@ -382,6 +488,8 @@ func (m Model) renderFooter() string {
 			keybindings = "enter: apply | esc: cancel"
 		case StateConfirm:
 			keybindings = "y: confirm | n: cancel"
+		case StateTodoValidation:
+			keybindings = "y: complete anyway | n/esc: cancel"
 		case StateModifyInput:
 			keybindings = "enter: apply | esc: cancel | tab: date+time picker"
 		case StateAnnotateInput:
