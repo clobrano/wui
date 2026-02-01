@@ -3,6 +3,8 @@ package config
 import (
 	"os"
 	"path/filepath"
+
+	"k8s.io/utils/ptr"
 )
 
 // DefaultConfig returns a Config with sensible defaults
@@ -34,18 +36,13 @@ func DefaultCalendarSync() *CalendarSync {
 	}
 }
 
-// boolPtr returns a pointer to a bool value
-func boolPtr(b bool) *bool {
-	return &b
-}
-
 // DefaultTUIConfig returns TUI configuration with defaults
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
-		SidebarWidth:            33,            // Percentage of terminal width (33%)
-		ScrollBuffer:            1,             // Number of tasks to keep visible above/below cursor
-		InputMode:               "floating",    // Default to floating window for input prompts
-		ValidateTodosOnComplete: boolPtr(true), // Prevent completing tasks with TODO: annotations
+		SidebarWidth:            33,           // Percentage of terminal width (33%)
+		ScrollBuffer:            1,            // Number of tasks to keep visible above/below cursor
+		InputMode:               "floating",   // Default to floating window for input prompts
+		ValidateTodosOnComplete: ptr.To(true), // Prevent completing tasks with TODO: annotations
 		Tabs:                    DefaultTabs(),
 		Columns:                 DefaultColumns(),
 		NarrowViewFields:        DefaultNarrowViewFields(),
