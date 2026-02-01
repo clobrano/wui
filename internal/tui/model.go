@@ -1307,7 +1307,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if selectedTask != nil {
 				urls := ExtractURLsFromAnnotations(selectedTask)
 				if len(urls) == 0 {
-					m.statusMessage = "No URLs found in task annotations"
+					m.statusMessage = "No URLs found in task"
 					return m, nil
 				} else if len(urls) == 1 {
 					// Single URL - open directly

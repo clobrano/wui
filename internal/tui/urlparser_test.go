@@ -103,12 +103,41 @@ func TestExtractURLsFromAnnotations(t *testing.T) {
 			expectedLen: 0,
 		},
 		{
-			name: "task with no annotations",
+			name: "task with no annotations and no URL in description",
 			task: &core.Task{
 				Description: "Test task",
 				Annotations: []core.Annotation{},
 			},
 			expectedLen: 0,
+		},
+		{
+			name: "task with URL in description",
+			task: &core.Task{
+				Description: "TODO: open a task to track https://github.com/openshift/cluster-etcd-operator/pull/1534 see also task (0c8ed3a7)",
+				Annotations: []core.Annotation{},
+			},
+			expectedLen:        1,
+			expectedAnnotation: "TODO: open a task to track https://github.com/openshift/cluster-etcd-operator/pull/1534 see also task (0c8ed3a7)",
+		},
+		{
+			name: "task with URL in description only (no annotations)",
+			task: &core.Task{
+				Description: "Check https://example.com for details",
+				Annotations: []core.Annotation{},
+			},
+			expectedLen:        1,
+			expectedAnnotation: "Check https://example.com for details",
+		},
+		{
+			name: "task with URL in both description and annotation (deduplicated)",
+			task: &core.Task{
+				Description: "See https://example.com",
+				Annotations: []core.Annotation{
+					{Description: "Also see https://example.com"},
+				},
+			},
+			expectedLen:        1, // duplicates should be removed
+			expectedAnnotation: "See https://example.com",
 		},
 		{
 			name: "task with annotation containing URL",

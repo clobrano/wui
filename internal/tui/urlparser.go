@@ -13,19 +13,34 @@ type URLMatch struct {
 	Annotation string // The full annotation text containing this URL
 }
 
-// ExtractURLsFromAnnotations extracts all URLs from a task's annotations
+// ExtractURLsFromAnnotations extracts all URLs from a task's description and annotations
 // Supports:
 // - Plain URLs (http://, https://, ftp://)
 // - Markdown links: [text](url)
 // - URLs with complex query strings and fragments
 func ExtractURLsFromAnnotations(task *core.Task) []URLMatch {
-	if task == nil || len(task.Annotations) == 0 {
+	if task == nil {
 		return nil
 	}
 
 	var urls []URLMatch
 	seen := make(map[string]bool) // Deduplicate URLs
 
+	// First, extract URLs from task description
+	if task.Description != "" {
+		extractedURLs := extractURLsFromText(task.Description)
+		for _, url := range extractedURLs {
+			if !seen[url] {
+				seen[url] = true
+				urls = append(urls, URLMatch{
+					URL:        url,
+					Annotation: task.Description,
+				})
+			}
+		}
+	}
+
+	// Then extract URLs from annotations
 	for _, annotation := range task.Annotations {
 		extractedURLs := extractURLsFromText(annotation.Description)
 		for _, url := range extractedURLs {
