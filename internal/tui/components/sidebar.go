@@ -89,10 +89,10 @@ func (s *Sidebar) handleKey(msg tea.KeyMsg) {
 		s.scrollDown(1)
 	case "K": // K (shift+k) for line up
 		s.scrollUp(1)
-	case "ctrl+d": // Jump to bottom
-		s.scrollToBottom()
-	case "ctrl+u": // Jump to top
-		s.scrollToTop()
+	case "ctrl+d": // Scroll down half page
+		s.scrollDown(s.height / 2)
+	case "ctrl+u": // Scroll up half page
+		s.scrollUp(s.height / 2)
 	case "ctrl+f", "pgdown": // Full page down
 		s.scrollDown(s.height)
 	case "ctrl+b", "pgup": // Full page up
