@@ -67,8 +67,8 @@ const (
 	StateAnnotateInput
 	// StateNewTaskInput is active when user is creating a new task
 	StateNewTaskInput
-	// StateURLPicker is active when user is selecting a URL to open
-	StateURLPicker
+	// StateResourcePicker is active when user is selecting a resource (URL or file) to open
+	StateResourcePicker
 	// StateTaskValidation is active when user is shown task validation warnings (TODOs or blocking tasks)
 	StateTaskValidation
 )
@@ -90,8 +90,8 @@ func (s AppState) String() string {
 		return "annotate_input"
 	case StateNewTaskInput:
 		return "new_task_input"
-	case StateURLPicker:
-		return "url_picker"
+	case StateResourcePicker:
+		return "resource_picker"
 	case StateTaskValidation:
 		return "task_validation"
 	default:
@@ -168,10 +168,10 @@ type Model struct {
 	availableProjects      []string // all unique projects from loaded tasks
 	availableTags          []string // all unique tags from loaded tasks
 
-	// URL picker (for opening URLs from annotations)
-	urlPicker       components.ListPicker
-	urlPickerActive bool       // true when URL picker is shown
-	urlPickerURLs   []URLMatch // URLs extracted from current task's annotations
+	// Resource picker (for opening URLs and file paths from annotations)
+	resourcePicker       components.ListPicker
+	resourcePickerActive bool            // true when resource picker is shown
+	resourcePickerItems  []ResourceMatch // Resources (URLs/files) extracted from current task's annotations
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -607,32 +607,36 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// If URL picker is active, handle URL picker input
-	if m.urlPickerActive {
+	// If resource picker is active, handle resource picker input
+	if m.resourcePickerActive {
 		var cmd tea.Cmd
 
 		switch msg.String() {
 		case "enter":
-			// Open selected URL
-			if m.urlPicker.HasItems() {
-				selectedIdx := m.urlPicker.SelectedIndex()
-				if selectedIdx >= 0 && selectedIdx < len(m.urlPickerURLs) {
-					url := m.urlPickerURLs[selectedIdx].URL
-					m.deactivateURLPicker()
-					return m, openURLCmd(url)
+			// Open selected resource
+			if m.resourcePicker.HasItems() {
+				selectedIdx := m.resourcePicker.SelectedIndex()
+				if selectedIdx >= 0 && selectedIdx < len(m.resourcePickerItems) {
+					resource := m.resourcePickerItems[selectedIdx]
+					m.deactivateResourcePicker()
+					// Use appropriate opener based on resource type
+					if resource.Type == ResourceTypeURL {
+						return m, openURLCmd(resource.Resource)
+					}
+					return m, openFileCmd(resource.Resource)
 				}
 			}
-			m.deactivateURLPicker()
+			m.deactivateResourcePicker()
 			return m, nil
 
 		case "esc":
-			// Cancel URL picker
-			m.deactivateURLPicker()
+			// Cancel resource picker
+			m.deactivateResourcePicker()
 			return m, nil
 
 		default:
-			// Delegate to URL picker component
-			m.urlPicker, cmd = m.urlPicker.Update(msg)
+			// Delegate to resource picker component
+			m.resourcePicker, cmd = m.resourcePicker.Update(msg)
 			return m, cmd
 		}
 	}
@@ -997,24 +1001,24 @@ func (m *Model) insertSelectionFromListPicker() {
 	inputComponent.SetCursor(m.listPickerInsertPos + len(selectedItem))
 }
 
-// activateURLPicker activates the URL picker for selecting a URL to open
-func (m *Model) activateURLPicker(urls []URLMatch) {
+// activateResourcePicker activates the resource picker for selecting a URL or file to open
+func (m *Model) activateResourcePicker(resources []ResourceMatch) {
 	// Build display items for the picker
-	items := make([]string, len(urls))
-	for i, url := range urls {
-		items[i] = url.FormatForDisplay()
+	items := make([]string, len(resources))
+	for i, resource := range resources {
+		items[i] = resource.FormatForDisplay()
 	}
 
-	m.urlPicker = components.NewListPicker("Select URL to open", items, "")
-	m.urlPickerActive = true
-	m.urlPickerURLs = urls
-	m.state = StateURLPicker
+	m.resourcePicker = components.NewListPicker("Select resource to open", items, "")
+	m.resourcePickerActive = true
+	m.resourcePickerItems = resources
+	m.state = StateResourcePicker
 }
 
-// deactivateURLPicker closes the URL picker
-func (m *Model) deactivateURLPicker() {
-	m.urlPickerActive = false
-	m.urlPickerURLs = nil
+// deactivateResourcePicker closes the resource picker
+func (m *Model) deactivateResourcePicker() {
+	m.resourcePickerActive = false
+	m.resourcePickerItems = nil
 	m.state = StateNormal
 }
 
@@ -1081,6 +1085,76 @@ func openURLCmd(url string) tea.Cmd {
 
 		return StatusMsg{
 			Message: "Opening URL in browser...",
+			IsError: false,
+		}
+	}
+}
+
+// openFileCmd creates a command to open a file with the default application
+// Works on Android/Termux, Linux, macOS, and Windows
+func openFileCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		// Check if file exists
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return StatusMsg{
+				Message: fmt.Sprintf("File not found: %s", path),
+				IsError: true,
+			}
+		}
+
+		var cmd *exec.Cmd
+		var useRun bool // Use Run() instead of Start() to capture errors
+
+		const termuxOpen = "/data/data/com.termux/files/usr/bin/termux-open"
+
+		switch runtime.GOOS {
+		case "android":
+			cmd = exec.Command(termuxOpen, path)
+			useRun = true
+		case "linux":
+			if isTermux() {
+				cmd = exec.Command(termuxOpen, path)
+				useRun = true
+			} else {
+				cmd = exec.Command("xdg-open", path)
+			}
+		case "darwin":
+			cmd = exec.Command("open", path)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", "", path)
+		default:
+			return StatusMsg{
+				Message: fmt.Sprintf("Unsupported platform: %s", runtime.GOOS),
+				IsError: true,
+			}
+		}
+
+		var err error
+		if useRun {
+			// For termux-open, use CombinedOutput to capture any errors
+			output, runErr := cmd.CombinedOutput()
+			if runErr != nil {
+				errMsg := strings.TrimSpace(string(output))
+				if errMsg != "" {
+					err = fmt.Errorf("%s: %s", runErr.Error(), errMsg)
+				} else {
+					err = runErr
+				}
+			}
+		} else {
+			// For other platforms, use Start() to not block on application
+			err = cmd.Start()
+		}
+
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Failed to open file: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		return StatusMsg{
+			Message: "Opening file...",
 			IsError: false,
 		}
 	}
@@ -1313,20 +1387,24 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.keyMatches(keyPressed, "open_url") {
-		// Open URL from task annotations
+		// Open URL or file from task annotations
 		if !m.inGroupView {
 			selectedTask := m.taskList.SelectedTask()
 			if selectedTask != nil {
-				urls := ExtractURLsFromAnnotations(selectedTask)
-				if len(urls) == 0 {
-					m.statusMessage = "No URLs found in task annotations"
+				resources := ExtractResourcesFromAnnotations(selectedTask)
+				if len(resources) == 0 {
+					m.statusMessage = "No URLs or file paths found in task annotations"
 					return m, nil
-				} else if len(urls) == 1 {
-					// Single URL - open directly
-					return m, openURLCmd(urls[0].URL)
+				} else if len(resources) == 1 {
+					// Single resource - open directly
+					resource := resources[0]
+					if resource.Type == ResourceTypeURL {
+						return m, openURLCmd(resource.Resource)
+					}
+					return m, openFileCmd(resource.Resource)
 				} else {
-					// Multiple URLs - show picker
-					m.activateURLPicker(urls)
+					// Multiple resources - show picker
+					m.activateResourcePicker(resources)
 					return m, nil
 				}
 			} else {

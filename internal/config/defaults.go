@@ -39,16 +39,16 @@ func DefaultCalendarSync() *CalendarSync {
 // DefaultTUIConfig returns TUI configuration with defaults
 func DefaultTUIConfig() *TUIConfig {
 	return &TUIConfig{
-		SidebarWidth:            33,           // Percentage of terminal width (33%)
-		ScrollBuffer:            1,            // Number of tasks to keep visible above/below cursor
-		InputMode:               "floating",   // Default to floating window for input prompts
+		SidebarWidth:              33,           // Percentage of terminal width (33%)
+		ScrollBuffer:              1,            // Number of tasks to keep visible above/below cursor
+		InputMode:                 "floating",   // Default to floating window for input prompts
 		ValidateTodosOnComplete:   ptr.To(true), // Prevent completing tasks with TODO: annotations
 		ValidateBlockedOnComplete: ptr.To(true), // Prevent completing tasks blocked by other tasks
-		Tabs:                    DefaultTabs(),
-		Columns:                 DefaultColumns(),
-		NarrowViewFields:        DefaultNarrowViewFields(),
-		Keybindings:             DefaultKeybindings(),
-		Theme:                   DefaultTheme(),
+		Tabs:                      DefaultTabs(),
+		Columns:                   DefaultColumns(),
+		NarrowViewFields:          DefaultNarrowViewFields(),
+		Keybindings:               DefaultKeybindings(),
+		Theme:                     DefaultTheme(),
 	}
 }
 
@@ -178,13 +178,13 @@ func GetInternalShortcuts(keybindings map[string]string) map[string]string {
 	shortcuts[getKey("annotate", "a")] = "annotate"
 	shortcuts[getKey("new", "n")] = "new task"
 	shortcuts[getKey("undo", "u")] = "undo"
+	shortcuts[getKey("open_url", "o")] = "open URL/file from annotation"
 	shortcuts[getKey("filter", "/")] = "filter"
 	shortcuts[getKey("refresh", "r")] = "refresh"
 
 	// Hardcoded shortcuts (not configurable)
 	shortcuts["s"] = "start/stop task"
 	shortcuts["M"] = "export markdown"
-	shortcuts["o"] = "open annotation link"
 
 	return shortcuts
 }
