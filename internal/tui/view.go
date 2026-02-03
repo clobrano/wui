@@ -129,33 +129,17 @@ func (m Model) View() string {
 		)
 	}
 
-	// If URL picker is active, overlay it on top of everything
-	if m.urlPickerActive {
-		urlPickerView := m.urlPicker.View()
+	// If resource picker is active, overlay it on top of everything
+	if m.resourcePickerActive {
+		resourcePickerView := m.resourcePicker.View()
 
-		// Place URL picker in the center of the screen as an overlay
+		// Place resource picker in the center of the screen as an overlay
 		baseView = lipgloss.Place(
 			m.width,
 			m.height,
 			lipgloss.Center,
 			lipgloss.Center,
-			urlPickerView,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
-		)
-	}
-
-	// If file picker is active, overlay it on top of everything
-	if m.filePickerActive {
-		filePickerView := m.filePicker.View()
-
-		// Place file picker in the center of the screen as an overlay
-		baseView = lipgloss.Place(
-			m.width,
-			m.height,
-			lipgloss.Center,
-			lipgloss.Center,
-			filePickerView,
+			resourcePickerView,
 			lipgloss.WithWhitespaceChars(" "),
 			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
 		)
@@ -535,10 +519,8 @@ func (m Model) renderFooter() string {
 
 	// Show keybindings based on state
 	keybindings := ""
-	if m.urlPickerActive {
-		keybindings = "↑↓: navigate | enter: open URL | esc: cancel"
-	} else if m.filePickerActive {
-		keybindings = "↑↓: navigate | enter: open file | esc: cancel"
+	if m.resourcePickerActive {
+		keybindings = "↑↓: navigate | enter: open | esc: cancel"
 	} else if m.listPickerActive {
 		keybindings = "↑↓: navigate | enter: select | esc: cancel"
 	} else if m.timePickerActive {

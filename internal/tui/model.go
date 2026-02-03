@@ -67,10 +67,8 @@ const (
 	StateAnnotateInput
 	// StateNewTaskInput is active when user is creating a new task
 	StateNewTaskInput
-	// StateURLPicker is active when user is selecting a URL to open
-	StateURLPicker
-	// StateFilePicker is active when user is selecting a file path to open
-	StateFilePicker
+	// StateResourcePicker is active when user is selecting a resource (URL or file) to open
+	StateResourcePicker
 	// StateTaskValidation is active when user is shown task validation warnings (TODOs or blocking tasks)
 	StateTaskValidation
 )
@@ -92,10 +90,8 @@ func (s AppState) String() string {
 		return "annotate_input"
 	case StateNewTaskInput:
 		return "new_task_input"
-	case StateURLPicker:
-		return "url_picker"
-	case StateFilePicker:
-		return "file_picker"
+	case StateResourcePicker:
+		return "resource_picker"
 	case StateTaskValidation:
 		return "task_validation"
 	default:
@@ -172,15 +168,10 @@ type Model struct {
 	availableProjects      []string // all unique projects from loaded tasks
 	availableTags          []string // all unique tags from loaded tasks
 
-	// URL picker (for opening URLs from annotations)
-	urlPicker       components.ListPicker
-	urlPickerActive bool       // true when URL picker is shown
-	urlPickerURLs   []URLMatch // URLs extracted from current task's annotations
-
-	// File picker (for opening file paths from annotations)
-	filePicker       components.ListPicker
-	filePickerActive bool            // true when file picker is shown
-	filePickerPaths  []FilePathMatch // File paths extracted from current task's annotations
+	// Resource picker (for opening URLs and file paths from annotations)
+	resourcePicker       components.ListPicker
+	resourcePickerActive bool            // true when resource picker is shown
+	resourcePickerItems  []ResourceMatch // Resources (URLs/files) extracted from current task's annotations
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -616,62 +607,36 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// If URL picker is active, handle URL picker input
-	if m.urlPickerActive {
+	// If resource picker is active, handle resource picker input
+	if m.resourcePickerActive {
 		var cmd tea.Cmd
 
 		switch msg.String() {
 		case "enter":
-			// Open selected URL
-			if m.urlPicker.HasItems() {
-				selectedIdx := m.urlPicker.SelectedIndex()
-				if selectedIdx >= 0 && selectedIdx < len(m.urlPickerURLs) {
-					url := m.urlPickerURLs[selectedIdx].URL
-					m.deactivateURLPicker()
-					return m, openURLCmd(url)
+			// Open selected resource
+			if m.resourcePicker.HasItems() {
+				selectedIdx := m.resourcePicker.SelectedIndex()
+				if selectedIdx >= 0 && selectedIdx < len(m.resourcePickerItems) {
+					resource := m.resourcePickerItems[selectedIdx]
+					m.deactivateResourcePicker()
+					// Use appropriate opener based on resource type
+					if resource.Type == ResourceTypeURL {
+						return m, openURLCmd(resource.Resource)
+					}
+					return m, openFileCmd(resource.Resource)
 				}
 			}
-			m.deactivateURLPicker()
+			m.deactivateResourcePicker()
 			return m, nil
 
 		case "esc":
-			// Cancel URL picker
-			m.deactivateURLPicker()
+			// Cancel resource picker
+			m.deactivateResourcePicker()
 			return m, nil
 
 		default:
-			// Delegate to URL picker component
-			m.urlPicker, cmd = m.urlPicker.Update(msg)
-			return m, cmd
-		}
-	}
-
-	// If file picker is active, handle file picker input
-	if m.filePickerActive {
-		var cmd tea.Cmd
-
-		switch msg.String() {
-		case "enter":
-			// Open selected file
-			if m.filePicker.HasItems() {
-				selectedIdx := m.filePicker.SelectedIndex()
-				if selectedIdx >= 0 && selectedIdx < len(m.filePickerPaths) {
-					path := m.filePickerPaths[selectedIdx].Path
-					m.deactivateFilePicker()
-					return m, openFileCmd(path)
-				}
-			}
-			m.deactivateFilePicker()
-			return m, nil
-
-		case "esc":
-			// Cancel file picker
-			m.deactivateFilePicker()
-			return m, nil
-
-		default:
-			// Delegate to file picker component
-			m.filePicker, cmd = m.filePicker.Update(msg)
+			// Delegate to resource picker component
+			m.resourcePicker, cmd = m.resourcePicker.Update(msg)
 			return m, cmd
 		}
 	}
@@ -1036,45 +1001,24 @@ func (m *Model) insertSelectionFromListPicker() {
 	inputComponent.SetCursor(m.listPickerInsertPos + len(selectedItem))
 }
 
-// activateURLPicker activates the URL picker for selecting a URL to open
-func (m *Model) activateURLPicker(urls []URLMatch) {
+// activateResourcePicker activates the resource picker for selecting a URL or file to open
+func (m *Model) activateResourcePicker(resources []ResourceMatch) {
 	// Build display items for the picker
-	items := make([]string, len(urls))
-	for i, url := range urls {
-		items[i] = url.FormatForDisplay()
+	items := make([]string, len(resources))
+	for i, resource := range resources {
+		items[i] = resource.FormatForDisplay()
 	}
 
-	m.urlPicker = components.NewListPicker("Select URL to open", items, "")
-	m.urlPickerActive = true
-	m.urlPickerURLs = urls
-	m.state = StateURLPicker
+	m.resourcePicker = components.NewListPicker("Select resource to open", items, "")
+	m.resourcePickerActive = true
+	m.resourcePickerItems = resources
+	m.state = StateResourcePicker
 }
 
-// deactivateURLPicker closes the URL picker
-func (m *Model) deactivateURLPicker() {
-	m.urlPickerActive = false
-	m.urlPickerURLs = nil
-	m.state = StateNormal
-}
-
-// activateFilePicker activates the file picker for selecting a file path to open
-func (m *Model) activateFilePicker(paths []FilePathMatch) {
-	// Build display items for the picker
-	items := make([]string, len(paths))
-	for i, path := range paths {
-		items[i] = path.FormatForDisplay()
-	}
-
-	m.filePicker = components.NewListPicker("Select file to open", items, "")
-	m.filePickerActive = true
-	m.filePickerPaths = paths
-	m.state = StateFilePicker
-}
-
-// deactivateFilePicker closes the file picker
-func (m *Model) deactivateFilePicker() {
-	m.filePickerActive = false
-	m.filePickerPaths = nil
+// deactivateResourcePicker closes the resource picker
+func (m *Model) deactivateResourcePicker() {
+	m.resourcePickerActive = false
+	m.resourcePickerItems = nil
 	m.state = StateNormal
 }
 
@@ -1443,44 +1387,24 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.keyMatches(keyPressed, "open_url") {
-		// Open URL from task annotations
+		// Open URL or file from task annotations
 		if !m.inGroupView {
 			selectedTask := m.taskList.SelectedTask()
 			if selectedTask != nil {
-				urls := ExtractURLsFromAnnotations(selectedTask)
-				if len(urls) == 0 {
-					m.statusMessage = "No URLs found in task annotations"
+				resources := ExtractResourcesFromAnnotations(selectedTask)
+				if len(resources) == 0 {
+					m.statusMessage = "No URLs or file paths found in task annotations"
 					return m, nil
-				} else if len(urls) == 1 {
-					// Single URL - open directly
-					return m, openURLCmd(urls[0].URL)
+				} else if len(resources) == 1 {
+					// Single resource - open directly
+					resource := resources[0]
+					if resource.Type == ResourceTypeURL {
+						return m, openURLCmd(resource.Resource)
+					}
+					return m, openFileCmd(resource.Resource)
 				} else {
-					// Multiple URLs - show picker
-					m.activateURLPicker(urls)
-					return m, nil
-				}
-			} else {
-				m.statusMessage = "No task selected"
-			}
-		}
-		return m, nil
-	}
-
-	if m.keyMatches(keyPressed, "open_file") {
-		// Open file from task annotations
-		if !m.inGroupView {
-			selectedTask := m.taskList.SelectedTask()
-			if selectedTask != nil {
-				paths := ExtractFilePathsFromAnnotations(selectedTask)
-				if len(paths) == 0 {
-					m.statusMessage = "No file paths found in task annotations"
-					return m, nil
-				} else if len(paths) == 1 {
-					// Single file - open directly
-					return m, openFileCmd(paths[0].Path)
-				} else {
-					// Multiple files - show picker
-					m.activateFilePicker(paths)
+					// Multiple resources - show picker
+					m.activateResourcePicker(resources)
 					return m, nil
 				}
 			} else {

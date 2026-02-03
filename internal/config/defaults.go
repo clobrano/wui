@@ -128,15 +128,14 @@ func DefaultKeybindings() map[string]string {
 		"prev_section": "H",
 
 		// Task operations
-		"done":      "d",
-		"delete":    "x",
-		"edit":      "e",
-		"modify":    "m",
-		"annotate":  "a",
-		"new":       "n",
-		"undo":      "u",
-		"open_url":  "o",
-		"open_file": "O",
+		"done":     "d",
+		"delete":   "x",
+		"edit":     "e",
+		"modify":   "m",
+		"annotate": "a",
+		"new":      "n",
+		"undo":     "u",
+		"open_url": "o",
 
 		// Filtering
 		"filter":  "/",
@@ -179,8 +178,7 @@ func GetInternalShortcuts(keybindings map[string]string) map[string]string {
 	shortcuts[getKey("annotate", "a")] = "annotate"
 	shortcuts[getKey("new", "n")] = "new task"
 	shortcuts[getKey("undo", "u")] = "undo"
-	shortcuts[getKey("open_url", "o")] = "open URL from annotation"
-	shortcuts[getKey("open_file", "O")] = "open file from annotation"
+	shortcuts[getKey("open_url", "o")] = "open URL/file from annotation"
 	shortcuts[getKey("filter", "/")] = "filter"
 	shortcuts[getKey("refresh", "r")] = "refresh"
 
