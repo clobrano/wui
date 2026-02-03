@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -11,31 +12,35 @@ import (
 
 // FilePathMatch represents a file path found in an annotation
 type FilePathMatch struct {
-	Path       string // The actual file path (expanded)
+	Path       string // The actual file path (expanded and normalized)
 	Annotation string // The full annotation text containing this path
 }
 
 // ExtractFilePathsFromAnnotations extracts all file paths from a task's annotations
 // Supports:
 // - Absolute paths: /home/user/file.txt, /tmp/data
+// - Paths with spaces (quoted): "/home/user/my documents/file.txt"
+// - Paths with escaped spaces: /home/user/my\ documents/file.txt
 // - Home directory paths: ~/documents/file.txt
 // - Relative paths: ./file.txt, ../parent/file
-// - file:// URLs: file:///home/user/file.txt
+// - file:// URLs: file:///home/user/file.txt (with %20 for spaces)
 func ExtractFilePathsFromAnnotations(task *core.Task) []FilePathMatch {
 	if task == nil || len(task.Annotations) == 0 {
 		return nil
 	}
 
 	var paths []FilePathMatch
-	seen := make(map[string]bool) // Deduplicate paths
+	seen := make(map[string]bool) // Deduplicate by normalized path
 
 	for _, annotation := range task.Annotations {
 		extractedPaths := extractFilePathsFromText(annotation.Description)
 		for _, path := range extractedPaths {
-			if !seen[path] {
-				seen[path] = true
+			// Normalize the path for deduplication
+			normalizedPath := normalizePath(path)
+			if !seen[normalizedPath] {
+				seen[normalizedPath] = true
 				paths = append(paths, FilePathMatch{
-					Path:       path,
+					Path:       normalizedPath,
 					Annotation: annotation.Description,
 				})
 			}
@@ -51,63 +56,126 @@ func extractFilePathsFromText(text string) []string {
 	var paths []string
 	seen := make(map[string]bool)
 
-	// Pattern 1: file:// URLs
-	fileURLRegex := regexp.MustCompile(`file://(/[^\s<>\[\]"']+)`)
+	addPath := func(path string) {
+		normalized := normalizePath(path)
+		if normalized != "" && !seen[normalized] && isValidFilePath(normalized) {
+			seen[normalized] = true
+			paths = append(paths, normalized)
+		}
+	}
+
+	// Pattern 1: file:// URLs (may contain %20 for spaces)
+	fileURLRegex := regexp.MustCompile(`file://(/[^\s<>\[\]]+)`)
 	fileURLMatches := fileURLRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range fileURLMatches {
 		if len(match) >= 2 {
-			path := cleanPathTrailing(match[1])
-			if !seen[path] && isValidFilePath(path) {
-				seen[path] = true
-				paths = append(paths, path)
+			path := match[1]
+			// Decode URL-encoded characters (like %20 for spaces)
+			if decoded, err := url.PathUnescape(path); err == nil {
+				path = decoded
+			}
+			path = cleanPathTrailing(path)
+			addPath(path)
+		}
+	}
+
+	// Pattern 2: Double-quoted paths (supports spaces)
+	doubleQuotedRegex := regexp.MustCompile(`"((?:/|~/|\.\.?/)[^"]+)"`)
+	doubleQuotedMatches := doubleQuotedRegex.FindAllStringSubmatch(text, -1)
+	for _, match := range doubleQuotedMatches {
+		if len(match) >= 2 {
+			path := match[1]
+			addPath(path)
+		}
+	}
+
+	// Pattern 3: Single-quoted paths (supports spaces)
+	singleQuotedRegex := regexp.MustCompile(`'((?:/|~/|\.\.?/)[^']+)'`)
+	singleQuotedMatches := singleQuotedRegex.FindAllStringSubmatch(text, -1)
+	for _, match := range singleQuotedMatches {
+		if len(match) >= 2 {
+			path := match[1]
+			addPath(path)
+		}
+	}
+
+	// Pattern 4: Paths with escaped spaces (backslash before space)
+	// Match paths that contain \  (backslash-space) sequences
+	escapedSpaceRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9"'])((?:/|~/|\.\.?/)(?:[^\s"'<>\[\]]|\\ )+)`)
+	escapedMatches := escapedSpaceRegex.FindAllStringSubmatch(text, -1)
+	for _, match := range escapedMatches {
+		if len(match) >= 2 {
+			path := match[1]
+			// Only process if it actually contains escaped spaces
+			if strings.Contains(path, `\ `) {
+				// Unescape the spaces
+				path = strings.ReplaceAll(path, `\ `, " ")
+				path = cleanPathTrailing(path)
+				addPath(path)
 			}
 		}
 	}
 
-	// Pattern 2: Absolute Unix paths (starting with /)
+	// Pattern 5: Absolute Unix paths without spaces (starting with /)
 	// Must start with / followed by a word character to avoid matching standalone /
-	absolutePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9])(/[a-zA-Z0-9_][^\s<>\[\]"']*[^\s<>\[\]"'.,;:!?)])`)
+	absolutePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9"'/\\])(/[a-zA-Z0-9_][^\s<>\[\]"']*[^\s<>\[\]"'.,;:!?)])`)
 	absoluteMatches := absolutePathRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range absoluteMatches {
 		if len(match) >= 2 {
 			path := cleanPathTrailing(match[1])
-			if !seen[path] && isValidFilePath(path) {
-				seen[path] = true
-				paths = append(paths, path)
+			// Skip if this looks like it was already captured as a quoted path
+			if !strings.Contains(path, `\ `) {
+				addPath(path)
 			}
 		}
 	}
 
-	// Pattern 3: Home directory paths (starting with ~/)
-	homePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9])(~/[^\s<>\[\]"']+)`)
+	// Pattern 6: Home directory paths without spaces (starting with ~/)
+	homePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9"'\\])(~/[^\s<>\[\]"']+)`)
 	homeMatches := homePathRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range homeMatches {
 		if len(match) >= 2 {
 			path := cleanPathTrailing(match[1])
-			expandedPath := expandHomePath(path)
-			if !seen[expandedPath] && isValidFilePath(expandedPath) {
-				seen[expandedPath] = true
-				paths = append(paths, expandedPath)
-			}
+			addPath(path)
 		}
 	}
 
-	// Pattern 4: Relative paths (starting with ./ or ../)
-	relativePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9])(\.\.?/[^\s<>\[\]"']+)`)
+	// Pattern 7: Relative paths without spaces (starting with ./ or ../)
+	relativePathRegex := regexp.MustCompile(`(?:^|[^a-zA-Z0-9"'\\])(\.\.?/[^\s<>\[\]"']+)`)
 	relativeMatches := relativePathRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range relativeMatches {
 		if len(match) >= 2 {
 			path := cleanPathTrailing(match[1])
-			// Convert to absolute path
-			absPath, err := filepath.Abs(path)
-			if err == nil && !seen[absPath] && isValidFilePath(absPath) {
-				seen[absPath] = true
-				paths = append(paths, absPath)
-			}
+			addPath(path)
 		}
 	}
 
 	return paths
+}
+
+// normalizePath normalizes a path by expanding home directory and converting to absolute
+func normalizePath(path string) string {
+	if path == "" {
+		return ""
+	}
+
+	// Expand home directory
+	if strings.HasPrefix(path, "~/") {
+		path = expandHomePath(path)
+	}
+
+	// Convert relative paths to absolute
+	if strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") {
+		absPath, err := filepath.Abs(path)
+		if err == nil {
+			path = absPath
+		}
+	}
+
+	// Clean the path (removes redundant slashes, etc.)
+	path = filepath.Clean(path)
+
+	return path
 }
 
 // expandHomePath expands ~ to the user's home directory

@@ -33,6 +33,11 @@ func TestExtractFilePathsFromText(t *testing.T) {
 			expected: []string{"/home/user/data.json"},
 		},
 		{
+			name:     "file:// URL with encoded spaces",
+			text:     "Open file:///home/user/my%20documents/file.txt",
+			expected: []string{"/home/user/my documents/file.txt"},
+		},
+		{
 			name:     "home directory path",
 			text:     "Check ~/documents/report.pdf",
 			expected: []string{filepath.Join(homeDir, "documents/report.pdf")},
@@ -86,6 +91,37 @@ func TestExtractFilePathsFromText(t *testing.T) {
 			name:     "should not match URLs as file paths",
 			text:     "Visit https://example.com/path/to/page",
 			expected: []string{},
+		},
+		// Tests for paths with spaces
+		{
+			name:     "double-quoted path with spaces",
+			text:     `Check the file "/home/user/my documents/file.txt"`,
+			expected: []string{"/home/user/my documents/file.txt"},
+		},
+		{
+			name:     "single-quoted path with spaces",
+			text:     `Check the file '/home/user/my documents/file.txt'`,
+			expected: []string{"/home/user/my documents/file.txt"},
+		},
+		{
+			name:     "escaped spaces in path",
+			text:     `Check the file /home/user/my\ documents/file.txt`,
+			expected: []string{"/home/user/my documents/file.txt"},
+		},
+		{
+			name:     "double-quoted home path with spaces",
+			text:     `See "~/my documents/report.pdf"`,
+			expected: []string{filepath.Join(homeDir, "my documents/report.pdf")},
+		},
+		{
+			name:     "multiple spaces in quoted path",
+			text:     `Open "/home/user/a b c/d e f.txt"`,
+			expected: []string{"/home/user/a b c/d e f.txt"},
+		},
+		{
+			name:     "path with spaces and special chars",
+			text:     `File at "/home/user/my docs (2024)/report-v1.pdf"`,
+			expected: []string{"/home/user/my docs (2024)/report-v1.pdf"},
 		},
 	}
 
@@ -178,6 +214,30 @@ func TestExtractFilePathsFromAnnotations(t *testing.T) {
 			expectedLen:        1,
 			expectedAnnotation: "Check ~/documents/report.pdf",
 		},
+		{
+			name: "task with path with spaces",
+			task: &core.Task{
+				Description: "Test task",
+				Annotations: []core.Annotation{
+					{Description: `Check "/home/user/my documents/file.txt"`},
+				},
+			},
+			expectedLen:        1,
+			expectedAnnotation: `Check "/home/user/my documents/file.txt"`,
+		},
+		{
+			name: "task with same path in different formats - should deduplicate",
+			task: &core.Task{
+				Description: "Test task",
+				Annotations: []core.Annotation{
+					{Description: `Check "/home/user/my documents/file.txt"`},
+					{Description: `Also check /home/user/my\ documents/file.txt`},
+					{Description: `And file:///home/user/my%20documents/file.txt`},
+				},
+			},
+			expectedLen:        1, // All three refer to the same path
+			expectedAnnotation: `Check "/home/user/my documents/file.txt"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -185,6 +245,9 @@ func TestExtractFilePathsFromAnnotations(t *testing.T) {
 			result := ExtractFilePathsFromAnnotations(tt.task)
 			if len(result) != tt.expectedLen {
 				t.Errorf("expected %d paths, got %d", tt.expectedLen, len(result))
+				for i, r := range result {
+					t.Errorf("  result[%d]: path=%q annotation=%q", i, r.Path, r.Annotation)
+				}
 			}
 			if tt.expectedLen > 0 && len(result) > 0 {
 				if result[0].Annotation != tt.expectedAnnotation {
@@ -236,6 +299,14 @@ func TestFilePathMatchFormatForDisplay(t *testing.T) {
 			},
 			expected: "See file:///home/user/data.json for config",
 		},
+		{
+			name: "path with spaces annotation",
+			match: FilePathMatch{
+				Path:       "/home/user/my documents/file.txt",
+				Annotation: `Open "/home/user/my documents/file.txt"`,
+			},
+			expected: `Open "/home/user/my documents/file.txt"`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -270,6 +341,11 @@ func TestExpandHomePath(t *testing.T) {
 			name:     "does not expand path without tilde",
 			path:     "documents/file.txt",
 			expected: "documents/file.txt",
+		},
+		{
+			name:     "expands home directory with spaces",
+			path:     "~/my documents/file.txt",
+			expected: filepath.Join(homeDir, "my documents/file.txt"),
 		},
 	}
 
@@ -348,6 +424,11 @@ func TestIsValidFilePath(t *testing.T) {
 			expected: true,
 		},
 		{
+			name:     "valid path with spaces",
+			path:     "/home/user/my documents/file.txt",
+			expected: true,
+		},
+		{
 			name:     "empty path",
 			path:     "",
 			expected: false,
@@ -376,5 +457,78 @@ func TestIsValidFilePath(t *testing.T) {
 				t.Errorf("expected %v, got %v", tt.expected, result)
 			}
 		})
+	}
+}
+
+func TestNormalizePath(t *testing.T) {
+	homeDir, _ := os.UserHomeDir()
+
+	tests := []struct {
+		name     string
+		path     string
+		expected string
+	}{
+		{
+			name:     "absolute path unchanged",
+			path:     "/home/user/file.txt",
+			expected: "/home/user/file.txt",
+		},
+		{
+			name:     "home path expanded",
+			path:     "~/documents/file.txt",
+			expected: filepath.Join(homeDir, "documents/file.txt"),
+		},
+		{
+			name:     "path with redundant slashes cleaned",
+			path:     "/home/user//documents///file.txt",
+			expected: "/home/user/documents/file.txt",
+		},
+		{
+			name:     "path with spaces preserved",
+			path:     "/home/user/my documents/file.txt",
+			expected: "/home/user/my documents/file.txt",
+		},
+		{
+			name:     "empty path",
+			path:     "",
+			expected: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := normalizePath(tt.path)
+			if result != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, result)
+			}
+		})
+	}
+}
+
+func TestDeduplicationAcrossFormats(t *testing.T) {
+	// Test that the same path written in different formats is deduplicated
+	task := &core.Task{
+		Description: "Test task",
+		Annotations: []core.Annotation{
+			{Description: `Path 1: "/home/user/my documents/file.txt"`},
+			{Description: `Path 2: /home/user/my\ documents/file.txt`},
+			{Description: `Path 3: file:///home/user/my%20documents/file.txt`},
+		},
+	}
+
+	result := ExtractFilePathsFromAnnotations(task)
+
+	if len(result) != 1 {
+		t.Errorf("expected 1 deduplicated path, got %d", len(result))
+		for i, r := range result {
+			t.Errorf("  result[%d]: path=%q", i, r.Path)
+		}
+	}
+
+	if len(result) > 0 {
+		expectedPath := "/home/user/my documents/file.txt"
+		if result[0].Path != expectedPath {
+			t.Errorf("expected path %q, got %q", expectedPath, result[0].Path)
+		}
 	}
 }
