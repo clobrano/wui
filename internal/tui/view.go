@@ -145,6 +145,22 @@ func (m Model) View() string {
 		)
 	}
 
+	// If file picker is active, overlay it on top of everything
+	if m.filePickerActive {
+		filePickerView := m.filePicker.View()
+
+		// Place file picker in the center of the screen as an overlay
+		baseView = lipgloss.Place(
+			m.width,
+			m.height,
+			lipgloss.Center,
+			lipgloss.Center,
+			filePickerView,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("0")),
+		)
+	}
+
 	// If in task validation state, overlay the popup
 	if m.state == StateTaskValidation {
 		baseView = m.renderTaskValidationPopup(baseView)
@@ -521,6 +537,8 @@ func (m Model) renderFooter() string {
 	keybindings := ""
 	if m.urlPickerActive {
 		keybindings = "↑↓: navigate | enter: open URL | esc: cancel"
+	} else if m.filePickerActive {
+		keybindings = "↑↓: navigate | enter: open file | esc: cancel"
 	} else if m.listPickerActive {
 		keybindings = "↑↓: navigate | enter: select | esc: cancel"
 	} else if m.timePickerActive {

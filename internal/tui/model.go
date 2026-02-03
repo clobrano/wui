@@ -69,6 +69,8 @@ const (
 	StateNewTaskInput
 	// StateURLPicker is active when user is selecting a URL to open
 	StateURLPicker
+	// StateFilePicker is active when user is selecting a file path to open
+	StateFilePicker
 	// StateTaskValidation is active when user is shown task validation warnings (TODOs or blocking tasks)
 	StateTaskValidation
 )
@@ -92,6 +94,8 @@ func (s AppState) String() string {
 		return "new_task_input"
 	case StateURLPicker:
 		return "url_picker"
+	case StateFilePicker:
+		return "file_picker"
 	case StateTaskValidation:
 		return "task_validation"
 	default:
@@ -172,6 +176,11 @@ type Model struct {
 	urlPicker       components.ListPicker
 	urlPickerActive bool       // true when URL picker is shown
 	urlPickerURLs   []URLMatch // URLs extracted from current task's annotations
+
+	// File picker (for opening file paths from annotations)
+	filePicker       components.ListPicker
+	filePickerActive bool            // true when file picker is shown
+	filePickerPaths  []FilePathMatch // File paths extracted from current task's annotations
 
 	// Confirm action tracking
 	confirmAction string // "delete", "done", etc.
@@ -637,6 +646,36 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// If file picker is active, handle file picker input
+	if m.filePickerActive {
+		var cmd tea.Cmd
+
+		switch msg.String() {
+		case "enter":
+			// Open selected file
+			if m.filePicker.HasItems() {
+				selectedIdx := m.filePicker.SelectedIndex()
+				if selectedIdx >= 0 && selectedIdx < len(m.filePickerPaths) {
+					path := m.filePickerPaths[selectedIdx].Path
+					m.deactivateFilePicker()
+					return m, openFileCmd(path)
+				}
+			}
+			m.deactivateFilePicker()
+			return m, nil
+
+		case "esc":
+			// Cancel file picker
+			m.deactivateFilePicker()
+			return m, nil
+
+		default:
+			// Delegate to file picker component
+			m.filePicker, cmd = m.filePicker.Update(msg)
+			return m, cmd
+		}
+	}
+
 	// State-specific handling
 	switch m.state {
 	case StateNormal:
@@ -1018,6 +1057,27 @@ func (m *Model) deactivateURLPicker() {
 	m.state = StateNormal
 }
 
+// activateFilePicker activates the file picker for selecting a file path to open
+func (m *Model) activateFilePicker(paths []FilePathMatch) {
+	// Build display items for the picker
+	items := make([]string, len(paths))
+	for i, path := range paths {
+		items[i] = path.FormatForDisplay()
+	}
+
+	m.filePicker = components.NewListPicker("Select file to open", items, "")
+	m.filePickerActive = true
+	m.filePickerPaths = paths
+	m.state = StateFilePicker
+}
+
+// deactivateFilePicker closes the file picker
+func (m *Model) deactivateFilePicker() {
+	m.filePickerActive = false
+	m.filePickerPaths = nil
+	m.state = StateNormal
+}
+
 // isTermux returns true if running in Termux on Android
 func isTermux() bool {
 	_, exists := os.LookupEnv("TERMUX_VERSION")
@@ -1081,6 +1141,76 @@ func openURLCmd(url string) tea.Cmd {
 
 		return StatusMsg{
 			Message: "Opening URL in browser...",
+			IsError: false,
+		}
+	}
+}
+
+// openFileCmd creates a command to open a file with the default application
+// Works on Android/Termux, Linux, macOS, and Windows
+func openFileCmd(path string) tea.Cmd {
+	return func() tea.Msg {
+		// Check if file exists
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			return StatusMsg{
+				Message: fmt.Sprintf("File not found: %s", path),
+				IsError: true,
+			}
+		}
+
+		var cmd *exec.Cmd
+		var useRun bool // Use Run() instead of Start() to capture errors
+
+		const termuxOpen = "/data/data/com.termux/files/usr/bin/termux-open"
+
+		switch runtime.GOOS {
+		case "android":
+			cmd = exec.Command(termuxOpen, path)
+			useRun = true
+		case "linux":
+			if isTermux() {
+				cmd = exec.Command(termuxOpen, path)
+				useRun = true
+			} else {
+				cmd = exec.Command("xdg-open", path)
+			}
+		case "darwin":
+			cmd = exec.Command("open", path)
+		case "windows":
+			cmd = exec.Command("cmd", "/c", "start", "", path)
+		default:
+			return StatusMsg{
+				Message: fmt.Sprintf("Unsupported platform: %s", runtime.GOOS),
+				IsError: true,
+			}
+		}
+
+		var err error
+		if useRun {
+			// For termux-open, use CombinedOutput to capture any errors
+			output, runErr := cmd.CombinedOutput()
+			if runErr != nil {
+				errMsg := strings.TrimSpace(string(output))
+				if errMsg != "" {
+					err = fmt.Errorf("%s: %s", runErr.Error(), errMsg)
+				} else {
+					err = runErr
+				}
+			}
+		} else {
+			// For other platforms, use Start() to not block on application
+			err = cmd.Start()
+		}
+
+		if err != nil {
+			return StatusMsg{
+				Message: fmt.Sprintf("Failed to open file: %s", err.Error()),
+				IsError: true,
+			}
+		}
+
+		return StatusMsg{
+			Message: "Opening file...",
 			IsError: false,
 		}
 	}
@@ -1327,6 +1457,30 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				} else {
 					// Multiple URLs - show picker
 					m.activateURLPicker(urls)
+					return m, nil
+				}
+			} else {
+				m.statusMessage = "No task selected"
+			}
+		}
+		return m, nil
+	}
+
+	if m.keyMatches(keyPressed, "open_file") {
+		// Open file from task annotations
+		if !m.inGroupView {
+			selectedTask := m.taskList.SelectedTask()
+			if selectedTask != nil {
+				paths := ExtractFilePathsFromAnnotations(selectedTask)
+				if len(paths) == 0 {
+					m.statusMessage = "No file paths found in task annotations"
+					return m, nil
+				} else if len(paths) == 1 {
+					// Single file - open directly
+					return m, openFileCmd(paths[0].Path)
+				} else {
+					// Multiple files - show picker
+					m.activateFilePicker(paths)
 					return m, nil
 				}
 			} else {
