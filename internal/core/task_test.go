@@ -352,20 +352,20 @@ func TestFormatRelativeDateFrom(t *testing.T) {
 		{"6 months ago", timePtr(now.Add(-180 * 24 * time.Hour)), "6 months ago"},
 		{"1 year ago", timePtr(now.Add(-400 * 24 * time.Hour)), "1 year ago"},
 		{"3 years ago", timePtr(now.Add(-3 * 365 * 24 * time.Hour)), "3 years ago"},
-		// Future dates (with "in" prefix)
-		{"in moments", timePtr(now.Add(10 * time.Second)), "now"},
-		{"in 1 min", timePtr(now.Add(1 * time.Minute)), "in 1 min"},
-		{"in 5 min", timePtr(now.Add(5 * time.Minute)), "in 5 min"},
-		{"in 1 hour", timePtr(now.Add(1 * time.Hour)), "in 1 hour"},
-		{"in 3 hours", timePtr(now.Add(3 * time.Hour)), "in 3 hours"},
+		// Future dates (with "+" prefix)
+		{"+moments", timePtr(now.Add(10 * time.Second)), "now"},
+		{"+1 min", timePtr(now.Add(1 * time.Minute)), "+1 min"},
+		{"+5 min", timePtr(now.Add(5 * time.Minute)), "+5 min"},
+		{"+1 hour", timePtr(now.Add(1 * time.Hour)), "+1 hour"},
+		{"+3 hours", timePtr(now.Add(3 * time.Hour)), "+3 hours"},
 		{"tomorrow", timePtr(now.Add(30 * time.Hour)), "tomorrow"},
-		{"in 3 days", timePtr(now.Add(3 * 24 * time.Hour)), "in 3 days"},
-		{"in 1 week", timePtr(now.Add(8 * 24 * time.Hour)), "in 1 week"},
-		{"in 3 weeks", timePtr(now.Add(22 * 24 * time.Hour)), "in 3 weeks"},
-		{"in 1 month", timePtr(now.Add(45 * 24 * time.Hour)), "in 1 month"},
-		{"in 6 months", timePtr(now.Add(180 * 24 * time.Hour)), "in 6 months"},
-		{"in 1 year", timePtr(now.Add(400 * 24 * time.Hour)), "in 1 year"},
-		{"in 3 years", timePtr(now.Add(3 * 365 * 24 * time.Hour)), "in 3 years"},
+		{"+3 days", timePtr(now.Add(3 * 24 * time.Hour)), "+3 days"},
+		{"+1 week", timePtr(now.Add(8 * 24 * time.Hour)), "+1 week"},
+		{"+3 weeks", timePtr(now.Add(22 * 24 * time.Hour)), "+3 weeks"},
+		{"+1 month", timePtr(now.Add(45 * 24 * time.Hour)), "+1 month"},
+		{"+6 months", timePtr(now.Add(180 * 24 * time.Hour)), "+6 months"},
+		{"+1 year", timePtr(now.Add(400 * 24 * time.Hour)), "+1 year"},
+		{"+3 years", timePtr(now.Add(3 * 365 * 24 * time.Hour)), "+3 years"},
 	}
 
 	for _, tt := range tests {
@@ -405,8 +405,8 @@ func TestGetPropertyReturnsRelativeDates(t *testing.T) {
 	// Future date
 	task.Due = &tomorrow
 	dueVal, _ = task.GetProperty("due")
-	if dueVal != "tomorrow" && !contains(dueVal, "in ") {
-		t.Errorf("Expected future due to contain 'in' or be 'tomorrow', got %q", dueVal)
+	if dueVal != "tomorrow" && !contains(dueVal, "+") {
+		t.Errorf("Expected future due to contain '+' or be 'tomorrow', got %q", dueVal)
 	}
 
 	// Entry (always set) should return relative date

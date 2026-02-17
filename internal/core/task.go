@@ -187,39 +187,36 @@ func formatRelativeDateFrom(date *time.Time, now time.Time) string {
 			return "now"
 		case diff < time.Hour:
 			mins := int(diff.Minutes())
-			if mins == 1 {
-				return "in 1 min"
-			}
-			return fmt.Sprintf("in %d min", mins)
+			return fmt.Sprintf("+%d min", mins)
 		case diff < 24*time.Hour:
 			hours := int(diff.Hours())
 			if hours == 1 {
-				return "in 1 hour"
+				return "+1 hour"
 			}
-			return fmt.Sprintf("in %d hours", hours)
+			return fmt.Sprintf("+%d hours", hours)
 		case diff < 48*time.Hour:
 			return "tomorrow"
 		case diff < 7*24*time.Hour:
 			days := int(diff.Hours() / 24)
-			return fmt.Sprintf("in %d days", days)
+			return fmt.Sprintf("+%d days", days)
 		case diff < 30*24*time.Hour:
 			weeks := int(diff.Hours() / 24 / 7)
 			if weeks == 1 {
-				return "in 1 week"
+				return "+1 week"
 			}
-			return fmt.Sprintf("in %d weeks", weeks)
+			return fmt.Sprintf("+%d weeks", weeks)
 		case diff < 365*24*time.Hour:
 			months := int(diff.Hours() / 24 / 30)
 			if months == 1 {
-				return "in 1 month"
+				return "+1 month"
 			}
-			return fmt.Sprintf("in %d months", months)
+			return fmt.Sprintf("+%d months", months)
 		default:
 			years := int(diff.Hours() / 24 / 365)
 			if years == 1 {
-				return "in 1 year"
+				return "+1 year"
 			}
-			return fmt.Sprintf("in %d years", years)
+			return fmt.Sprintf("+%d years", years)
 		}
 	}
 
