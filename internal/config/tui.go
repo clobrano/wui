@@ -8,6 +8,7 @@ type TUIConfig struct {
 	ScrollBuffer                    int                      `yaml:"scroll_buffer"`
 	InputMode                       string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
 	RelativeDates                   bool                     `yaml:"relative_dates,omitempty"`                      // Show dates as relative (e.g., "2 weeks ago") instead of absolute (YYYY-MM-DD)
+	ForceSmallScreen                bool                     `yaml:"force_small_screen,omitempty"`                  // Force small screen mode regardless of terminal width
 	SilenceShortcutOverrideWarnings bool                     `yaml:"silence_shortcut_override_warnings,omitempty"`
 	ValidateTodosOnComplete         *bool                    `yaml:"validate_todos_on_complete,omitempty"`   // Prevent completing tasks with TODO: annotations (default: true)
 	ValidateBlockedOnComplete       *bool                    `yaml:"validate_blocked_on_complete,omitempty"` // Prevent completing tasks blocked by other tasks (default: true)

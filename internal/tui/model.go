@@ -1507,7 +1507,8 @@ func (m *Model) updateComponentSizes() {
 
 	// Detect small screen and auto-switch layout mode
 	// Don't auto-switch if we're in task detail view
-	if m.width < 80 {
+	forceSmall := m.config.TUI.ForceSmallScreen
+	if m.width < 80 || forceSmall {
 		if m.viewMode != ViewModeSmallTaskDetail {
 			m.viewMode = ViewModeSmall
 		}
@@ -1523,6 +1524,10 @@ func (m *Model) updateComponentSizes() {
 
 	// Update sections component width
 	m.sections.SetSize(m.width)
+
+	// Pass small screen state to task list so its rendering is consistent
+	// with the model's view mode determination
+	m.taskList.SetForceSmallScreen(m.viewMode == ViewModeSmall || m.viewMode == ViewModeSmallTaskDetail)
 
 	// Update help component size
 	m.help.SetSize(m.width, m.height)
