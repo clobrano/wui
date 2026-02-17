@@ -490,8 +490,10 @@ func (t TaskList) renderTaskList() string {
 			endIdx = len(t.tasks)
 		}
 	} else {
-		// For normal mode with wrapping, render until viewport is full
-		endIdx = len(t.tasks)
+		endIdx = t.offset + visibleHeight
+		if endIdx > len(t.tasks) {
+			endIdx = len(t.tasks)
+		}
 	}
 
 	// Render visible tasks
@@ -505,24 +507,14 @@ func (t TaskList) renderTaskList() string {
 			taskLines := t.renderSmallScreenTaskLines(task, isCursor, isMultiSelected)
 			lines = append(lines, taskLines...)
 		} else {
-			// Normal screen: render task with possible description wrapping
+			// Normal screen: render 1 line per task
 			quickJump := ""
 			if i-t.offset < 9 {
 				quickJump = fmt.Sprintf("%d", i-t.offset+1)
 			}
-			taskLines := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
-			lines = append(lines, taskLines...)
+			line := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
+			lines = append(lines, line)
 		}
-
-		// Stop if we've filled the visible height
-		if len(lines) >= t.height {
-			break
-		}
-	}
-
-	// Truncate if wrapping caused overflow beyond viewport
-	if len(lines) > t.height {
-		lines = lines[:t.height]
 	}
 
 	// Fill remaining space
@@ -626,44 +618,6 @@ func truncate(s string, length int) string {
 		return s[:length]
 	}
 	return s[:length-3] + "..."
-}
-
-// wrapTextByWidth wraps text to fit within the specified character width,
-// returning a slice of lines. Words longer than width are hard-broken.
-func wrapTextByWidth(text string, width int) []string {
-	if width <= 0 || len(text) <= width {
-		return []string{text}
-	}
-
-	words := strings.Fields(text)
-	if len(words) == 0 {
-		return []string{text}
-	}
-
-	var lines []string
-	currentLine := words[0]
-
-	for _, word := range words[1:] {
-		if len(currentLine)+1+len(word) <= width {
-			currentLine += " " + word
-		} else {
-			lines = append(lines, currentLine)
-			currentLine = word
-		}
-	}
-	lines = append(lines, currentLine)
-
-	// Handle lines that are still too long (single words exceeding width)
-	var result []string
-	for _, line := range lines {
-		for len(line) > width {
-			result = append(result, line[:width])
-			line = line[width:]
-		}
-		result = append(result, line)
-	}
-
-	return result
 }
 
 // columnWidths holds calculated column widths
@@ -805,8 +759,8 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 	return columnWidths{widths: widths}
 }
 
-// renderTaskLine renders a single task as one or more rows (wrapping description)
-func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected bool, quickJump string) []string {
+// renderTaskLine renders a single task row
+func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected bool, quickJump string) string {
 	cols := t.calculateColumnWidths()
 
 	// First column: cursor and multi-select indicator
@@ -823,11 +777,6 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 
 	// Build line dynamically based on displayColumns
 	parts := []string{cursor + " "}
-	prefixWidth := 2 // cursor indicator + space
-	descriptionReached := false
-	descriptionWidth := 0
-	var wrappedDescLines []string
-
 	for _, col := range t.displayColumns {
 		value, exists := task.GetProperty(col)
 		width := cols.widths[col]
@@ -838,11 +787,8 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 			value = "-"
 		}
 
-		// Handle description column: word-wrap instead of truncating
+		// Handle description separately (add status icons)
 		if col == "description" {
-			descriptionReached = true
-			descriptionWidth = width
-
 			// Add status icon prefix for description
 			statusIcon := ""
 			if task.Start != nil {
@@ -851,18 +797,6 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 				statusIcon = "⏸ "
 			}
 			value = statusIcon + task.Description
-
-			// Word-wrap the description
-			wrappedDescLines = wrapTextByWidth(value, width)
-
-			// Use first line for the main row
-			firstLine := ""
-			if len(wrappedDescLines) > 0 {
-				firstLine = wrappedDescLines[0]
-			}
-			value = fmt.Sprintf("%-*s", width, firstLine)
-			parts = append(parts, value+" ")
-			continue
 		}
 
 		// Truncate value if it exceeds column width
@@ -908,9 +842,6 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 				value = priorityStyle.Render(value)
 			}
 			parts = append(parts, value+" ")
-			if !descriptionReached {
-				prefixWidth += width + 1
-			}
 			continue
 
 		case "due":
@@ -923,9 +854,6 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 
 		// Add to parts with trailing space
 		parts = append(parts, value+" ")
-		if !descriptionReached {
-			prefixWidth += width + 1
-		}
 	}
 
 	line := strings.Join(parts, "")
@@ -967,20 +895,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 		}
 	}
 
-	// Build result lines
-	var result []string
-	result = append(result, lineStyle.Width(t.width).Render(line))
-
-	// Add wrapped description continuation lines
-	if len(wrappedDescLines) > 1 {
-		padding := strings.Repeat(" ", prefixWidth)
-		for _, wl := range wrappedDescLines[1:] {
-			wrappedLine := padding + fmt.Sprintf("%-*s", descriptionWidth, wl)
-			result = append(result, lineStyle.Width(t.width).Render(wrappedLine))
-		}
-	}
-
-	return result
+	return lineStyle.Width(t.width).Render(line)
 }
 
 // renderSmallScreenTaskLines renders a task as multiple lines for small screens
