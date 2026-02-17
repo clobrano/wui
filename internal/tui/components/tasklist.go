@@ -1207,11 +1207,11 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 	// Cursor indicator
 	cursor := " "
 	if isCursor && isMultiSelected {
-		cursor = "◆" // Both cursor and selected
+		cursor = "+"
 	} else if isCursor {
-		cursor = "■" // Just cursor
+		cursor = ">"
 	} else if isMultiSelected {
-		cursor = "✓" // Just selected
+		cursor = "*"
 	}
 
 	// ID
@@ -1232,14 +1232,8 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 	}
 
 	// Line 1: ID + Description with 2 space indent
-	// Format: "■ 1  Description text here..."
-	availableWidth := t.width - 6 // cursor(2) + id(2) + indent(2)
+	// Format: "> 1  Description text here..."
 	description := statusIcon + task.Description
-	if len(description) > availableWidth && availableWidth > 3 {
-		description = description[:availableWidth-3] + "..."
-	} else if len(description) > availableWidth {
-		description = description[:availableWidth]
-	}
 	line1 := fmt.Sprintf("%s %-2s  %s", cursor, id, description)
 
 	// Apply status-based styling to all lines
