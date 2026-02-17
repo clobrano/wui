@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -326,6 +327,129 @@ func TestToMarkdown(t *testing.T) {
 				t.Errorf("ToMarkdown() = %q, expected %q", result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestFormatRelativeDateFrom(t *testing.T) {
+	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		date     *time.Time
+		expected string
+	}{
+		{"nil date", nil, ""},
+		// Past dates (with "ago")
+		{"just now", timePtr(now.Add(-10 * time.Second)), "now"},
+		{"1 min ago", timePtr(now.Add(-1 * time.Minute)), "1 min ago"},
+		{"5 min ago", timePtr(now.Add(-5 * time.Minute)), "5 min ago"},
+		{"1 hour ago", timePtr(now.Add(-1 * time.Hour)), "1 hour ago"},
+		{"3 hours ago", timePtr(now.Add(-3 * time.Hour)), "3 hours ago"},
+		{"yesterday", timePtr(now.Add(-30 * time.Hour)), "yesterday"},
+		{"3 days ago", timePtr(now.Add(-3 * 24 * time.Hour)), "3 days ago"},
+		{"1 week ago", timePtr(now.Add(-8 * 24 * time.Hour)), "1 week ago"},
+		{"3 weeks ago", timePtr(now.Add(-22 * 24 * time.Hour)), "3 weeks ago"},
+		{"1 month ago", timePtr(now.Add(-45 * 24 * time.Hour)), "1 month ago"},
+		{"6 months ago", timePtr(now.Add(-180 * 24 * time.Hour)), "6 months ago"},
+		{"1 year ago", timePtr(now.Add(-400 * 24 * time.Hour)), "1 year ago"},
+		{"3 years ago", timePtr(now.Add(-3 * 365 * 24 * time.Hour)), "3 years ago"},
+		// Future dates (with "+" prefix)
+		{"+moments", timePtr(now.Add(10 * time.Second)), "now"},
+		{"+1 min", timePtr(now.Add(1 * time.Minute)), "+1 min"},
+		{"+5 min", timePtr(now.Add(5 * time.Minute)), "+5 min"},
+		{"+1 hour", timePtr(now.Add(1 * time.Hour)), "+1 hour"},
+		{"+3 hours", timePtr(now.Add(3 * time.Hour)), "+3 hours"},
+		{"tomorrow", timePtr(now.Add(30 * time.Hour)), "tomorrow"},
+		{"+3 days", timePtr(now.Add(3 * 24 * time.Hour)), "+3 days"},
+		{"+1 week", timePtr(now.Add(8 * 24 * time.Hour)), "+1 week"},
+		{"+3 weeks", timePtr(now.Add(22 * 24 * time.Hour)), "+3 weeks"},
+		{"+1 month", timePtr(now.Add(45 * 24 * time.Hour)), "+1 month"},
+		{"+6 months", timePtr(now.Add(180 * 24 * time.Hour)), "+6 months"},
+		{"+1 year", timePtr(now.Add(400 * 24 * time.Hour)), "+1 year"},
+		{"+3 years", timePtr(now.Add(3 * 365 * 24 * time.Hour)), "+3 years"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatRelativeDateFrom(tt.date, now)
+			if result != tt.expected {
+				t.Errorf("formatRelativeDateFrom() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPropertyReturnsAbsoluteDates(t *testing.T) {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+
+	task := Task{
+		Due:    &yesterday,
+		Status: "pending",
+		Entry:  now,
+	}
+
+	// GetProperty should return absolute date format (YYYY-MM-DD)
+	dueVal, ok := task.GetProperty("due")
+	if !ok {
+		t.Fatal("Expected GetProperty('due') to return ok=true")
+	}
+	// Should be an absolute date, not relative
+	if len(dueVal) < 10 || dueVal[4] != '-' || dueVal[7] != '-' {
+		t.Errorf("Expected absolute date format YYYY-MM-DD, got %q", dueVal)
+	}
+
+	// Entry (always set) should return absolute date
+	entryVal, ok := task.GetProperty("entry")
+	if !ok {
+		t.Fatal("Expected GetProperty('entry') to return ok=true")
+	}
+	if len(entryVal) < 10 || entryVal[4] != '-' || entryVal[7] != '-' {
+		t.Errorf("Expected absolute date format YYYY-MM-DD, got %q", entryVal)
+	}
+}
+
+func TestGetDateValue(t *testing.T) {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+
+	task := Task{
+		Due:   &yesterday,
+		Entry: now,
+	}
+
+	// Due should return the pointer
+	dueVal := task.GetDateValue("due")
+	if dueVal == nil {
+		t.Fatal("Expected GetDateValue('due') to return non-nil")
+	}
+	if !dueVal.Equal(yesterday) {
+		t.Errorf("Expected due date to match, got %v", dueVal)
+	}
+
+	// Entry should return a pointer to Entry
+	entryVal := task.GetDateValue("entry")
+	if entryVal == nil {
+		t.Fatal("Expected GetDateValue('entry') to return non-nil")
+	}
+
+	// Nil date field
+	task.Scheduled = nil
+	schedVal := task.GetDateValue("scheduled")
+	if schedVal != nil {
+		t.Errorf("Expected nil for unset scheduled, got %v", schedVal)
+	}
+
+	// Non-date field
+	unknownVal := task.GetDateValue("description")
+	if unknownVal != nil {
+		t.Errorf("Expected nil for non-date field, got %v", unknownVal)
+	}
+
+	// FormatRelativeDate on past date should contain "ago" or "yesterday"
+	relVal := FormatRelativeDate(dueVal)
+	if relVal != "yesterday" && !strings.Contains(relVal, "ago") {
+		t.Errorf("Expected relative date with 'ago' or 'yesterday', got %q", relVal)
 	}
 }
 

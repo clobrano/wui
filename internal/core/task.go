@@ -164,6 +164,127 @@ func (t *Task) formatDate(date *time.Time) string {
 	return localTime.Format("2006-01-02 15:04")
 }
 
+// GetDateValue returns the raw time.Time pointer for a given date property name.
+// Returns nil for non-date properties or unset date fields.
+func (t *Task) GetDateValue(property string) *time.Time {
+	switch property {
+	case "due":
+		return t.Due
+	case "scheduled":
+		return t.Scheduled
+	case "wait":
+		return t.Wait
+	case "start":
+		return t.Start
+	case "entry":
+		return &t.Entry
+	case "modified":
+		return t.Modified
+	case "end":
+		return t.End
+	default:
+		return nil
+	}
+}
+
+// FormatRelativeDate returns a compact human-readable relative date string.
+// Past dates include "ago" suffix (e.g., "2 weeks ago").
+// Future dates use "+" prefix (e.g., "+3 days").
+func FormatRelativeDate(date *time.Time) string {
+	return formatRelativeDateFrom(date, time.Now())
+}
+
+// formatRelativeDateFrom returns a relative date string computed against a given reference time.
+// Extracted for testability.
+func formatRelativeDateFrom(date *time.Time, now time.Time) string {
+	if date == nil {
+		return ""
+	}
+	diff := now.Sub(*date)
+
+	if diff < 0 {
+		// Future dates
+		diff = -diff
+		switch {
+		case diff < time.Minute:
+			return "now"
+		case diff < time.Hour:
+			mins := int(diff.Minutes())
+			return fmt.Sprintf("+%d min", mins)
+		case diff < 24*time.Hour:
+			hours := int(diff.Hours())
+			if hours == 1 {
+				return "+1 hour"
+			}
+			return fmt.Sprintf("+%d hours", hours)
+		case diff < 48*time.Hour:
+			return "tomorrow"
+		case diff < 7*24*time.Hour:
+			days := int(diff.Hours() / 24)
+			return fmt.Sprintf("+%d days", days)
+		case diff < 30*24*time.Hour:
+			weeks := int(diff.Hours() / 24 / 7)
+			if weeks == 1 {
+				return "+1 week"
+			}
+			return fmt.Sprintf("+%d weeks", weeks)
+		case diff < 365*24*time.Hour:
+			months := int(diff.Hours() / 24 / 30)
+			if months == 1 {
+				return "+1 month"
+			}
+			return fmt.Sprintf("+%d months", months)
+		default:
+			years := int(diff.Hours() / 24 / 365)
+			if years == 1 {
+				return "+1 year"
+			}
+			return fmt.Sprintf("+%d years", years)
+		}
+	}
+
+	// Past dates
+	switch {
+	case diff < time.Minute:
+		return "now"
+	case diff < time.Hour:
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 min ago"
+		}
+		return fmt.Sprintf("%d min ago", mins)
+	case diff < 24*time.Hour:
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	case diff < 48*time.Hour:
+		return "yesterday"
+	case diff < 7*24*time.Hour:
+		days := int(diff.Hours() / 24)
+		return fmt.Sprintf("%d days ago", days)
+	case diff < 30*24*time.Hour:
+		weeks := int(diff.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1 week ago"
+		}
+		return fmt.Sprintf("%d weeks ago", weeks)
+	case diff < 365*24*time.Hour:
+		months := int(diff.Hours() / 24 / 30)
+		if months == 1 {
+			return "1 month ago"
+		}
+		return fmt.Sprintf("%d months ago", months)
+	default:
+		years := int(diff.Hours() / 24 / 365)
+		if years == 1 {
+			return "1 year ago"
+		}
+		return fmt.Sprintf("%d years ago", years)
+	}
+}
+
 // FormatDueDate returns the due date formatted as YYYY-MM-DD or YYYY-MM-DD HH:MM
 // Shows time only if it's not midnight. Returns empty string if due date is not set.
 // Converts to local timezone for display.
