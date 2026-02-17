@@ -99,34 +99,34 @@ func (t *Task) GetProperty(name string) (string, bool) {
 		if t.Due == nil {
 			return "-", true
 		}
-		return t.formatDate(t.Due), true
+		return FormatRelativeDate(t.Due), true
 	case "scheduled":
 		if t.Scheduled == nil {
 			return "-", true
 		}
-		return t.formatDate(t.Scheduled), true
+		return FormatRelativeDate(t.Scheduled), true
 	case "wait":
 		if t.Wait == nil {
 			return "-", true
 		}
-		return t.formatDate(t.Wait), true
+		return FormatRelativeDate(t.Wait), true
 	case "start":
 		if t.Start == nil {
 			return "-", true
 		}
-		return t.formatDate(t.Start), true
+		return FormatRelativeDate(t.Start), true
 	case "entry":
-		return t.formatDate(&t.Entry), true
+		return FormatRelativeDate(&t.Entry), true
 	case "modified":
 		if t.Modified == nil {
 			return "-", true
 		}
-		return t.formatDate(t.Modified), true
+		return FormatRelativeDate(t.Modified), true
 	case "end":
 		if t.End == nil {
 			return "-", true
 		}
-		return t.formatDate(t.End), true
+		return FormatRelativeDate(t.End), true
 	case "urgency":
 		return fmt.Sprintf("%.1f", t.Urgency), true
 	case "annotation":
@@ -162,6 +162,107 @@ func (t *Task) formatDate(date *time.Time) string {
 		return localTime.Format("2006-01-02")
 	}
 	return localTime.Format("2006-01-02 15:04")
+}
+
+// FormatRelativeDate returns a compact human-readable relative date string.
+// Past dates include "ago" suffix (e.g., "2 weeks ago").
+// Future dates include "in" prefix (e.g., "in 3 days").
+func FormatRelativeDate(date *time.Time) string {
+	return formatRelativeDateFrom(date, time.Now())
+}
+
+// formatRelativeDateFrom returns a relative date string computed against a given reference time.
+// Extracted for testability.
+func formatRelativeDateFrom(date *time.Time, now time.Time) string {
+	if date == nil {
+		return ""
+	}
+	diff := now.Sub(*date)
+
+	if diff < 0 {
+		// Future dates
+		diff = -diff
+		switch {
+		case diff < time.Minute:
+			return "now"
+		case diff < time.Hour:
+			mins := int(diff.Minutes())
+			if mins == 1 {
+				return "in 1 min"
+			}
+			return fmt.Sprintf("in %d min", mins)
+		case diff < 24*time.Hour:
+			hours := int(diff.Hours())
+			if hours == 1 {
+				return "in 1 hour"
+			}
+			return fmt.Sprintf("in %d hours", hours)
+		case diff < 48*time.Hour:
+			return "tomorrow"
+		case diff < 7*24*time.Hour:
+			days := int(diff.Hours() / 24)
+			return fmt.Sprintf("in %d days", days)
+		case diff < 30*24*time.Hour:
+			weeks := int(diff.Hours() / 24 / 7)
+			if weeks == 1 {
+				return "in 1 week"
+			}
+			return fmt.Sprintf("in %d weeks", weeks)
+		case diff < 365*24*time.Hour:
+			months := int(diff.Hours() / 24 / 30)
+			if months == 1 {
+				return "in 1 month"
+			}
+			return fmt.Sprintf("in %d months", months)
+		default:
+			years := int(diff.Hours() / 24 / 365)
+			if years == 1 {
+				return "in 1 year"
+			}
+			return fmt.Sprintf("in %d years", years)
+		}
+	}
+
+	// Past dates
+	switch {
+	case diff < time.Minute:
+		return "now"
+	case diff < time.Hour:
+		mins := int(diff.Minutes())
+		if mins == 1 {
+			return "1 min ago"
+		}
+		return fmt.Sprintf("%d min ago", mins)
+	case diff < 24*time.Hour:
+		hours := int(diff.Hours())
+		if hours == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", hours)
+	case diff < 48*time.Hour:
+		return "yesterday"
+	case diff < 7*24*time.Hour:
+		days := int(diff.Hours() / 24)
+		return fmt.Sprintf("%d days ago", days)
+	case diff < 30*24*time.Hour:
+		weeks := int(diff.Hours() / 24 / 7)
+		if weeks == 1 {
+			return "1 week ago"
+		}
+		return fmt.Sprintf("%d weeks ago", weeks)
+	case diff < 365*24*time.Hour:
+		months := int(diff.Hours() / 24 / 30)
+		if months == 1 {
+			return "1 month ago"
+		}
+		return fmt.Sprintf("%d months ago", months)
+	default:
+		years := int(diff.Hours() / 24 / 365)
+		if years == 1 {
+			return "1 year ago"
+		}
+		return fmt.Sprintf("%d years ago", years)
+	}
 }
 
 // FormatDueDate returns the due date formatted as YYYY-MM-DD or YYYY-MM-DD HH:MM

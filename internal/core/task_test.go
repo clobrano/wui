@@ -329,6 +329,109 @@ func TestToMarkdown(t *testing.T) {
 	}
 }
 
+func TestFormatRelativeDateFrom(t *testing.T) {
+	now := time.Date(2026, 2, 17, 12, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name     string
+		date     *time.Time
+		expected string
+	}{
+		{"nil date", nil, ""},
+		// Past dates (with "ago")
+		{"just now", timePtr(now.Add(-10 * time.Second)), "now"},
+		{"1 min ago", timePtr(now.Add(-1 * time.Minute)), "1 min ago"},
+		{"5 min ago", timePtr(now.Add(-5 * time.Minute)), "5 min ago"},
+		{"1 hour ago", timePtr(now.Add(-1 * time.Hour)), "1 hour ago"},
+		{"3 hours ago", timePtr(now.Add(-3 * time.Hour)), "3 hours ago"},
+		{"yesterday", timePtr(now.Add(-30 * time.Hour)), "yesterday"},
+		{"3 days ago", timePtr(now.Add(-3 * 24 * time.Hour)), "3 days ago"},
+		{"1 week ago", timePtr(now.Add(-8 * 24 * time.Hour)), "1 week ago"},
+		{"3 weeks ago", timePtr(now.Add(-22 * 24 * time.Hour)), "3 weeks ago"},
+		{"1 month ago", timePtr(now.Add(-45 * 24 * time.Hour)), "1 month ago"},
+		{"6 months ago", timePtr(now.Add(-180 * 24 * time.Hour)), "6 months ago"},
+		{"1 year ago", timePtr(now.Add(-400 * 24 * time.Hour)), "1 year ago"},
+		{"3 years ago", timePtr(now.Add(-3 * 365 * 24 * time.Hour)), "3 years ago"},
+		// Future dates (with "in" prefix)
+		{"in moments", timePtr(now.Add(10 * time.Second)), "now"},
+		{"in 1 min", timePtr(now.Add(1 * time.Minute)), "in 1 min"},
+		{"in 5 min", timePtr(now.Add(5 * time.Minute)), "in 5 min"},
+		{"in 1 hour", timePtr(now.Add(1 * time.Hour)), "in 1 hour"},
+		{"in 3 hours", timePtr(now.Add(3 * time.Hour)), "in 3 hours"},
+		{"tomorrow", timePtr(now.Add(30 * time.Hour)), "tomorrow"},
+		{"in 3 days", timePtr(now.Add(3 * 24 * time.Hour)), "in 3 days"},
+		{"in 1 week", timePtr(now.Add(8 * 24 * time.Hour)), "in 1 week"},
+		{"in 3 weeks", timePtr(now.Add(22 * 24 * time.Hour)), "in 3 weeks"},
+		{"in 1 month", timePtr(now.Add(45 * 24 * time.Hour)), "in 1 month"},
+		{"in 6 months", timePtr(now.Add(180 * 24 * time.Hour)), "in 6 months"},
+		{"in 1 year", timePtr(now.Add(400 * 24 * time.Hour)), "in 1 year"},
+		{"in 3 years", timePtr(now.Add(3 * 365 * 24 * time.Hour)), "in 3 years"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := formatRelativeDateFrom(tt.date, now)
+			if result != tt.expected {
+				t.Errorf("formatRelativeDateFrom() = %q, expected %q", result, tt.expected)
+			}
+		})
+	}
+}
+
+func TestGetPropertyReturnsRelativeDates(t *testing.T) {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
+	tomorrow := now.Add(24 * time.Hour)
+
+	task := Task{
+		Due:    &yesterday,
+		Status: "pending",
+		Entry:  now,
+	}
+
+	// Due date in the past should contain "ago"
+	dueVal, ok := task.GetProperty("due")
+	if !ok {
+		t.Fatal("Expected GetProperty('due') to return ok=true")
+	}
+	if dueVal == "-" {
+		t.Fatal("Expected non-empty due value")
+	}
+	// Past date should contain "ago" or "yesterday"
+	if dueVal != "yesterday" && !contains(dueVal, "ago") {
+		t.Errorf("Expected past due to contain 'ago' or be 'yesterday', got %q", dueVal)
+	}
+
+	// Future date
+	task.Due = &tomorrow
+	dueVal, _ = task.GetProperty("due")
+	if dueVal != "tomorrow" && !contains(dueVal, "in ") {
+		t.Errorf("Expected future due to contain 'in' or be 'tomorrow', got %q", dueVal)
+	}
+
+	// Entry (always set) should return relative date
+	entryVal, ok := task.GetProperty("entry")
+	if !ok {
+		t.Fatal("Expected GetProperty('entry') to return ok=true")
+	}
+	if entryVal == "" || entryVal == "-" {
+		t.Errorf("Expected non-empty entry value, got %q", entryVal)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (s == substr || len(s) > 0 && stringContains(s, substr))
+}
+
+func stringContains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
+}
+
 // Helper function to create time pointer
 func timePtr(t time.Time) *time.Time {
 	return &t

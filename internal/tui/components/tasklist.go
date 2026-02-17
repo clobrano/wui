@@ -810,9 +810,9 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 	// UUID column (short form)
 	case "uuid":
 		return 8 + 1, true
-	// Date columns (YYYY-MM-DD HH:MM format - 16 chars max)
+	// Date columns (relative format, e.g. "11 months ago" - 13 chars max)
 	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
-		return 16 + 1, true
+		return 14, true
 	// Tags column
 	case "tags":
 		return 15, true
