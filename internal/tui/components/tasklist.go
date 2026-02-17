@@ -53,6 +53,7 @@ type TaskList struct {
 	narrowViewLabels  map[string]string // Map of field name to display label for narrow view
 	narrowViewLengths map[string]int    // Map of field name to custom max length for narrow view
 	relativeDates     bool              // Show dates as relative (e.g., "2 weeks ago") instead of absolute
+	forceSmallScreen  bool              // Force small screen mode (set by model when width < 80 or config)
 	offset            int               // Scroll offset for viewport (in lines, not tasks)
 	scrollBuffer      int               // Number of tasks to keep visible above/below cursor
 	styles            TaskListStyles
@@ -278,6 +279,13 @@ func (t *TaskList) SetScrollBuffer(buffer int) {
 // SetRelativeDates enables or disables relative date display in date columns
 func (t *TaskList) SetRelativeDates(enabled bool) {
 	t.relativeDates = enabled
+}
+
+// SetForceSmallScreen forces the task list into small screen rendering mode.
+// This is set by the model when the terminal width is below the threshold or
+// when the user has configured force_small_screen in the config.
+func (t *TaskList) SetForceSmallScreen(force bool) {
+	t.forceSmallScreen = force
 }
 
 // getTaskValue returns the display value for a task property.
@@ -872,9 +880,14 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 }
 
 // needsSmallScreenMode returns true if terminal width is insufficient for table layout.
-// This dynamically calculates the minimum required width based on fixed columns
-// plus a minimum description width, rather than using a hardcoded threshold.
+// It returns true when forceSmallScreen is set (by the model for width < 80 or by config),
+// or when the terminal width is below the dynamically calculated minimum based on
+// configured columns plus a minimum description width.
 func (t TaskList) needsSmallScreenMode() bool {
+	if t.forceSmallScreen {
+		return true
+	}
+
 	const minDescriptionWidth = 20
 	const cursorWidth = 2
 	const spacing = 1
@@ -883,6 +896,8 @@ func (t TaskList) needsSmallScreenMode() bool {
 	for _, col := range t.displayColumns {
 		if col == "description" {
 			requiredWidth += minDescriptionWidth + spacing
+		} else if customLength, hasCustom := t.columnLengths[col]; hasCustom && customLength > 0 {
+			requiredWidth += customLength + spacing
 		} else {
 			w, _ := t.getEffectiveColumnWidth(col)
 			requiredWidth += w + spacing
