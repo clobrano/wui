@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
 )
@@ -38,23 +39,25 @@ type TaskListStyles struct {
 
 // TaskList is a component for displaying and navigating a list of tasks or groups
 type TaskList struct {
-	tasks               []core.Task
-	groups              []core.TaskGroup // For displaying groups (Projects/Tags)
-	displayMode         DisplayMode      // What to display: tasks or groups
-	cursor              int              // Selected task/group index
-	selectedUUIDs       map[string]bool  // Multi-select: UUIDs of selected tasks
-	width               int
-	height              int
-	displayColumns      []string          // Column names to display
-	columnLabels        map[string]string // Map of column name to display label
-	columnLengths       map[string]int    // Map of column name to custom max length (0 = use default)
-	narrowViewFields    []string          // Field names to display in narrow view (below description)
-	narrowViewLabels    map[string]string // Map of field name to display label for narrow view
-	narrowViewLengths   map[string]int    // Map of field name to custom max length for narrow view
-	offset              int               // Scroll offset for viewport
-	scrollBuffer        int               // Number of tasks to keep visible above/below cursor
-	styles              TaskListStyles
-	emptyMessage        string // Custom message to show when list is empty
+	tasks             []core.Task
+	groups            []core.TaskGroup // For displaying groups (Projects/Tags)
+	displayMode       DisplayMode      // What to display: tasks or groups
+	cursor            int              // Selected task/group index
+	selectedUUIDs     map[string]bool  // Multi-select: UUIDs of selected tasks
+	width             int
+	height            int
+	displayColumns    []string          // Column names to display
+	columnLabels      map[string]string // Map of column name to display label
+	columnLengths     map[string]int    // Map of column name to custom max length (0 = use default)
+	narrowViewFields  []string          // Field names to display in narrow view (below description)
+	narrowViewLabels  map[string]string // Map of field name to display label for narrow view
+	narrowViewLengths map[string]int    // Map of field name to custom max length for narrow view
+	offset            int               // Scroll offset for viewport (in lines, not tasks)
+	scrollBuffer      int               // Number of tasks to keep visible above/below cursor
+	styles            TaskListStyles
+	emptyMessage      string // Custom message to show when list is empty
+	rowHeights        []int  // Cached height (in lines) of each rendered row
+	rowHeightsWidth   int    // Width used when calculating row heights (invalidate on resize)
 }
 
 // NewTaskList creates a new task list component
@@ -161,6 +164,8 @@ func (t *TaskList) SetTasksWithSort(tasks []core.Task, sortMethod string, revers
 	if t.cursor >= len(t.tasks) {
 		t.cursor = 0
 	}
+	// Rebuild row heights for new tasks
+	t.rebuildRowHeights()
 	t.updateScroll()
 }
 
@@ -243,8 +248,13 @@ func (t *TaskList) SetGroups(groups []core.TaskGroup) {
 
 // SetSize updates the component dimensions
 func (t *TaskList) SetSize(width, height int) {
+	oldWidth := t.width
 	t.width = width
 	t.height = height
+	// Rebuild row heights if width changed (wrapping may change)
+	if oldWidth != width && t.displayMode == DisplayModeTasks {
+		t.rebuildRowHeights()
+	}
 	t.updateScroll()
 }
 
@@ -262,6 +272,96 @@ func (t *TaskList) SetScrollBuffer(buffer int) {
 	}
 	t.scrollBuffer = buffer
 	t.updateScroll()
+}
+
+// calculateRowHeight renders a task row and returns its height in lines
+func (t *TaskList) calculateRowHeight(task core.Task) int {
+	// In small screen mode, height is fixed at 2 lines per task (description + narrow fields)
+	if t.needsSmallScreenMode() {
+		return 1 + len(t.narrowViewFields) // 1 for description line + narrow view fields
+	}
+
+	// Render the task row and count newlines
+	rendered := t.renderTaskRow(task, false, false, "")
+	return strings.Count(rendered, "\n") + 1
+}
+
+// rebuildRowHeights recalculates the height cache for all tasks
+func (t *TaskList) rebuildRowHeights() {
+	if t.displayMode != DisplayModeTasks {
+		return
+	}
+
+	t.rowHeights = make([]int, len(t.tasks))
+	t.rowHeightsWidth = t.width
+
+	for i, task := range t.tasks {
+		t.rowHeights[i] = t.calculateRowHeight(task)
+	}
+}
+
+// getRowStartLine returns the starting line number for a given task index
+func (t *TaskList) getRowStartLine(taskIndex int) int {
+	line := 0
+	for i := 0; i < taskIndex && i < len(t.rowHeights); i++ {
+		line += t.rowHeights[i]
+	}
+	return line
+}
+
+// getTotalContentHeight returns the total height of all rows in lines
+func (t *TaskList) getTotalContentHeight() int {
+	total := 0
+	for _, h := range t.rowHeights {
+		total += h
+	}
+	return total
+}
+
+// getVisibleTaskRange returns the start and end task indices that fit in the viewport
+// based on the current line offset
+func (t *TaskList) getVisibleTaskRange() (start, end int) {
+	if len(t.tasks) == 0 || len(t.rowHeights) == 0 {
+		return 0, 0
+	}
+
+	// Calculate header height
+	headerHeight := 0
+	if !t.needsSmallScreenMode() {
+		headerHeight = 2 // header + separator
+	}
+	visibleHeight := t.height - headerHeight
+
+	// Find start task based on line offset
+	linesSoFar := 0
+	start = 0
+	for i, h := range t.rowHeights {
+		if linesSoFar+h > t.offset {
+			start = i
+			break
+		}
+		linesSoFar += h
+		if i == len(t.rowHeights)-1 {
+			start = i
+		}
+	}
+
+	// Find end task that fits in viewport
+	linesUsed := 0
+	end = start
+	for i := start; i < len(t.rowHeights); i++ {
+		linesUsed += t.rowHeights[i]
+		end = i + 1
+		if linesUsed >= visibleHeight {
+			break
+		}
+	}
+
+	if end > len(t.tasks) {
+		end = len(t.tasks)
+	}
+
+	return start, end
 }
 
 // Update handles messages for the task list
@@ -354,17 +454,14 @@ func (t TaskList) itemCount() int {
 //   - When moving up, scrolling triggers when cursor is 1 position from viewport top
 //   - This maintains context around the selected task during navigation
 //
-// Adaptive buffer at list boundaries:
-//   - At list start: buffer below cursor is maintained, buffer above cursor is 0
-//   - At list end: buffer above cursor is maintained, buffer below cursor adapts to remaining tasks
-//   - Example: With scrollBuffer=3, when on task 18 of 20 tasks, only 1 task remains below,
-//     so the effective buffer below becomes 1 instead of 3
-//   - This prevents jarring jumps and ensures all tasks are reachable
-//   - With scrollBuffer=0: cursor can touch viewport edges (original behavior)
+// Variable row heights:
+//   - With mini-table rendering, rows can have variable heights due to text wrapping
+//   - The offset is now in lines, not tasks
+//   - This function ensures the cursor row is fully visible in the viewport
 //
 // Small screen handling:
-//   - Small screens (width < 80) skip headers and use 2 lines per task
-//   - visibleTasks calculation accounts for these differences
+//   - Small screens (width < 80) use fixed row heights (no wrapping)
+//   - Groups mode also uses fixed 1-line rows
 func (t *TaskList) updateScroll() {
 	itemCount := t.itemCount()
 	if itemCount == 0 {
@@ -372,8 +469,71 @@ func (t *TaskList) updateScroll() {
 		return
 	}
 
+	// Groups mode and small screen use simple task-based scrolling
+	if t.displayMode == DisplayModeGroups || t.needsSmallScreenMode() {
+		t.updateScrollSimple()
+		return
+	}
+
+	// For task mode with variable heights, ensure row heights are calculated
+	if len(t.rowHeights) != len(t.tasks) || t.rowHeightsWidth != t.width {
+		t.rebuildRowHeights()
+	}
+
+	// Calculate available viewport height
+	headerHeight := 2 // header + separator
+	visibleHeight := t.height - headerHeight
+	if visibleHeight < 1 {
+		visibleHeight = 1
+	}
+
+	// Calculate cursor row position in lines
+	cursorStartLine := t.getRowStartLine(t.cursor)
+	cursorHeight := 1
+	if t.cursor < len(t.rowHeights) {
+		cursorHeight = t.rowHeights[t.cursor]
+	}
+	cursorEndLine := cursorStartLine + cursorHeight
+
+	// Calculate total content height
+	totalHeight := t.getTotalContentHeight()
+
+	// Calculate max offset
+	maxOffset := totalHeight - visibleHeight
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+
+	// Ensure cursor row is visible
+	// If cursor start is above viewport, scroll up
+	if cursorStartLine < t.offset {
+		t.offset = cursorStartLine
+	}
+
+	// If cursor end is below viewport, scroll down
+	if cursorEndLine > t.offset+visibleHeight {
+		t.offset = cursorEndLine - visibleHeight
+	}
+
+	// Clamp offset
+	if t.offset > maxOffset {
+		t.offset = maxOffset
+	}
+	if t.offset < 0 {
+		t.offset = 0
+	}
+}
+
+// updateScrollSimple handles scrolling for groups mode and small screens with fixed row heights
+func (t *TaskList) updateScrollSimple() {
+	itemCount := t.itemCount()
+	if itemCount == 0 {
+		t.offset = 0
+		return
+	}
+
 	// Calculate visible tasks accounting for screen size
-	isSmallScreen := t.width < 80
+	isSmallScreen := t.needsSmallScreenMode()
 	headerHeight := 0
 	if !isSmallScreen {
 		headerHeight = 2 // header + separator
@@ -398,7 +558,6 @@ func (t *TaskList) updateScroll() {
 	}
 
 	// Cursor moving up: scroll when cursor gets within buffer distance from top
-	// Unless we're already at the start of the list
 	if t.cursor < t.offset+t.scrollBuffer {
 		t.offset = t.cursor - t.scrollBuffer
 		if t.offset < 0 {
@@ -407,7 +566,6 @@ func (t *TaskList) updateScroll() {
 	}
 
 	// Cursor moving down: scroll when cursor gets within buffer distance from bottom
-	// Use adaptive buffer that reduces when approaching the end of the list
 	tasksBelow := itemCount - t.cursor - 1
 	effectiveBufferBelow := t.scrollBuffer
 	if tasksBelow < effectiveBufferBelow {
@@ -421,8 +579,7 @@ func (t *TaskList) updateScroll() {
 		t.offset = t.cursor - visibleTasks + effectiveBufferBelow + 1
 	}
 
-	// Ensure cursor is always visible (safety check)
-	// This handles edge cases where buffer logic might fail
+	// Ensure cursor is always visible
 	if t.cursor < t.offset {
 		t.offset = t.cursor
 	}
@@ -430,12 +587,10 @@ func (t *TaskList) updateScroll() {
 		t.offset = t.cursor - visibleTasks + 1
 	}
 
-	// Don't scroll past the end of the list
+	// Don't scroll past the end
 	if t.offset > maxOffset {
 		t.offset = maxOffset
 	}
-
-	// Final safety: ensure offset is non-negative
 	if t.offset < 0 {
 		t.offset = 0
 	}
@@ -462,7 +617,7 @@ func (t TaskList) renderTaskList() string {
 	}
 
 	// Check if we're in small screen mode
-	isSmallScreen := t.width < 80
+	isSmallScreen := t.needsSmallScreenMode()
 
 	var lines []string
 
@@ -481,39 +636,51 @@ func (t TaskList) renderTaskList() string {
 
 	visibleHeight := t.height - headerHeight
 
-	// In small screen mode, each task takes 2 lines
-	var endIdx int
 	if isSmallScreen {
+		// Small screen mode: fixed 2 lines per task
 		maxVisibleTasks := visibleHeight / 2
-		endIdx = t.offset + maxVisibleTasks
+		endIdx := t.offset + maxVisibleTasks
 		if endIdx > len(t.tasks) {
 			endIdx = len(t.tasks)
 		}
-	} else {
-		endIdx = t.offset + visibleHeight
-		if endIdx > len(t.tasks) {
-			endIdx = len(t.tasks)
-		}
-	}
 
-	// Render visible tasks
-	for i := t.offset; i < endIdx; i++ {
-		task := t.tasks[i]
-		isCursor := i == t.cursor
-		isMultiSelected := t.IsSelected(task.UUID)
-
-		if isSmallScreen {
-			// Small screen: render 2 lines per task
+		for i := t.offset; i < endIdx; i++ {
+			task := t.tasks[i]
+			isCursor := i == t.cursor
+			isMultiSelected := t.IsSelected(task.UUID)
 			taskLines := t.renderSmallScreenTaskLines(task, isCursor, isMultiSelected)
 			lines = append(lines, taskLines...)
-		} else {
-			// Normal screen: render 1 line per task
+		}
+	} else {
+		// Normal mode: variable height rows with mini-table rendering
+		// Note: rowHeights should already be populated by SetTasks/SetSize/updateScroll
+		startIdx, endIdx := t.getVisibleTaskRange()
+		linesRendered := 0
+		visibleTaskNum := 0
+
+		for i := startIdx; i < endIdx && linesRendered < visibleHeight; i++ {
+			task := t.tasks[i]
+			isCursor := i == t.cursor
+			isMultiSelected := t.IsSelected(task.UUID)
+
+			// Quick jump number (1-9 for visible tasks)
 			quickJump := ""
-			if i-t.offset < 9 {
-				quickJump = fmt.Sprintf("%d", i-t.offset+1)
+			if visibleTaskNum < 9 {
+				quickJump = fmt.Sprintf("%d", visibleTaskNum+1)
 			}
-			line := t.renderTaskLine(task, isCursor, isMultiSelected, quickJump)
-			lines = append(lines, line)
+			visibleTaskNum++
+
+			// Render the task row with mini-table
+			rowContent := t.renderTaskRow(task, isCursor, isMultiSelected, quickJump)
+
+			// Split row into lines (in case it wrapped)
+			rowLines := strings.Split(rowContent, "\n")
+			for _, rl := range rowLines {
+				if linesRendered < visibleHeight {
+					lines = append(lines, rl)
+					linesRendered++
+				}
+			}
 		}
 	}
 
@@ -571,7 +738,7 @@ func (t TaskList) renderHeader() string {
 	cols := t.calculateColumnWidths()
 
 	// Build header dynamically based on displayColumns
-	parts := []string{"  "} // Start with cursor space
+	parts := []string{"   "} // Cursor (2) + padding (1) to match table
 
 	for _, col := range t.displayColumns {
 		width := cols.widths[col]
@@ -581,12 +748,8 @@ func (t TaskList) renderHeader() string {
 			name = strings.ToUpper(col)
 		}
 
-		// Priority, annotation, and dependency columns are single character, others are padded
-		if col == "priority" || col == "annotation" || col == "dependency" {
-			parts = append(parts, name+" ")
-		} else {
-			parts = append(parts, fmt.Sprintf("%-*s ", width, truncate(name, width)))
-		}
+		// All columns use the same width formatting for consistency with table
+		parts = append(parts, fmt.Sprintf("%-*s ", width, truncate(name, width)))
 	}
 
 	header := strings.Join(parts, "")
@@ -640,16 +803,16 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 	switch columnName {
 	// Single-character columns
 	case "priority", "annotation", "dependency":
-		return 1, true
+		return 1 + 1, true
 	// ID column
 	case "id":
 		return 4, true
 	// UUID column (short form)
 	case "uuid":
-		return 8, true
+		return 8 + 1, true
 	// Date columns (YYYY-MM-DD HH:MM format - 16 chars max)
 	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
-		return 16, true
+		return 16 + 1, true
 	// Tags column
 	case "tags":
 		return 15, true
@@ -668,6 +831,26 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 		// Unknown columns get a default width
 		return 15, true
 	}
+}
+
+// needsSmallScreenMode returns true if terminal width is insufficient for table layout.
+// This dynamically calculates the minimum required width based on fixed columns
+// plus a minimum description width, rather than using a hardcoded threshold.
+func (t TaskList) needsSmallScreenMode() bool {
+	const minDescriptionWidth = 20
+	const cursorWidth = 2
+	const spacing = 1
+
+	requiredWidth := cursorWidth
+	for _, col := range t.displayColumns {
+		if col == "description" {
+			requiredWidth += minDescriptionWidth + spacing
+		} else {
+			w, _ := getColumnWidth(col)
+			requiredWidth += w + spacing
+		}
+	}
+	return t.width < requiredWidth
 }
 
 // calculateColumnWidths determines column widths based on available space
@@ -896,6 +1079,125 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	}
 
 	return lineStyle.Width(t.width).Render(line)
+}
+
+// renderTaskRow renders a single task row using a mini-table for proper cell wrapping
+// This enables long descriptions to wrap within their cell rather than breaking layout
+func (t TaskList) renderTaskRow(task core.Task, isCursor bool, isMultiSelected bool, quickJump string) string {
+	cols := t.calculateColumnWidths()
+
+	// Build row data array from task properties
+	var rowData []string
+
+	// First column: cursor indicator
+	// Use ASCII characters to ensure consistent 1-cell width rendering
+	cursor := " "
+	if isCursor && isMultiSelected {
+		cursor = "+"
+	} else if isCursor {
+		cursor = ">"
+	} else if isMultiSelected {
+		cursor = "*"
+	}
+	rowData = append(rowData, cursor)
+
+	// Add task property values for each column
+	for _, col := range t.displayColumns {
+		value, exists := task.GetProperty(col)
+		if !exists {
+			log.Printf("Warning: unknown column '%s' - property not found in task", col)
+			value = "-"
+		}
+
+		// Handle description separately (add status icons)
+		if col == "description" {
+			statusIcon := ""
+			if task.Start != nil {
+				statusIcon = "▶ "
+			} else if task.Status == "waiting" {
+				statusIcon = "⏸ "
+			}
+			value = statusIcon + task.Description
+			// Description wrapping is handled by the table's Wrap(true) setting
+		}
+
+		// Non-description columns are NOT truncated - they get their full allocated width
+		// The table will handle layout, and if space is insufficient we switch to small screen mode
+
+		rowData = append(rowData, value)
+	}
+
+	// Calculate column widths for the table
+	tableWidths := make([]int, 0, len(t.displayColumns)+1)
+	tableWidths = append(tableWidths, 3) // cursor column
+	for _, col := range t.displayColumns {
+		tableWidths = append(tableWidths, cols.widths[col]+1)
+	}
+
+	// Determine row style based on cursor/selection/status
+	var rowStyle lipgloss.Style
+	if isCursor || isMultiSelected {
+		rowStyle = t.styles.Selection
+	} else {
+		rowStyle = lipgloss.NewStyle()
+		if task.Start != nil {
+			rowStyle = rowStyle.Foreground(t.styles.StatusActive).Bold(true)
+		} else {
+			switch task.Status {
+			case "completed":
+				rowStyle = rowStyle.Foreground(t.styles.StatusCompleted).Strikethrough(true)
+			case "waiting":
+				rowStyle = rowStyle.Foreground(t.styles.StatusWaiting).Italic(true)
+			case "deleted":
+				rowStyle = rowStyle.Foreground(t.styles.StatusCompleted).Strikethrough(true)
+			}
+		}
+	}
+
+	// Create single-row table with wrapping enabled for description column
+	tbl := table.New().
+		Row(rowData...).
+		Width(t.width).
+		Wrap(true).
+		Border(lipgloss.Border{}).
+		BorderTop(false).
+		BorderBottom(false).
+		BorderLeft(false).
+		BorderRight(false).
+		BorderRow(false).
+		BorderColumn(false).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			// Apply priority coloring for priority column
+			if col > 0 && col <= len(t.displayColumns) {
+				colName := t.displayColumns[col-1]
+				cellStyle := rowStyle
+
+				// Apply special styling for priority column when not selected
+				if colName == "priority" && !isCursor && !isMultiSelected && task.Priority != "" {
+					switch task.Priority {
+					case "H":
+						cellStyle = cellStyle.Foreground(t.styles.PriorityHigh)
+					case "M":
+						cellStyle = cellStyle.Foreground(t.styles.PriorityMedium)
+					case "L":
+						cellStyle = cellStyle.Foreground(t.styles.PriorityLow)
+					}
+				}
+
+				// Apply overdue styling for due column when not selected
+				if colName == "due" && !isCursor && !isMultiSelected && task.IsOverdue() {
+					cellStyle = cellStyle.Foreground(t.styles.DueOverdue)
+				}
+
+				// Set column width with padding for spacing between columns
+				return cellStyle.Width(tableWidths[col]).PaddingRight(1)
+			}
+
+			// Cursor column style
+			return rowStyle.Width(tableWidths[0]).PaddingRight(1)
+		})
+
+	return tbl.Render()
 }
 
 // renderSmallScreenTaskLines renders a task as multiple lines for small screens
