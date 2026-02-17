@@ -1,6 +1,7 @@
 package core
 
 import (
+	"strings"
 	"testing"
 	"time"
 )
@@ -378,10 +379,9 @@ func TestFormatRelativeDateFrom(t *testing.T) {
 	}
 }
 
-func TestGetPropertyReturnsRelativeDates(t *testing.T) {
+func TestGetPropertyReturnsAbsoluteDates(t *testing.T) {
 	now := time.Now()
 	yesterday := now.Add(-24 * time.Hour)
-	tomorrow := now.Add(24 * time.Hour)
 
 	task := Task{
 		Due:    &yesterday,
@@ -389,47 +389,68 @@ func TestGetPropertyReturnsRelativeDates(t *testing.T) {
 		Entry:  now,
 	}
 
-	// Due date in the past should contain "ago"
+	// GetProperty should return absolute date format (YYYY-MM-DD)
 	dueVal, ok := task.GetProperty("due")
 	if !ok {
 		t.Fatal("Expected GetProperty('due') to return ok=true")
 	}
-	if dueVal == "-" {
-		t.Fatal("Expected non-empty due value")
-	}
-	// Past date should contain "ago" or "yesterday"
-	if dueVal != "yesterday" && !contains(dueVal, "ago") {
-		t.Errorf("Expected past due to contain 'ago' or be 'yesterday', got %q", dueVal)
+	// Should be an absolute date, not relative
+	if len(dueVal) < 10 || dueVal[4] != '-' || dueVal[7] != '-' {
+		t.Errorf("Expected absolute date format YYYY-MM-DD, got %q", dueVal)
 	}
 
-	// Future date
-	task.Due = &tomorrow
-	dueVal, _ = task.GetProperty("due")
-	if dueVal != "tomorrow" && !contains(dueVal, "+") {
-		t.Errorf("Expected future due to contain '+' or be 'tomorrow', got %q", dueVal)
-	}
-
-	// Entry (always set) should return relative date
+	// Entry (always set) should return absolute date
 	entryVal, ok := task.GetProperty("entry")
 	if !ok {
 		t.Fatal("Expected GetProperty('entry') to return ok=true")
 	}
-	if entryVal == "" || entryVal == "-" {
-		t.Errorf("Expected non-empty entry value, got %q", entryVal)
+	if len(entryVal) < 10 || entryVal[4] != '-' || entryVal[7] != '-' {
+		t.Errorf("Expected absolute date format YYYY-MM-DD, got %q", entryVal)
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && stringContains(s, substr))
-}
+func TestGetDateValue(t *testing.T) {
+	now := time.Now()
+	yesterday := now.Add(-24 * time.Hour)
 
-func stringContains(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
+	task := Task{
+		Due:   &yesterday,
+		Entry: now,
 	}
-	return false
+
+	// Due should return the pointer
+	dueVal := task.GetDateValue("due")
+	if dueVal == nil {
+		t.Fatal("Expected GetDateValue('due') to return non-nil")
+	}
+	if !dueVal.Equal(yesterday) {
+		t.Errorf("Expected due date to match, got %v", dueVal)
+	}
+
+	// Entry should return a pointer to Entry
+	entryVal := task.GetDateValue("entry")
+	if entryVal == nil {
+		t.Fatal("Expected GetDateValue('entry') to return non-nil")
+	}
+
+	// Nil date field
+	task.Scheduled = nil
+	schedVal := task.GetDateValue("scheduled")
+	if schedVal != nil {
+		t.Errorf("Expected nil for unset scheduled, got %v", schedVal)
+	}
+
+	// Non-date field
+	unknownVal := task.GetDateValue("description")
+	if unknownVal != nil {
+		t.Errorf("Expected nil for non-date field, got %v", unknownVal)
+	}
+
+	// FormatRelativeDate on past date should contain "ago" or "yesterday"
+	relVal := FormatRelativeDate(dueVal)
+	if relVal != "yesterday" && !strings.Contains(relVal, "ago") {
+		t.Errorf("Expected relative date with 'ago' or 'yesterday', got %q", relVal)
+	}
 }
 
 // Helper function to create time pointer

@@ -99,34 +99,34 @@ func (t *Task) GetProperty(name string) (string, bool) {
 		if t.Due == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.Due), true
+		return t.formatDate(t.Due), true
 	case "scheduled":
 		if t.Scheduled == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.Scheduled), true
+		return t.formatDate(t.Scheduled), true
 	case "wait":
 		if t.Wait == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.Wait), true
+		return t.formatDate(t.Wait), true
 	case "start":
 		if t.Start == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.Start), true
+		return t.formatDate(t.Start), true
 	case "entry":
-		return FormatRelativeDate(&t.Entry), true
+		return t.formatDate(&t.Entry), true
 	case "modified":
 		if t.Modified == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.Modified), true
+		return t.formatDate(t.Modified), true
 	case "end":
 		if t.End == nil {
 			return "-", true
 		}
-		return FormatRelativeDate(t.End), true
+		return t.formatDate(t.End), true
 	case "urgency":
 		return fmt.Sprintf("%.1f", t.Urgency), true
 	case "annotation":
@@ -164,9 +164,32 @@ func (t *Task) formatDate(date *time.Time) string {
 	return localTime.Format("2006-01-02 15:04")
 }
 
+// GetDateValue returns the raw time.Time pointer for a given date property name.
+// Returns nil for non-date properties or unset date fields.
+func (t *Task) GetDateValue(property string) *time.Time {
+	switch property {
+	case "due":
+		return t.Due
+	case "scheduled":
+		return t.Scheduled
+	case "wait":
+		return t.Wait
+	case "start":
+		return t.Start
+	case "entry":
+		return &t.Entry
+	case "modified":
+		return t.Modified
+	case "end":
+		return t.End
+	default:
+		return nil
+	}
+}
+
 // FormatRelativeDate returns a compact human-readable relative date string.
 // Past dates include "ago" suffix (e.g., "2 weeks ago").
-// Future dates include "in" prefix (e.g., "in 3 days").
+// Future dates use "+" prefix (e.g., "+3 days").
 func FormatRelativeDate(date *time.Time) string {
 	return formatRelativeDateFrom(date, time.Now())
 }

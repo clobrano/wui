@@ -52,6 +52,7 @@ type TaskList struct {
 	narrowViewFields  []string          // Field names to display in narrow view (below description)
 	narrowViewLabels  map[string]string // Map of field name to display label for narrow view
 	narrowViewLengths map[string]int    // Map of field name to custom max length for narrow view
+	relativeDates     bool              // Show dates as relative (e.g., "2 weeks ago") instead of absolute
 	offset            int               // Scroll offset for viewport (in lines, not tasks)
 	scrollBuffer      int               // Number of tasks to keep visible above/below cursor
 	styles            TaskListStyles
@@ -272,6 +273,24 @@ func (t *TaskList) SetScrollBuffer(buffer int) {
 	}
 	t.scrollBuffer = buffer
 	t.updateScroll()
+}
+
+// SetRelativeDates enables or disables relative date display in date columns
+func (t *TaskList) SetRelativeDates(enabled bool) {
+	t.relativeDates = enabled
+}
+
+// getTaskValue returns the display value for a task property.
+// When relativeDates is enabled, date columns return relative strings.
+func (t TaskList) getTaskValue(task core.Task, col string) (string, bool) {
+	if t.relativeDates && isDateColumn(col) {
+		dateVal := task.GetDateValue(col)
+		if dateVal == nil {
+			return "-", true
+		}
+		return core.FormatRelativeDate(dateVal), true
+	}
+	return task.GetProperty(col)
 }
 
 // calculateRowHeight renders a task row and returns its height in lines
@@ -798,6 +817,25 @@ func (t TaskList) hasColumn(name string) bool {
 	return false
 }
 
+// isDateColumn returns true if the column name is a date column
+func isDateColumn(col string) bool {
+	switch col {
+	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
+		return true
+	default:
+		return false
+	}
+}
+
+// getEffectiveColumnWidth returns the column width, accounting for relativeDates setting
+func (t TaskList) getEffectiveColumnWidth(columnName string) (width int, isFixed bool) {
+	w, fixed := getColumnWidth(columnName)
+	if fixed && isDateColumn(columnName) && t.relativeDates {
+		return 14, true // Relative dates are shorter (max ~13 chars)
+	}
+	return w, fixed
+}
+
 // getColumnWidth returns the default width for a column type
 func getColumnWidth(columnName string) (width int, isFixed bool) {
 	switch columnName {
@@ -810,9 +848,9 @@ func getColumnWidth(columnName string) (width int, isFixed bool) {
 	// UUID column (short form)
 	case "uuid":
 		return 8 + 1, true
-	// Date columns (relative format, e.g. "11 months ago" - 13 chars max)
+	// Date columns (YYYY-MM-DD HH:MM format - 16 chars max)
 	case "due", "scheduled", "wait", "start", "entry", "modified", "end":
-		return 14, true
+		return 16 + 1, true
 	// Tags column
 	case "tags":
 		return 15, true
@@ -846,7 +884,7 @@ func (t TaskList) needsSmallScreenMode() bool {
 		if col == "description" {
 			requiredWidth += minDescriptionWidth + spacing
 		} else {
-			w, _ := getColumnWidth(col)
+			w, _ := t.getEffectiveColumnWidth(col)
 			requiredWidth += w + spacing
 		}
 	}
@@ -874,7 +912,7 @@ func (t TaskList) calculateColumnWidths() columnWidths {
 			fixedWidth += customLength + spacing
 		} else {
 			// Use default width calculation
-			width, isFixed := getColumnWidth(col)
+			width, isFixed := t.getEffectiveColumnWidth(col)
 			if isFixed {
 				widths[col] = width
 				fixedWidth += width + spacing
@@ -961,7 +999,7 @@ func (t TaskList) renderTaskLine(task core.Task, isCursor bool, isMultiSelected 
 	// Build line dynamically based on displayColumns
 	parts := []string{cursor + " "}
 	for _, col := range t.displayColumns {
-		value, exists := task.GetProperty(col)
+		value, exists := t.getTaskValue(task, col)
 		width := cols.widths[col]
 
 		// If property doesn't exist, show empty value and log warning
@@ -1103,7 +1141,7 @@ func (t TaskList) renderTaskRow(task core.Task, isCursor bool, isMultiSelected b
 
 	// Add task property values for each column
 	for _, col := range t.displayColumns {
-		value, exists := task.GetProperty(col)
+		value, exists := t.getTaskValue(task, col)
 		if !exists {
 			log.Printf("Warning: unknown column '%s' - property not found in task", col)
 			value = "-"
@@ -1267,7 +1305,7 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 		}
 
 		// Get the field value
-		value, exists := task.GetProperty(fieldName)
+		value, exists := t.getTaskValue(task, fieldName)
 		if !exists {
 			value = "-"
 		}
