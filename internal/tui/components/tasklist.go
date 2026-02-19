@@ -90,6 +90,11 @@ func NewTaskList(width, height int, columns config.Columns, narrowViewFields con
 		narrowViewFields = config.DefaultNarrowViewFields()
 	}
 
+	// Limit to maximum 3 narrow view fields
+	if len(narrowViewFields) > 3 {
+		narrowViewFields = narrowViewFields[:3]
+	}
+
 	// Build narrow view field names, labels, and lengths maps
 	normalizedNarrowViewFields := make([]string, len(narrowViewFields))
 	narrowViewLabels := make(map[string]string)
