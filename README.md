@@ -13,6 +13,7 @@ A modern, fast Terminal User Interface (TUI) for [Taskwarrior](https://taskwarri
 - **Rich task metadata** - Full support for priorities, dates, dependencies, and recurrence
 - **Custom commands** - Execute system commands with task data using flexible templates (e.g., open URLs, copy to clipboard)
 - **Google Calendar sync** - Synchronize tasks to Google Calendar with customizable filters
+- **Short view** - Compact single-column layout for narrow terminals, showing configurable fields below each task description
 - **Highly configurable** - Customize keybindings, colors, columns, tabs/sections, sorting, and custom commands
 - **Respects Taskwarrior config** - Reads your `.taskrc` for contexts and settings
 
@@ -127,6 +128,18 @@ tui:
     - priority
     - due
     - description
+
+  # Short view - fields shown below each task description when terminal width < 80
+  # (or when force_small_screen is true). Max 3 fields. Defaults to due and tags.
+  # Supports the same field names as columns (id, project, priority, due, tags, etc.)
+  narrow_view_fields:
+    - name: due
+      label: "DUE"
+    - name: tags
+      label: "TAGS"
+
+  # Force narrow/short view regardless of terminal width
+  # force_small_screen: false
 
   # Tabs/sections - fully customizable!
   # You can reorder, remove defaults, or add your own
@@ -578,6 +591,41 @@ tabs:
 ```
 
 **Note**: Completed tasks always appear after non-completed tasks, regardless of the sort method. Sorting is applied within each status group.
+
+## Short View (Narrow Layout)
+
+When the terminal width is below 80 columns, wui automatically switches to a compact **short view** where each task is displayed across multiple lines:
+
+```
+▶ Fix login page crash
+  DUE:  2026-02-20
+  TAGS: +bug, +frontend
+```
+
+You can also force this layout at any terminal width with `force_small_screen: true` in your config.
+
+### Configuring Short View Fields
+
+Up to **3 fields** can be shown below the description. The default fields are **due date** and **tags**. Configure them with `narrow_view_fields` in your config:
+
+```yaml
+tui:
+  narrow_view_fields:
+    - name: due
+      label: "DUE"
+    - name: tags
+      label: "TAGS"
+    - name: project
+      label: "PROJECT"
+```
+
+Any field supported by Taskwarrior works: `due`, `tags`, `project`, `priority`, `urgency`, `scheduled`, or any UDA.
+
+To always use the short view:
+```yaml
+tui:
+  force_small_screen: true
+```
 
 ## Default Tabs
 

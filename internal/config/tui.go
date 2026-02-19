@@ -14,7 +14,7 @@ type TUIConfig struct {
 	ValidateBlockedOnComplete       *bool                    `yaml:"validate_blocked_on_complete,omitempty"` // Prevent completing tasks blocked by other tasks (default: true)
 	Tabs                            []Tab                    `yaml:"tabs"`
 	Columns                         Columns                  `yaml:"columns"`
-	NarrowViewFields                Columns                  `yaml:"narrow_view_fields"` // Fields to display below description in narrow view (terminal width < 80)
+	NarrowViewFields                Columns                  `yaml:"narrow_view_fields"` // Fields to display below description in narrow view (terminal width < 80); up to 3 fields, defaults to due and tags
 	Keybindings                     map[string]string        `yaml:"keybindings"`
 	Theme                           *Theme                   `yaml:"theme"`
 	CustomCommands                  map[string]CustomCommand `yaml:"custom_commands,omitempty"`
