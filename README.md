@@ -597,9 +597,9 @@ tabs:
 When the terminal width is below 80 columns, wui automatically switches to a compact **short view** where each task is displayed across multiple lines:
 
 ```
-▶ 42  Fix login page crash
-      DUE:  2026-02-20
-      TAGS: +bug, +frontend
+▶ Fix login page crash
+  DUE:  2026-02-20
+  TAGS: +bug, +frontend
 ```
 
 You can also force this layout at any terminal width with `force_small_screen: true` in your config.
