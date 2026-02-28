@@ -31,6 +31,8 @@ const (
 	ViewModeSmall
 	// ViewModeSmallTaskDetail shows full-screen task details on small screens
 	ViewModeSmallTaskDetail
+	// ViewModeTaskDetail shows full-screen task details (replaces list view)
+	ViewModeTaskDetail
 )
 
 // String returns the string representation of ViewMode
@@ -44,6 +46,8 @@ func (v ViewMode) String() string {
 		return "small"
 	case ViewModeSmallTaskDetail:
 		return "small_task_detail"
+	case ViewModeTaskDetail:
+		return "task_detail"
 	default:
 		return "unknown"
 	}
@@ -1166,6 +1170,37 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	keyPressed := msg.String()
 
+	// In task detail view, handle detail-specific keys
+	if m.viewMode == ViewModeTaskDetail {
+		switch keyPressed {
+		case "esc":
+			m.viewMode = ViewModeList
+			m.updateComponentSizes()
+			return m, nil
+		case "k":
+			// Scroll task detail up
+			scrollUpMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}}
+			m.sidebar, _ = m.sidebar.Update(scrollUpMsg)
+			return m, nil
+		case "j":
+			// Scroll task detail down
+			scrollDownMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}}
+			m.sidebar, _ = m.sidebar.Update(scrollDownMsg)
+			return m, nil
+		case "K":
+			// Navigate to previous task
+			m.taskList.MoveCursorUp()
+			m.updateSidebar()
+			return m, nil
+		case "J":
+			// Navigate to next task
+			m.taskList.MoveCursorDown()
+			m.updateSidebar()
+			return m, nil
+		}
+		// For other keys (d, s, e, m, a, q, ?, etc.), fall through to normal handling
+	}
+
 	// Check configured keybindings
 	if m.keyMatches(keyPressed, "quit") {
 		// Check if auto-sync before quit is enabled
@@ -1201,6 +1236,12 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// If in small screen task detail view, go back to task list
 		if m.viewMode == ViewModeSmallTaskDetail {
 			m.viewMode = ViewModeSmall
+			m.updateComponentSizes()
+			return m, nil
+		}
+		// If in full-screen task detail view, go back to list
+		if m.viewMode == ViewModeTaskDetail {
+			m.viewMode = ViewModeList
 			m.updateComponentSizes()
 			return m, nil
 		}
@@ -1274,15 +1315,13 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
-		// Otherwise toggle sidebar (for normal screens)
+		// On normal screens, Enter opens full-screen task detail view
 		if m.viewMode == ViewModeList {
-			m.viewMode = ViewModeListWithSidebar
-		} else if m.viewMode == ViewModeListWithSidebar {
-			m.viewMode = ViewModeList
+			m.viewMode = ViewModeTaskDetail
+			m.updateComponentSizes()
+			m.updateSidebar()
+			return m, nil
 		}
-		m.updateComponentSizes()
-		m.updateSidebar()
-		return m, nil
 	}
 
 	if m.keyMatches(keyPressed, "done") {
@@ -1486,11 +1525,10 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// If sidebar is visible, check for sidebar scrolling keys (not configurable)
-	if m.viewMode == ViewModeListWithSidebar {
+	// If sidebar is visible (task detail view), check for sidebar scrolling keys (not configurable)
+	if m.viewMode == ViewModeTaskDetail || m.viewMode == ViewModeSmallTaskDetail {
 		if keyPressed == "ctrl+d" || keyPressed == "ctrl+u" || keyPressed == "ctrl+f" ||
-			keyPressed == "ctrl+b" || keyPressed == "J" || keyPressed == "K" ||
-			keyPressed == "pgdown" || keyPressed == "pgup" {
+			keyPressed == "ctrl+b" || keyPressed == "pgdown" || keyPressed == "pgup" {
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}
@@ -1509,7 +1547,7 @@ func (m *Model) updateComponentSizes() {
 	// Don't auto-switch if we're in task detail view
 	forceSmall := m.config.TUI.ForceSmallScreen
 	if m.width < 80 || forceSmall {
-		if m.viewMode != ViewModeSmallTaskDetail {
+		if m.viewMode != ViewModeSmallTaskDetail && m.viewMode != ViewModeTaskDetail {
 			m.viewMode = ViewModeSmall
 		}
 	} else {
@@ -1520,6 +1558,7 @@ func (m *Model) updateComponentSizes() {
 			// If we're in task detail on small screen but screen got bigger, go back to list
 			m.viewMode = ViewModeList
 		}
+		// ViewModeTaskDetail persists through resizes
 	}
 
 	// Update sections component width
@@ -1561,7 +1600,7 @@ func (m *Model) updateComponentSizes() {
 
 		m.taskList.SetSize(taskListWidth, availableHeight)
 		m.sidebar.SetSize(sidebarWidth, availableHeight)
-	} else if m.viewMode == ViewModeSmallTaskDetail {
+	} else if m.viewMode == ViewModeSmallTaskDetail || m.viewMode == ViewModeTaskDetail {
 		// Full screen task detail view (using sidebar component)
 		m.sidebar.SetSize(m.width, availableHeight)
 	} else {

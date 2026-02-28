@@ -12,12 +12,13 @@ import (
 
 // SidebarStyles holds the styles needed for rendering the sidebar
 type SidebarStyles struct {
-	Border         lipgloss.Style
-	Title          lipgloss.Style
-	Label          lipgloss.Style
-	Value          lipgloss.Style
-	Dim            lipgloss.Style
-	PriorityHigh   lipgloss.Color
+	Border              lipgloss.Style
+	Title               lipgloss.Style
+	Label               lipgloss.Style
+	Value               lipgloss.Style
+	Dim                 lipgloss.Style
+	AnnotationTimestamp lipgloss.Style
+	PriorityHigh        lipgloss.Color
 	PriorityMedium lipgloss.Color
 	PriorityLow    lipgloss.Color
 	DueOverdue     lipgloss.Color
@@ -34,7 +35,7 @@ type Sidebar struct {
 	allTasks []core.Task // All tasks for dependency lookups
 	width    int
 	height   int
-	offset   int // Scroll offset for content
+	offset   int // Scroll offset for main content (left panel)
 	styles   SidebarStyles
 }
 
@@ -74,7 +75,6 @@ func (s Sidebar) Update(msg tea.Msg) (Sidebar, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		// Use pointer to modify the sidebar in place
 		s.handleKey(msg)
 		return s, nil
 	}
@@ -83,7 +83,6 @@ func (s Sidebar) Update(msg tea.Msg) (Sidebar, tea.Cmd) {
 
 // handleKey processes keyboard input for scrolling
 func (s *Sidebar) handleKey(msg tea.KeyMsg) {
-	// Only handle scrolling keys when sidebar is active
 	switch msg.String() {
 	case "J": // J (shift+j) for line down
 		s.scrollDown(1)
@@ -100,14 +99,19 @@ func (s *Sidebar) handleKey(msg tea.KeyMsg) {
 	}
 }
 
-// scrollDown scrolls the sidebar content down
+// scrollDown scrolls the main content down
 func (s *Sidebar) scrollDown(amount int) {
-	// Calculate actual content lines by rendering
-	sections := s.renderContent()
-	lines := strings.Split(sections, "\n")
+	// Use approximate left panel width for content measurement
+	leftWidth := s.width - rightPanelWidth(s.width)
+	contentWidth := leftWidth - 4
+	if contentWidth < 10 {
+		contentWidth = 10
+	}
+
+	lines := strings.Split(s.renderMainContent(contentWidth), "\n")
 	totalLines := len(lines)
 
-	contentHeight := s.height - 10
+	contentHeight := s.height - titleHeight()
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -123,7 +127,7 @@ func (s *Sidebar) scrollDown(amount int) {
 	}
 }
 
-// scrollUp scrolls the sidebar content up
+// scrollUp scrolls the main content up
 func (s *Sidebar) scrollUp(amount int) {
 	s.offset -= amount
 	if s.offset < 0 {
@@ -131,60 +135,63 @@ func (s *Sidebar) scrollUp(amount int) {
 	}
 }
 
-// scrollToBottom scrolls to the bottom of the sidebar content
+// scrollToBottom scrolls to the bottom of the main content
 func (s *Sidebar) scrollToBottom() {
-	// Set to a very large number - View() will clamp it
 	s.offset = 9999
 }
 
-// scrollToTop scrolls to the top of the sidebar content
+// scrollToTop scrolls to the top of the main content
 func (s *Sidebar) scrollToTop() {
 	s.offset = 0
 }
 
-// contentLineCount estimates the number of content lines
-func (s *Sidebar) contentLineCount() int {
-	if s.task == nil {
-		return 0
-	}
-
-	// Rough estimate based on content sections
-	lines := 10 // Base fields
-	lines += len(s.task.Tags)
-	lines += len(s.task.Annotations) * 3
-	lines += len(s.task.Depends) * 2
-	lines += len(s.task.UDAs)
-
-	// Description wrapping
-	if len(s.task.Description) > s.width-6 {
-		lines += len(s.task.Description) / (s.width - 6)
-	}
-
-	return lines
+// titleHeight returns the number of lines the title section occupies
+func titleHeight() int {
+	return 2 // title line + separator line
 }
 
-// View renders the sidebar
+// rightPanelWidth returns the width of the right metadata panel
+func rightPanelWidth(totalWidth int) int {
+	w := totalWidth * 30 / 100
+	if w < 26 {
+		w = 26
+	}
+	if w > 46 {
+		w = 46
+	}
+	return w
+}
+
+// View renders the task detail page
 func (s Sidebar) View() string {
 	if s.task == nil {
 		return s.renderEmpty()
 	}
 
-	// Render all content sections
-	sections := s.renderContent()
+	rightWidth := rightPanelWidth(s.width)
+	leftWidth := s.width - rightWidth
 
-	// Apply scrolling offset
-	lines := strings.Split(sections, "\n")
-
-	// Account for border (2 lines) + padding (2 lines from Padding(1, 2)) = 4 lines total
-	// Add extra safety margin to account for lipgloss wrapping long lines
-	contentHeight := s.height - 10
+	// Title occupies 2 lines (content + separator)
+	th := titleHeight()
+	contentHeight := s.height - th
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
 
-	// Clamp offset to ensure we can fill the screen
-	// If offset is too large, show the last contentHeight lines
-	maxOffset := len(lines) - contentHeight
+	// Left panel inner width (Padding(0,2) adds 4 to outer width)
+	leftContentWidth := leftWidth - 4
+	if leftContentWidth < 10 {
+		leftContentWidth = 10
+	}
+
+	// Render title (full width)
+	title := s.renderTitle()
+
+	// Render and scroll main content (dependencies + annotations)
+	mainContent := s.renderMainContent(leftContentWidth)
+	mainLines := strings.Split(mainContent, "\n")
+
+	maxOffset := len(mainLines) - contentHeight
 	if maxOffset < 0 {
 		maxOffset = 0
 	}
@@ -192,33 +199,55 @@ func (s Sidebar) View() string {
 	if offset > maxOffset {
 		offset = maxOffset
 	}
-	if offset < 0 {
-		offset = 0
-	}
 
-	visibleLines := lines[offset:]
+	visibleLines := mainLines[offset:]
 	if len(visibleLines) > contentHeight {
 		visibleLines = visibleLines[:contentHeight]
 	}
-
-	// Fill remaining space to match content height
 	for len(visibleLines) < contentHeight {
 		visibleLines = append(visibleLines, "")
 	}
 
-	content := strings.Join(visibleLines, "\n")
+	leftPanel := lipgloss.NewStyle().
+		Width(leftContentWidth).
+		Height(contentHeight).
+		Padding(0, 2).
+		Render(strings.Join(visibleLines, "\n"))
 
-	// Apply sidebar styling with explicit height to ensure border closes at bottom
-	return s.styles.Border.
-		Width(s.width - 4).
-		MaxHeight(s.height).
-		Render(content)
+	// Right panel: proper sidebar with a full-height │ separator on the left.
+	// Overhead: 1 (│) + 1 (left pad) + 1 (right pad) = 3 chars.
+	rightInnerWidth := rightWidth - 3
+	if rightInnerWidth < 8 {
+		rightInnerWidth = 8
+	}
+
+	// Pad metadata content to fill the full height so the separator extends top-to-bottom.
+	metaLines := strings.Split(s.renderMetadata(), "\n")
+	for len(metaLines) < contentHeight {
+		metaLines = append(metaLines, "")
+	}
+	if len(metaLines) > contentHeight {
+		metaLines = metaLines[:contentHeight]
+	}
+
+	sidebarStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.Border{Left: "│"}).
+		BorderLeft(true).
+		BorderForeground(s.styles.Dim.GetForeground()).
+		PaddingLeft(1).
+		PaddingRight(1)
+
+	rightPanel := sidebarStyle.
+		Width(rightInnerWidth).
+		Render(strings.Join(metaLines, "\n"))
+
+	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
+	return lipgloss.JoinVertical(lipgloss.Left, title, body)
 }
 
-// renderEmpty renders the empty state
+// renderEmpty renders the empty state (no task selected)
 func (s Sidebar) renderEmpty() string {
-	// Fill empty content to match expected height
-	contentHeight := s.height - 6 // border(2) + padding(2) + safety margin(2)
+	contentHeight := s.height - 6
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -231,86 +260,88 @@ func (s Sidebar) renderEmpty() string {
 
 	return s.styles.Border.
 		Width(s.width - 4).
-		MaxHeight(s.height). // Use MaxHeight to prevent overflow
+		MaxHeight(s.height).
 		Render(strings.Join(lines, "\n"))
 }
 
-// renderContent renders all task details
-func (s Sidebar) renderContent() string {
+// renderTitle renders the task title bar: "#ID  Description" + separator
+func (s Sidebar) renderTitle() string {
+	idStr := s.styles.Label.Render(fmt.Sprintf("#%d", s.task.ID))
+	if s.task.ID == 0 {
+		idStr = s.styles.Label.Render("Task")
+	}
+	titleLine := idStr + "  " + s.task.Description
+	separator := s.styles.Dim.Render(strings.Repeat("─", s.width))
+	return titleLine + "\n" + separator
+}
+
+// renderMainContent renders the scrollable left panel (dependencies + annotations)
+func (s Sidebar) renderMainContent(contentWidth int) string {
 	var sections []string
 
-	// Title
-	title := fmt.Sprintf("Task #%d", s.task.ID)
-	if s.task.ID == 0 {
-		title = "Task Details"
+	if len(s.task.Depends) > 0 {
+		sections = append(sections, s.renderDependencies())
+		sections = append(sections, "")
 	}
-	sections = append(sections, s.styles.Title.Render(title))
-	sections = append(sections, "")
 
-	// UUID
-	sections = append(sections, s.renderField("UUID", s.task.UUID))
+	if len(s.task.Annotations) > 0 {
+		sections = append(sections, s.renderAnnotations(contentWidth))
+	}
 
-	// Description (wrapped)
-	sections = append(sections, s.renderWrappedField("Description", s.task.Description))
+	if len(sections) == 0 {
+		sections = append(sections, s.styles.Dim.Render("No dependencies or annotations"))
+	}
+
+	return strings.Join(sections, "\n")
+}
+
+// renderMetadata renders the right sidebar metadata panel (fixed, not scrollable)
+func (s Sidebar) renderMetadata() string {
+	var lines []string
+
+	// Status
+	lines = append(lines, s.renderStatusField())
 
 	// Project
 	project := s.task.Project
 	if project == "" {
 		project = "-"
 	}
-	sections = append(sections, s.renderField("Project", project))
-
-	// Status
-	sections = append(sections, s.renderStatusField())
+	lines = append(lines, s.renderField("Project", project))
 
 	// Priority
 	priority := s.task.Priority
 	if priority == "" {
 		priority = "-"
 	}
-	sections = append(sections, s.renderPriorityField(priority))
+	lines = append(lines, s.renderPriorityField(priority))
 
 	// Tags
 	if len(s.task.Tags) > 0 {
-		sections = append(sections, "")
-		sections = append(sections, s.renderTags())
+		lines = append(lines, s.renderTags())
 	}
 
-	// Virtual Tags (based on status)
+	// Virtual tags
 	virtualTags := s.getVirtualTags()
 	if len(virtualTags) > 0 {
-		// Always add spacing before virtual tags
-		sections = append(sections, "")
-		sections = append(sections, s.renderVirtualTags(virtualTags))
+		lines = append(lines, s.renderVirtualTags(virtualTags))
 	}
 
-	// Dates section
-	sections = append(sections, "")
-	sections = append(sections, s.renderDates())
-
-	// Dependencies
-	if len(s.task.Depends) > 0 {
-		sections = append(sections, "")
-		sections = append(sections, s.renderDependencies())
-	}
-
-	// Annotations
-	if len(s.task.Annotations) > 0 {
-		sections = append(sections, "")
-		sections = append(sections, s.renderAnnotations())
-	}
-
-	// UDAs (User Defined Attributes)
-	if len(s.task.UDAs) > 0 {
-		sections = append(sections, "")
-		sections = append(sections, s.renderUDAs())
-	}
+	// Dates
+	lines = append(lines, "")
+	lines = append(lines, s.renderDatesCompact())
 
 	// Urgency
-	sections = append(sections, "")
-	sections = append(sections, s.renderField("Urgency", fmt.Sprintf("%.2f", s.task.Urgency)))
+	lines = append(lines, "")
+	lines = append(lines, s.renderField("Urgency", fmt.Sprintf("%.2f", s.task.Urgency)))
 
-	return strings.Join(sections, "\n")
+	// UDAs
+	if len(s.task.UDAs) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, s.renderUDAs())
+	}
+
+	return strings.Join(lines, "\n")
 }
 
 // renderField renders a simple label: value field
@@ -318,22 +349,11 @@ func (s Sidebar) renderField(label, value string) string {
 	return fmt.Sprintf("%s: %s", s.styles.Label.Render(label), value)
 }
 
-// renderWrappedField renders a field with wrapped text
-func (s Sidebar) renderWrappedField(label, value string) string {
-	// Wrap text to fit width
-	// Account for border width (-4) and padding (-4) = -8 total
-	maxWidth := s.width - 8
-	wrapped := wrapText(value, maxWidth)
-
-	return fmt.Sprintf("%s:\n%s", s.styles.Label.Render(label), wrapped)
-}
-
 // renderStatusField renders the status with color coding
 func (s Sidebar) renderStatusField() string {
 	statusStyle := lipgloss.NewStyle()
 	statusText := s.task.Status
 
-	// Check if task is started (has Start field set)
 	if s.task.Start != nil {
 		statusStyle = statusStyle.Foreground(s.styles.StatusActive).Bold(true)
 		statusText = s.task.Status + " (started)"
@@ -370,8 +390,7 @@ func (s Sidebar) renderPriorityField(priority string) string {
 
 // renderTags renders the tags section
 func (s Sidebar) renderTags() string {
-	tagStyle := lipgloss.NewStyle().
-		Foreground(s.styles.Tag)
+	tagStyle := lipgloss.NewStyle().Foreground(s.styles.Tag)
 
 	tags := make([]string, len(s.task.Tags))
 	for i, tag := range s.task.Tags {
@@ -382,28 +401,20 @@ func (s Sidebar) renderTags() string {
 }
 
 // getVirtualTags returns virtual tags based on task state
-// Only shows the most relevant virtual tags (ACTIVE, WAITING)
 func (s Sidebar) getVirtualTags() []string {
 	var virtualTags []string
-
-	// A task is ACTIVE if it has a start time set
 	if s.task.Start != nil {
 		virtualTags = append(virtualTags, "ACTIVE")
 	}
-
-	// A task is WAITING if status is waiting
 	if s.task.Status == "waiting" {
 		virtualTags = append(virtualTags, "WAITING")
 	}
-
 	return virtualTags
 }
 
 // renderVirtualTags renders virtual tags
 func (s Sidebar) renderVirtualTags(virtualTags []string) string {
-	// Use tag color for virtual tags to make them visible
-	tagStyle := lipgloss.NewStyle().
-		Foreground(s.styles.Tag)
+	tagStyle := lipgloss.NewStyle().Foreground(s.styles.Tag)
 
 	styledTags := make([]string, len(virtualTags))
 	for i, tag := range virtualTags {
@@ -413,48 +424,34 @@ func (s Sidebar) renderVirtualTags(virtualTags []string) string {
 	return fmt.Sprintf("%s: %s", s.styles.Label.Render("Virtual"), strings.Join(styledTags, " "))
 }
 
-// renderDates renders all date fields
-func (s Sidebar) renderDates() string {
+// renderDatesCompact renders date fields in a compact format for the right panel
+func (s Sidebar) renderDatesCompact() string {
 	var lines []string
 
 	lines = append(lines, s.styles.Label.Underline(true).Render("Dates"))
 
-	// Due date
 	if s.task.Due != nil {
-		dueStr := formatDateWithRelative(*s.task.Due)
 		style := lipgloss.NewStyle()
 		if s.task.IsOverdue() {
 			style = style.Foreground(s.styles.DueOverdue)
 		}
-		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(dueStr)))
+		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(formatCompactDate(*s.task.Due))))
 	}
-
-	// Scheduled date
 	if s.task.Scheduled != nil {
-		lines = append(lines, fmt.Sprintf("  Scheduled: %s", formatDateWithRelative(*s.task.Scheduled)))
+		lines = append(lines, fmt.Sprintf("  Sched: %s", formatCompactDate(*s.task.Scheduled)))
 	}
-
-	// Wait date
 	if s.task.Wait != nil {
-		lines = append(lines, fmt.Sprintf("  Wait: %s", formatDateWithRelative(*s.task.Wait)))
+		lines = append(lines, fmt.Sprintf("  Wait: %s", formatCompactDate(*s.task.Wait)))
 	}
-
-	// Start date (when task was started)
 	if s.task.Start != nil {
-		lines = append(lines, fmt.Sprintf("  Started: %s", formatDateWithRelative(*s.task.Start)))
+		lines = append(lines, fmt.Sprintf("  Started: %s", formatCompactDate(*s.task.Start)))
 	}
-
-	// Entry date
-	lines = append(lines, fmt.Sprintf("  Created: %s", formatDateWithRelative(s.task.Entry)))
-
-	// Modified date
+	lines = append(lines, fmt.Sprintf("  Created: %s", formatCompactDate(s.task.Entry)))
 	if s.task.Modified != nil {
-		lines = append(lines, fmt.Sprintf("  Modified: %s", formatDateWithRelative(*s.task.Modified)))
+		lines = append(lines, fmt.Sprintf("  Modified: %s", formatCompactDate(*s.task.Modified)))
 	}
-
-	// End date (for completed tasks)
 	if s.task.End != nil {
-		lines = append(lines, fmt.Sprintf("  Completed: %s", formatDateWithRelative(*s.task.End)))
+		lines = append(lines, fmt.Sprintf("  Done: %s", formatCompactDate(*s.task.End)))
 	}
 
 	return strings.Join(lines, "\n")
@@ -465,32 +462,21 @@ func (s Sidebar) renderDependencies() string {
 	var lines []string
 	lines = append(lines, s.styles.Label.Underline(true).Render("Dependencies"))
 
-	if len(s.task.Depends) > 0 {
-		lines = append(lines, "  Blocked by:")
-		for _, uuid := range s.task.Depends {
-			// Look up the dependent task
-			depTask := s.findTaskByUUID(uuid)
-
-			if depTask != nil {
-				// Check if task is completed
-				if depTask.Status == "completed" {
-					// Show with "x" prefix for completed tasks
-					lines = append(lines, fmt.Sprintf("    - x %s", depTask.Description))
-				} else {
-					// Show ID and description for non-completed tasks
-					lines = append(lines, fmt.Sprintf("    - #%d: %s", depTask.ID, depTask.Description))
-				}
+	for _, uuid := range s.task.Depends {
+		depTask := s.findTaskByUUID(uuid)
+		if depTask != nil {
+			if depTask.Status == "completed" {
+				lines = append(lines, fmt.Sprintf("  ✓ %s", depTask.Description))
 			} else {
-				// Show shortened UUID if task not found
-				shortUUID := uuid
-				if len(shortUUID) > 8 {
-					shortUUID = shortUUID[:8]
-				}
-				lines = append(lines, fmt.Sprintf("    - %s", shortUUID))
+				lines = append(lines, fmt.Sprintf("  ○ #%d: %s", depTask.ID, depTask.Description))
 			}
+		} else {
+			shortUUID := uuid
+			if len(shortUUID) > 8 {
+				shortUUID = shortUUID[:8]
+			}
+			lines = append(lines, fmt.Sprintf("  ○ %s", shortUUID))
 		}
-	} else {
-		lines = append(lines, "  None")
 	}
 
 	return strings.Join(lines, "\n")
@@ -507,17 +493,15 @@ func (s Sidebar) findTaskByUUID(uuid string) *core.Task {
 }
 
 // renderAnnotations renders task annotations
-func (s Sidebar) renderAnnotations() string {
+func (s Sidebar) renderAnnotations(contentWidth int) string {
 	var lines []string
 	lines = append(lines, s.styles.Label.Underline(true).Render("Annotations"))
 
 	for _, ann := range s.task.Annotations {
 		dateStr := formatDateWithRelative(ann.Entry)
-		lines = append(lines, fmt.Sprintf("  [%s]", dateStr))
+		lines = append(lines, "  "+s.styles.AnnotationTimestamp.Render("["+dateStr+"]"))
 
-		// Wrap annotation text
-		// Account for border width (-4) and padding (-4) = -8 total
-		wrapped := wrapText(ann.Description, s.width-8)
+		wrapped := wrapText(ann.Description, contentWidth-4)
 		for _, line := range strings.Split(wrapped, "\n") {
 			lines = append(lines, fmt.Sprintf("  %s", line))
 		}
@@ -532,7 +516,6 @@ func (s Sidebar) renderUDAs() string {
 	var lines []string
 	lines = append(lines, s.styles.Label.Underline(true).Render("Custom Fields"))
 
-	// Sort keys for consistent display
 	for key, value := range s.task.UDAs {
 		lines = append(lines, fmt.Sprintf("  %s: %s", key, value))
 	}
@@ -540,15 +523,20 @@ func (s Sidebar) renderUDAs() string {
 	return strings.Join(lines, "\n")
 }
 
+// formatCompactDate formats a date compactly: relative time or date only
+func formatCompactDate(t time.Time) string {
+	relative := formatRelativeTime(t)
+	if relative != "" {
+		return relative
+	}
+	return t.Local().Format("2006-01-02")
+}
+
 // formatDateWithRelative formats a date with relative time
 func formatDateWithRelative(t time.Time) string {
-	// Convert to local timezone for display
 	localTime := t.Local()
-
-	// Format: "2006-01-02 15:04 (2 days ago)"
 	dateStr := localTime.Format("2006-01-02 15:04")
 	relativeStr := formatRelativeTime(t)
-
 	if relativeStr != "" {
 		return fmt.Sprintf("%s (%s)", dateStr, relativeStr)
 	}
@@ -562,7 +550,6 @@ func formatRelativeTime(t time.Time) string {
 
 	if diff < 0 {
 		diff = -diff
-		// Future dates
 		if diff < time.Minute {
 			return "in moments"
 		} else if diff < time.Hour {
@@ -578,7 +565,6 @@ func formatRelativeTime(t time.Time) string {
 			}
 			return fmt.Sprintf("in %d hours", hours)
 		} else if diff < 36*time.Hour {
-			// 24-36 hours = tomorrow
 			return "tomorrow"
 		} else if diff < 7*24*time.Hour {
 			days := int(diff.Hours() / 24)
@@ -587,7 +573,6 @@ func formatRelativeTime(t time.Time) string {
 		return ""
 	}
 
-	// Past dates
 	if diff < time.Minute {
 		return "just now"
 	} else if diff < time.Hour {
