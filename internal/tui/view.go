@@ -187,13 +187,8 @@ func (m Model) renderContent() string {
 func (m Model) renderTaskListWithComponents() string {
 	var content string
 
-	if m.viewMode == ViewModeListWithSidebar {
-		// Render task list and sidebar side by side
-		taskListView := m.taskList.View()
-		sidebarView := m.sidebar.View()
-		content = lipgloss.JoinHorizontal(lipgloss.Top, taskListView, sidebarView)
-	} else if m.viewMode == ViewModeSmallTaskDetail {
-		// Render full-screen task detail view (for small screens)
+	if m.viewMode == ViewModeSmallTaskDetail || m.viewMode == ViewModeTaskDetail {
+		// Render full-screen task detail view
 		content = m.sidebar.View()
 	} else {
 		// Render just the task list (ViewModeList or ViewModeSmall)
@@ -530,7 +525,11 @@ func (m Model) renderFooter() string {
 	} else {
 		switch m.state {
 		case StateNormal:
-			keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
+			if m.viewMode == ViewModeTaskDetail {
+				keybindings = "k/l: scroll | K/L: prev/next task | esc: back | d: done | s: start/stop | e: edit | m: modify | a: annotate"
+			} else {
+				keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
+			}
 		case StateHelp:
 			keybindings = "?: close help"
 		case StateFilterInput:
