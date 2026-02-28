@@ -1182,7 +1182,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			scrollUpMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}}
 			m.sidebar, _ = m.sidebar.Update(scrollUpMsg)
 			return m, nil
-		case "j", "l":
+		case "j":
 			// Scroll task detail down
 			scrollDownMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}}
 			m.sidebar, _ = m.sidebar.Update(scrollDownMsg)
@@ -1192,8 +1192,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskList.MoveCursorUp()
 			m.updateSidebar()
 			return m, nil
-		case "J", "L":
-			// Navigate to next task (J mirrors K for vim-style navigation; L also accepted)
+		case "J":
+			// Navigate to next task
 			m.taskList.MoveCursorDown()
 			m.updateSidebar()
 			return m, nil
