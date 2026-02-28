@@ -213,16 +213,32 @@ func (s Sidebar) View() string {
 		Padding(0, 2).
 		Render(strings.Join(visibleLines, "\n"))
 
-	// Right panel: metadata sidebar
-	// s.styles.Border has RoundedBorder + Padding(1,2): +6 width, +4 height overhead
-	rightInnerWidth := rightWidth - 6
+	// Right panel: proper sidebar with a full-height │ separator on the left.
+	// Overhead: 1 (│) + 1 (left pad) + 1 (right pad) = 3 chars.
+	rightInnerWidth := rightWidth - 3
 	if rightInnerWidth < 8 {
 		rightInnerWidth = 8
 	}
-	rightPanel := s.styles.Border.
+
+	// Pad metadata content to fill the full height so the separator extends top-to-bottom.
+	metaLines := strings.Split(s.renderMetadata(), "\n")
+	for len(metaLines) < contentHeight {
+		metaLines = append(metaLines, "")
+	}
+	if len(metaLines) > contentHeight {
+		metaLines = metaLines[:contentHeight]
+	}
+
+	sidebarStyle := lipgloss.NewStyle().
+		BorderStyle(lipgloss.Border{Left: "│"}).
+		BorderLeft(true).
+		BorderForeground(s.styles.Dim.GetForeground()).
+		PaddingLeft(1).
+		PaddingRight(1)
+
+	rightPanel := sidebarStyle.
 		Width(rightInnerWidth).
-		MaxHeight(contentHeight).
-		Render(s.renderMetadata())
+		Render(strings.Join(metaLines, "\n"))
 
 	body := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, rightPanel)
 	return lipgloss.JoinVertical(lipgloss.Left, title, body)
