@@ -1192,8 +1192,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskList.MoveCursorUp()
 			m.updateSidebar()
 			return m, nil
-		case "L":
-			// Navigate to next task
+		case "J", "L":
+			// Navigate to next task (J mirrors K for vim-style navigation; L also accepted)
 			m.taskList.MoveCursorDown()
 			m.updateSidebar()
 			return m, nil
@@ -1528,8 +1528,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If sidebar is visible (task detail view), check for sidebar scrolling keys (not configurable)
 	if m.viewMode == ViewModeTaskDetail || m.viewMode == ViewModeSmallTaskDetail {
 		if keyPressed == "ctrl+d" || keyPressed == "ctrl+u" || keyPressed == "ctrl+f" ||
-			keyPressed == "ctrl+b" || keyPressed == "J" ||
-			keyPressed == "pgdown" || keyPressed == "pgup" {
+			keyPressed == "ctrl+b" || keyPressed == "pgdown" || keyPressed == "pgup" {
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd
 		}

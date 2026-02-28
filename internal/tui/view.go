@@ -526,7 +526,7 @@ func (m Model) renderFooter() string {
 		switch m.state {
 		case StateNormal:
 			if m.viewMode == ViewModeTaskDetail {
-				keybindings = "k/l: scroll | K/L: prev/next task | esc: back | d: done | s: start/stop | e: edit | m: modify | a: annotate"
+				keybindings = "k/l: scroll | K/J: prev/next task | esc: back | d: done | s: start/stop | e: edit | m: modify | a: annotate"
 			} else {
 				keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"
 			}
