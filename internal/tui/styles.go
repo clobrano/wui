@@ -460,11 +460,12 @@ func (s *Styles) ToTaskListStyles() components.TaskListStyles {
 // ToSidebarStyles converts Styles to component-specific SidebarStyles
 func (s *Styles) ToSidebarStyles() components.SidebarStyles {
 	return components.SidebarStyles{
-		Border:         s.SidebarBorder,
-		Title:          s.SidebarTitle,
-		Label:          s.Label,
-		Value:          s.Value,
-		Dim:            s.Dim,
+		Border:              s.SidebarBorder,
+		Title:               s.SidebarTitle,
+		Label:               s.Label,
+		Value:               s.Value,
+		Dim:                 s.Dim,
+		AnnotationTimestamp: s.Dim,
 		PriorityHigh:   s.theme.Colors.PriorityHigh,
 		PriorityMedium: s.theme.Colors.PriorityMedium,
 		PriorityLow:    s.theme.Colors.PriorityLow,

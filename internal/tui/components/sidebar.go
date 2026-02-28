@@ -12,12 +12,13 @@ import (
 
 // SidebarStyles holds the styles needed for rendering the sidebar
 type SidebarStyles struct {
-	Border         lipgloss.Style
-	Title          lipgloss.Style
-	Label          lipgloss.Style
-	Value          lipgloss.Style
-	Dim            lipgloss.Style
-	PriorityHigh   lipgloss.Color
+	Border              lipgloss.Style
+	Title               lipgloss.Style
+	Label               lipgloss.Style
+	Value               lipgloss.Style
+	Dim                 lipgloss.Style
+	AnnotationTimestamp lipgloss.Style
+	PriorityHigh        lipgloss.Color
 	PriorityMedium lipgloss.Color
 	PriorityLow    lipgloss.Color
 	DueOverdue     lipgloss.Color
@@ -498,7 +499,7 @@ func (s Sidebar) renderAnnotations(contentWidth int) string {
 
 	for _, ann := range s.task.Annotations {
 		dateStr := formatDateWithRelative(ann.Entry)
-		lines = append(lines, fmt.Sprintf("  [%s]", dateStr))
+		lines = append(lines, "  "+s.styles.AnnotationTimestamp.Render("["+dateStr+"]"))
 
 		wrapped := wrapText(ann.Description, contentWidth-4)
 		for _, line := range strings.Split(wrapped, "\n") {
