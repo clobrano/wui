@@ -1189,14 +1189,12 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "K":
 			// Navigate to previous task
-			upMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
-			m.taskList, _ = m.taskList.Update(upMsg)
+			m.taskList.MoveCursorUp()
 			m.updateSidebar()
 			return m, nil
 		case "L":
 			// Navigate to next task
-			downMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
-			m.taskList, _ = m.taskList.Update(downMsg)
+			m.taskList.MoveCursorDown()
 			m.updateSidebar()
 			return m, nil
 		}
@@ -1530,7 +1528,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If sidebar is visible (task detail view), check for sidebar scrolling keys (not configurable)
 	if m.viewMode == ViewModeTaskDetail || m.viewMode == ViewModeSmallTaskDetail {
 		if keyPressed == "ctrl+d" || keyPressed == "ctrl+u" || keyPressed == "ctrl+f" ||
-			keyPressed == "ctrl+b" || keyPressed == "J" || keyPressed == "K" ||
+			keyPressed == "ctrl+b" || keyPressed == "J" ||
 			keyPressed == "pgdown" || keyPressed == "pgup" {
 			m.sidebar, cmd = m.sidebar.Update(msg)
 			return m, cmd

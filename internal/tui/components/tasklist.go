@@ -443,6 +443,16 @@ func (t *TaskList) moveUp() {
 	}
 }
 
+// MoveCursorUp moves the cursor to the previous task (public, for external callers)
+func (t *TaskList) MoveCursorUp() {
+	t.moveUp()
+}
+
+// MoveCursorDown moves the cursor to the next task (public, for external callers)
+func (t *TaskList) MoveCursorDown() {
+	t.moveDown()
+}
+
 // moveToStart jumps to first task
 func (t *TaskList) moveToStart() {
 	if t.itemCount() > 0 {
