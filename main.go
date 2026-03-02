@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,7 +13,6 @@ import (
 	"github.com/clobrano/wui/internal/taskwarrior"
 	"github.com/clobrano/wui/internal/tui"
 	"github.com/clobrano/wui/internal/version"
-	"github.com/spf13/cobra"
 )
 
 var (
@@ -25,85 +25,99 @@ var (
 	searchFilter string
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "wui",
-	Short: "Warrior UI - A modern TUI for Taskwarrior",
-	Long: `wui (Warrior UI) is a Terminal User Interface for Taskwarrior built with Go and bubbletea.
-It provides an intuitive, keyboard-driven interface for managing your tasks.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := runTUI(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	},
-}
-
-var versionCmd = &cobra.Command{
-	Use:   "version",
-	Short: "Print the version number of wui",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("wui version %s\n", version.GetVersion())
-	},
-}
-
 var (
 	syncCalendarName string
 	syncTaskFilter   string
 )
 
-var syncCmd = &cobra.Command{
-	Use:   "sync",
-	Short: "Sync Taskwarrior tasks to Google Calendar",
-	Long: `Synchronize Taskwarrior tasks to Google Calendar.
+func usage() {
+	fmt.Fprintf(os.Stderr, `wui (Warrior UI) - A modern TUI for Taskwarrior
 
-This command syncs tasks from Taskwarrior to a specified Google Calendar using
-settings from your config file (~/.config/wui/config.yaml). You can override
-these settings with command-line flags.
+Usage:
+  wui [flags]         Run the TUI
+  wui version         Print the version number of wui
+  wui sync [flags]    Sync Taskwarrior tasks to Google Calendar
+  wui help            Show this help
 
-Before syncing, you need to:
-1. Create a Google Cloud project and enable the Google Calendar API
-2. Download the credentials.json file from Google Cloud Console
-3. Place it in ~/.config/wui/credentials.json
-4. Configure calendar_name and task_filter in config.yaml
+Flags:
+  --config string      config file path (default: ~/.config/wui/config.yaml)
+  --taskrc string      taskrc file path (default: ~/.taskrc)
+  --task-bin string    task binary path (default: /usr/local/bin/task)
+  --log-level string   log level: debug, info, warn, error (default: error)
+  --log-format string  log format: text, json (default: text)
+  --search string      open in Search tab with the specified filter
 
-On first run, you'll be prompted to authorize the app in your browser.
+Sync flags:
+  --calendar string    Google Calendar name (overrides config)
+  --filter string      Taskwarrior filter for tasks to sync (overrides config)
 
-Examples:
-  wui sync                                    # Use config.yaml settings
-  wui sync --calendar "Work"                  # Override calendar
-  wui sync --filter "+urgent"                 # Override filter
-  wui sync --calendar "Tasks" --filter "due:today"  # Override both`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if err := runSync(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	},
+Before syncing you need to:
+  1. Create a Google Cloud project and enable the Google Calendar API
+  2. Download the credentials.json file from Google Cloud Console
+  3. Place it in ~/.config/wui/credentials.json
+  4. Configure calendar_name and task_filter in config.yaml
+`)
 }
 
-func init() {
-	// Add subcommands
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(syncCmd)
-
-	// Sync command flags (optional - override config file values)
-	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
-	syncCmd.Flags().StringVar(&syncTaskFilter, "filter", "", "Taskwarrior filter for tasks to sync (overrides config)")
-
-	// Persistent flags available to all commands
-	rootCmd.PersistentFlags().StringVar(&configPath, "config", "", "config file path (default: ~/.config/wui/config.yaml)")
-	rootCmd.PersistentFlags().StringVar(&taskrcPath, "taskrc", "", "taskrc file path (default: ~/.taskrc)")
-	rootCmd.PersistentFlags().StringVar(&taskBinPath, "task-bin", "", "task binary path (default: /usr/local/bin/task)")
-	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "error", "log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().StringVar(&logFormat, "log-format", "text", "log format (text, json)")
-	rootCmd.PersistentFlags().StringVar(&searchFilter, "search", "", "open in Search tab with the specified filter")
+func addCommonFlags(fs *flag.FlagSet) {
+	fs.StringVar(&configPath, "config", "", "config file path (default: ~/.config/wui/config.yaml)")
+	fs.StringVar(&taskrcPath, "taskrc", "", "taskrc file path (default: ~/.taskrc)")
+	fs.StringVar(&taskBinPath, "task-bin", "", "task binary path (default: /usr/local/bin/task)")
+	fs.StringVar(&logLevel, "log-level", "error", "log level (debug, info, warn, error)")
+	fs.StringVar(&logFormat, "log-format", "text", "log format (text, json)")
+	fs.StringVar(&searchFilter, "search", "", "open in Search tab with the specified filter")
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+	args := os.Args
+	// Guard against empty os.Args (can occur on Android/Termux arm64)
+	if len(args) == 0 {
+		args = []string{"wui"}
+	}
+
+	if len(args) >= 2 {
+		switch args[1] {
+		case "version":
+			fmt.Printf("wui version %s\n", version.GetVersion())
+			return
+		case "sync":
+			if err := runSyncWithFlags(args[2:]); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		case "help":
+			usage()
+			return
+		}
+	}
+
+	if err := runRootWithFlags(args[1:]); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func runRootWithFlags(args []string) error {
+	fs := flag.NewFlagSet("wui", flag.ExitOnError)
+	addCommonFlags(fs)
+	fs.Usage = usage
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return runTUI()
+}
+
+func runSyncWithFlags(args []string) error {
+	fs := flag.NewFlagSet("sync", flag.ExitOnError)
+	addCommonFlags(fs)
+	fs.StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
+	fs.StringVar(&syncTaskFilter, "filter", "", "Taskwarrior filter for tasks to sync (overrides config)")
+	fs.Usage = usage
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	return runSync()
 }
 
 // runTUI initializes and runs the TUI application
@@ -179,7 +193,6 @@ func initLogging(cfg *config.Config) {
 	}
 
 	// Override with CLI flag if provided (non-default)
-	// Note: We check if it's different from the default value
 	if logLevel != "" {
 		effectiveLogLevel = logLevel
 	}
@@ -202,17 +215,14 @@ func initLogging(cfg *config.Config) {
 	// For TUI mode, log to file instead of stderr to avoid interfering with display
 	logFile := os.Getenv("WUI_LOG_FILE")
 	if logFile == "" {
-		// Default to temp file
 		logFile = "/tmp/wui.log"
 	}
 
 	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
-		// Fallback to discarding logs if file can't be opened
 		f = nil
 	}
 
-	// Create handler based on format
 	var handler slog.Handler
 	opts := &slog.HandlerOptions{Level: level}
 
@@ -227,13 +237,11 @@ func initLogging(cfg *config.Config) {
 		handler = slog.NewTextHandler(output, opts)
 	}
 
-	// Set default logger
 	slog.SetDefault(slog.New(handler))
 }
 
 // checkTaskBinary verifies that the task binary exists and is executable
 func checkTaskBinary(taskBin string) error {
-	// Use exec.LookPath to check if the binary is in PATH or at the specified location
 	path, err := exec.LookPath(taskBin)
 	if err != nil {
 		return fmt.Errorf(`task binary not found: %w
@@ -256,25 +264,20 @@ Visit https://taskwarrior.org for more information.`, err)
 
 // runSync performs the Google Calendar sync operation
 func runSync() error {
-	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
 
-	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
-		// Use basic logging before config is loaded
 		initLogging(nil)
 		slog.Error("Failed to load config", "error", err, "path", cfgPath)
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Initialize logging with config (priority: flag > env > config)
 	initLogging(cfg)
 
 	slog.Info("Starting Google Calendar sync", "version", version.GetVersion())
 	slog.Debug("Using config path", "path", cfgPath)
 
-	// Override with CLI flags if provided
 	if taskBinPath != "" {
 		cfg.TaskBin = taskBinPath
 	}
@@ -282,7 +285,6 @@ func runSync() error {
 		cfg.TaskrcPath = taskrcPath
 	}
 
-	// Get calendar name and filter from config, allow flags to override
 	calendarName := cfg.CalendarSync.CalendarName
 	taskFilter := cfg.CalendarSync.TaskFilter
 
@@ -293,7 +295,6 @@ func runSync() error {
 		taskFilter = syncTaskFilter
 	}
 
-	// Validate required fields
 	if calendarName == "" {
 		return fmt.Errorf("calendar name is required (set in config.yaml or use --calendar flag)")
 	}
@@ -307,25 +308,21 @@ func runSync() error {
 		"task_bin", cfg.TaskBin,
 		"taskrc_path", cfg.TaskrcPath)
 
-	// Check if task binary exists
 	if err := checkTaskBinary(cfg.TaskBin); err != nil {
 		return err
 	}
 
-	// Create Taskwarrior client
 	taskClient, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
 	if err != nil {
 		slog.Error("Failed to create taskwarrior client", "error", err)
 		return fmt.Errorf("failed to create taskwarrior client: %w", err)
 	}
 
-	// Get credentials and token paths from config
 	credentialsPath := cfg.CalendarSync.CredentialsPath
 	tokenPath := cfg.CalendarSync.TokenPath
 
 	slog.Info("Using credentials", "path", credentialsPath, "token_path", tokenPath)
 
-	// Create sync client
 	ctx := context.Background()
 	syncClient, err := calendar.NewSyncClient(ctx, taskClient, credentialsPath, tokenPath, calendarName, taskFilter)
 	if err != nil {
@@ -333,7 +330,6 @@ func runSync() error {
 		return fmt.Errorf("failed to create sync client: %w", err)
 	}
 
-	// Perform sync
 	result, err := syncClient.Sync(ctx)
 	if err != nil {
 		slog.Error("Sync failed", "error", err)
@@ -342,7 +338,6 @@ func runSync() error {
 
 	slog.Info("Sync completed successfully", "created", result.Created, "updated", result.Updated)
 
-	// Print warnings if any (for TUI mode when output might be lost)
 	if len(result.Warnings) > 0 {
 		fmt.Println("\n========================================")
 		for _, warning := range result.Warnings {
