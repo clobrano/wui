@@ -29,22 +29,25 @@ type Config struct {
 	InitialSearchFilter string        `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
 
-// LoadConfig loads configuration from a YAML file
-// If the file doesn't exist, creates a default config file and returns default configuration
-// Merges loaded config with defaults to ensure all fields are set
-func LoadConfig(path string) (*Config, error) {
+// LoadConfig loads configuration from a YAML file.
+// If explicitPath is true and the file doesn't exist, an error is returned.
+// If explicitPath is false and the file doesn't exist, a default config is created and returned.
+// Merges loaded config with defaults to ensure all fields are set.
+func LoadConfig(path string, explicitPath bool) (*Config, error) {
 	// Get defaults first
 	cfg := DefaultConfig()
 
 	// Try to read the file
 	data, err := os.ReadFile(path)
 	if err != nil {
-		// If file doesn't exist, create default config file and return defaults
 		if os.IsNotExist(err) {
-			// Create default config file
+			// If the user explicitly specified this path, it must exist
+			if explicitPath {
+				return nil, fmt.Errorf("config file not found: %s", path)
+			}
+			// Default path: create it with defaults
 			if err := SaveConfig(cfg, path); err != nil {
 				// If we can't save, just return defaults (don't fail)
-				// This allows the app to work even if config dir isn't writable
 				return cfg, nil
 			}
 			return cfg, nil
@@ -89,12 +92,17 @@ func SaveConfig(cfg *Config, path string) error {
 	return nil
 }
 
-// ResolveConfigPath resolves the config file path
-// If empty, returns default path: ~/.config/wui/config.yaml
-// If starts with ~, expands home directory
-// Otherwise returns the path as-is
+// ResolveConfigPath resolves the config file path.
+// Priority: explicit path argument > WUI_CONFIG environment variable > default path.
+// If starts with ~, expands home directory. Relative paths are made absolute.
 func ResolveConfigPath(path string) string {
-	// Empty path - use default
+	// Use explicitly provided path first
+	if path == "" {
+		// Fall back to WUI_CONFIG environment variable
+		path = os.Getenv("WUI_CONFIG")
+	}
+
+	// Use default if still empty
 	if path == "" {
 		homeDir, _ := os.UserHomeDir()
 		return filepath.Join(homeDir, ".config", "wui", "config.yaml")

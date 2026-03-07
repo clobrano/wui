@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -53,8 +54,8 @@ func TestLoadConfig_FileNotExist(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	// Load config from non-existent file - should create default
-	cfg, err := LoadConfig(configPath)
+	// Load config from non-existent file (not explicit) - should create default
+	cfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Errorf("Expected no error for missing config, got %v", err)
 	}
@@ -72,12 +73,23 @@ func TestLoadConfig_FileNotExist(t *testing.T) {
 	}
 
 	// Verify file contains valid YAML
-	loadedCfg, err := LoadConfig(configPath)
+	loadedCfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Fatalf("Failed to load created config: %v", err)
 	}
 	if loadedCfg.TaskBin != cfg.TaskBin {
 		t.Errorf("Expected TaskBin %s, got %s", cfg.TaskBin, loadedCfg.TaskBin)
+	}
+}
+
+func TestLoadConfig_ExplicitPathNotExist(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "nonexistent.yaml")
+
+	// When path is explicitly specified and file doesn't exist, expect error
+	_, err := LoadConfig(configPath, true)
+	if err == nil {
+		t.Error("Expected error when explicitly specified config file doesn't exist")
 	}
 }
 
@@ -102,7 +114,7 @@ tui:
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -134,7 +146,7 @@ invalid yaml content {{{
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	_, err = LoadConfig(configPath)
+	_, err = LoadConfig(configPath, false)
 	if err == nil {
 		t.Error("Expected error for invalid YAML")
 	}
@@ -166,7 +178,7 @@ func TestSaveConfig(t *testing.T) {
 	}
 
 	// Load it back and verify
-	loadedCfg, err := LoadConfig(configPath)
+	loadedCfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Fatalf("Failed to load saved config: %v", err)
 	}
@@ -180,45 +192,60 @@ func TestSaveConfig(t *testing.T) {
 }
 
 func TestResolveConfigPath(t *testing.T) {
+	// Ensure WUI_CONFIG is not set for these tests
+	t.Setenv("WUI_CONFIG", "")
+
 	tests := []struct {
 		name     string
 		input    string
-		expected string // partial match, since home dir varies
+		contains string
 	}{
 		{
 			name:     "empty path uses default",
 			input:    "",
-			expected: ".config/wui/config.yaml",
+			contains: ".config/wui/config.yaml",
 		},
 		{
 			name:     "absolute path unchanged",
 			input:    "/custom/path/config.yaml",
-			expected: "/custom/path/config.yaml",
+			contains: "/custom/path/config.yaml",
 		},
 		{
 			name:     "tilde expansion",
 			input:    "~/myconfig.yaml",
-			expected: "myconfig.yaml", // will contain expanded home
+			contains: "myconfig.yaml",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := ResolveConfigPath(tt.input)
-			if tt.expected == "" {
-				t.Logf("Result: %s", result)
-			} else if !filepath.IsAbs(result) && tt.input != "" {
+			if !filepath.IsAbs(result) {
 				t.Errorf("Expected absolute path, got %s", result)
 			}
-			// For partial matches
-			if tt.expected != "" && tt.input != "" {
-				if tt.input == "" && result == "" {
-					t.Error("Expected non-empty default config path")
-				}
+			if tt.contains != "" && !strings.Contains(result, tt.contains) {
+				t.Errorf("Expected path to contain %q, got %s", tt.contains, result)
 			}
 		})
 	}
 }
+
+func TestResolveConfigPath_EnvVar(t *testing.T) {
+	t.Setenv("WUI_CONFIG", "/env/path/config.yaml")
+
+	// Empty flag should fall back to env var
+	result := ResolveConfigPath("")
+	if result != "/env/path/config.yaml" {
+		t.Errorf("Expected WUI_CONFIG path, got %s", result)
+	}
+
+	// Explicit flag should take precedence over env var
+	result = ResolveConfigPath("/flag/path/config.yaml")
+	if result != "/flag/path/config.yaml" {
+		t.Errorf("Expected flag path to override WUI_CONFIG, got %s", result)
+	}
+}
+
 
 func TestConfigMergeWithDefaults(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -233,7 +260,7 @@ func TestConfigMergeWithDefaults(t *testing.T) {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}
@@ -284,7 +311,7 @@ func TestConfigMergeNarrowViewFields(t *testing.T) {
 		t.Fatalf("Failed to create test config: %v", err)
 	}
 
-	cfg, err := LoadConfig(configPath)
+	cfg, err := LoadConfig(configPath, false)
 	if err != nil {
 		t.Fatalf("Expected no error, got %v", err)
 	}

@@ -108,11 +108,12 @@ func main() {
 
 // runTUI initializes and runs the TUI application
 func runTUI() error {
-	// Resolve config path
+	// Resolve config path (--config flag > WUI_CONFIG env var > default)
+	explicitPath := configPath != "" || os.Getenv("WUI_CONFIG") != ""
 	cfgPath := config.ResolveConfigPath(configPath)
 
 	// Load configuration
-	cfg, err := config.LoadConfig(cfgPath)
+	cfg, err := config.LoadConfig(cfgPath, explicitPath)
 	if err != nil {
 		// Use basic logging before config is loaded
 		initLogging(nil)
@@ -256,11 +257,12 @@ Visit https://taskwarrior.org for more information.`, err)
 
 // runSync performs the Google Calendar sync operation
 func runSync() error {
-	// Resolve config path
+	// Resolve config path (--config flag > WUI_CONFIG env var > default)
+	explicitPath := configPath != "" || os.Getenv("WUI_CONFIG") != ""
 	cfgPath := config.ResolveConfigPath(configPath)
 
 	// Load configuration
-	cfg, err := config.LoadConfig(cfgPath)
+	cfg, err := config.LoadConfig(cfgPath, explicitPath)
 	if err != nil {
 		// Use basic logging before config is loaded
 		initLogging(nil)
