@@ -62,6 +62,9 @@ func LoadConfig(path string) (*Config, error) {
 	// Merge with defaults
 	cfg = mergeWithDefaults(cfg, &loaded)
 
+	// Expand ~ in path fields
+	expandTildePaths(cfg)
+
 	return cfg, nil
 }
 
@@ -115,6 +118,27 @@ func ResolveConfigPath(path string) string {
 	}
 
 	return path
+}
+
+// expandTilde expands a leading ~ to the user's home directory.
+func expandTilde(path string) string {
+	if strings.HasPrefix(path, "~/") || path == "~" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(homeDir, path[1:])
+		}
+	}
+	return path
+}
+
+// expandTildePaths expands ~ in all path fields of the config.
+func expandTildePaths(cfg *Config) {
+	cfg.TaskBin = expandTilde(cfg.TaskBin)
+	cfg.TaskrcPath = expandTilde(cfg.TaskrcPath)
+	if cfg.CalendarSync != nil {
+		cfg.CalendarSync.CredentialsPath = expandTilde(cfg.CalendarSync.CredentialsPath)
+		cfg.CalendarSync.TokenPath = expandTilde(cfg.CalendarSync.TokenPath)
+	}
 }
 
 // mergeWithDefaults merges loaded config with defaults
