@@ -150,6 +150,16 @@ func (m Model) View() string {
 		baseView = m.renderTaskValidationPopup(baseView)
 	}
 
+	// If token is expired, overlay the token-refresh prompt
+	if m.state == StateTokenExpired {
+		baseView = m.renderTokenExpiredPopup(baseView)
+	}
+
+	// If waiting for the browser-based OAuth2 flow, show the auth URL popup
+	if m.state == StateWaitingForCalendarAuth {
+		baseView = m.renderCalendarAuthPopup(baseView)
+	}
+
 	return baseView
 }
 
@@ -482,6 +492,138 @@ func (m Model) renderTaskValidationPopup(baseView string) string {
 		lineIndex := verticalPos + i
 		if lineIndex < len(baseLines) {
 			// Center the window line horizontally
+			padding := max(0, (m.width-windowWidthActual)/2)
+			baseLines[lineIndex] = strings.Repeat(" ", padding) + windowLine
+		}
+	}
+
+	return strings.Join(baseLines, "\n")
+}
+
+// renderCalendarAuthPopup renders a centered overlay popup that shows the OAuth2
+// authorization URL and waits for the user to complete the browser flow.
+func (m Model) renderCalendarAuthPopup(baseView string) string {
+	var content strings.Builder
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("12")). // Blue
+		MarginBottom(1)
+	content.WriteString(titleStyle.Render("Google Calendar Authorization"))
+	content.WriteString("\n\n")
+
+	bodyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	content.WriteString(bodyStyle.Render("Your browser has been opened. If it did not open automatically,\nvisit the URL below to authorize access:"))
+	content.WriteString("\n\n")
+
+	urlStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("14")). // Bright cyan — clickable in most terminals
+		Bold(true)
+	content.WriteString(urlStyle.Render(m.calendarAuthURL))
+	content.WriteString("\n\n")
+
+	waitStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("11")). // Yellow
+		Italic(true)
+	content.WriteString(waitStyle.Render("Waiting for authorization..."))
+	content.WriteString("\n\n")
+
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	content.WriteString(hintStyle.Render("Press Esc to cancel"))
+
+	// Make the window wide enough to show the full URL without wrapping if possible
+	urlWidth := lipgloss.Width(m.calendarAuthURL) + 8 // padding + border
+	windowWidth := max(60, min(m.width-4, urlWidth))
+	windowBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("12")). // Blue border
+		Padding(1, 2).
+		Width(windowWidth - 4).
+		Render(content.String())
+
+	baseHeight := lipgloss.Height(baseView)
+	windowHeight := lipgloss.Height(windowBox)
+	windowWidthActual := lipgloss.Width(windowBox)
+
+	verticalPos := max(0, (baseHeight-windowHeight)/2-2)
+
+	baseLines := strings.Split(baseView, "\n")
+	windowLines := strings.Split(windowBox, "\n")
+
+	for i, windowLine := range windowLines {
+		lineIndex := verticalPos + i
+		if lineIndex < len(baseLines) {
+			padding := max(0, (m.width-windowWidthActual)/2)
+			baseLines[lineIndex] = strings.Repeat(" ", padding) + windowLine
+		}
+	}
+
+	return strings.Join(baseLines, "\n")
+}
+
+// renderTokenExpiredPopup renders a centered overlay popup that informs the user
+// their Google Calendar token is expired and offers to delete it and re-authenticate.
+func (m Model) renderTokenExpiredPopup(baseView string) string {
+	var content strings.Builder
+
+	titleStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("9")). // Red for error
+		MarginBottom(1)
+	content.WriteString(titleStyle.Render("Calendar Token Expired"))
+	content.WriteString("\n\n")
+
+	bodyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+
+	// Show the raw error for transparency
+	if m.tokenExpiredMessage != "" {
+		errStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("8")).
+			Italic(true)
+		// Truncate long messages
+		msg := m.tokenExpiredMessage
+		if len(msg) > 120 {
+			msg = msg[:117] + "..."
+		}
+		content.WriteString(errStyle.Render(msg))
+		content.WriteString("\n\n")
+	}
+
+	content.WriteString(bodyStyle.Render("Your Google Calendar authorization token has expired\nor been revoked."))
+	content.WriteString("\n\n")
+
+	warningStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("11")) // Yellow for warning
+	content.WriteString(warningStyle.Render("⚠  The existing token file will be permanently deleted."))
+	content.WriteString("\n\n")
+
+	content.WriteString(bodyStyle.Render("Selecting YES will delete the old token and open your\nbrowser to authorize access again."))
+	content.WriteString("\n\n")
+
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	content.WriteString(hintStyle.Render("Refresh token now? (Y)es / (N)o"))
+
+	windowWidth := max(50, min(80, m.width*60/100))
+	windowBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("9")). // Red border
+		Padding(1, 2).
+		Width(windowWidth - 4).
+		Render(content.String())
+
+	baseHeight := lipgloss.Height(baseView)
+	windowHeight := lipgloss.Height(windowBox)
+	windowWidthActual := lipgloss.Width(windowBox)
+
+	verticalPos := max(0, (baseHeight-windowHeight)/2-2)
+
+	baseLines := strings.Split(baseView, "\n")
+	windowLines := strings.Split(windowBox, "\n")
+
+	for i, windowLine := range windowLines {
+		lineIndex := verticalPos + i
+		if lineIndex < len(baseLines) {
 			padding := max(0, (m.width-windowWidthActual)/2)
 			baseLines[lineIndex] = strings.Repeat(" ", padding) + windowLine
 		}

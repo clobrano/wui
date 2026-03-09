@@ -43,6 +43,19 @@ type CalendarSyncCompletedMsg struct {
 	Err    error
 }
 
+// CalendarAuthRequiredMsg is sent when calendar sync cannot proceed because
+// there is no saved OAuth2 token. The AuthServer is already listening; the
+// TUI should display AuthServer.URL to the user and launch waitForCalendarAuthCmd.
+type CalendarAuthRequiredMsg struct {
+	AuthServer *calendar.AuthServer
+}
+
+// CalendarAuthTokenReadyMsg is sent when the OAuth2 authorization flow completes
+// (either successfully or with an error).
+type CalendarAuthTokenReadyMsg struct {
+	Err error
+}
+
 // AutocompleteDataLoadedMsg is sent when autocomplete data (projects/tags) has been loaded
 type AutocompleteDataLoadedMsg struct {
 	Projects []string
