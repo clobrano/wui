@@ -3,6 +3,7 @@ package tui
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -77,6 +78,8 @@ const (
 	StateTaskValidation
 	// StateTokenExpired is active when the calendar token is expired and user is prompted to refresh it
 	StateTokenExpired
+	// StateWaitingForCalendarAuth is active while waiting for the user to complete browser-based OAuth2 authorization
+	StateWaitingForCalendarAuth
 )
 
 // String returns the string representation of AppState
@@ -102,6 +105,8 @@ func (s AppState) String() string {
 		return "task_validation"
 	case StateTokenExpired:
 		return "token_expired"
+	case StateWaitingForCalendarAuth:
+		return "waiting_for_calendar_auth"
 	default:
 		return "unknown"
 	}
@@ -193,6 +198,8 @@ type Model struct {
 	syncingBeforeQuit    bool                 // true when syncing before quit
 	syncWarnings         *calendar.SyncResult // warnings to print after quit
 	tokenExpiredMessage  string               // error message shown in the token-expired popup
+	calendarAuthServer   *calendar.AuthServer // active OAuth2 auth server (nil when not in auth flow)
+	calendarAuthURL      string               // auth URL shown in the waiting-for-auth popup
 
 	// Shortcut override warnings (custom commands overriding internal shortcuts)
 	shortcutWarnings []string
@@ -498,6 +505,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false
 		m.syncingBeforeQuit = false
 		if msg.Err != nil {
+			if errors.Is(msg.Err, calendar.ErrNoToken) {
+				// No token on disk — start the browser-based auth flow
+				oauthConfig, err := calendar.LoadOAuthConfig(m.config.CalendarSync.CredentialsPath)
+				if err != nil {
+					m.errorMessage = "Calendar auth setup failed: " + err.Error()
+					return m, nil
+				}
+				authServer, err := calendar.StartAuthServer(oauthConfig)
+				if err != nil {
+					m.errorMessage = "Calendar auth setup failed: " + err.Error()
+					return m, nil
+				}
+				m.calendarAuthServer = authServer
+				m.calendarAuthURL = authServer.URL
+				m.state = StateWaitingForCalendarAuth
+				tokenPath := m.config.CalendarSync.TokenPath
+				return m, tea.Batch(
+					openBrowserCmd(authServer.URL),
+					waitForCalendarAuthCmd(authServer, tokenPath),
+				)
+			}
 			if calendar.IsTokenExpiredError(msg.Err) {
 				m.tokenExpiredMessage = msg.Err.Error()
 				m.state = StateTokenExpired
@@ -523,6 +551,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Quit after successful sync
 		return m, tea.Quit
+
+	case CalendarAuthRequiredMsg:
+		// Auth server was started elsewhere; wire it up.
+		m.isLoading = false
+		m.calendarAuthServer = msg.AuthServer
+		m.calendarAuthURL = msg.AuthServer.URL
+		m.state = StateWaitingForCalendarAuth
+		tokenPath := m.config.CalendarSync.TokenPath
+		return m, tea.Batch(
+			openBrowserCmd(msg.AuthServer.URL),
+			waitForCalendarAuthCmd(msg.AuthServer, tokenPath),
+		)
+
+	case CalendarAuthTokenReadyMsg:
+		m.calendarAuthServer = nil
+		m.calendarAuthURL = ""
+		m.state = StateNormal
+		if msg.Err != nil {
+			m.errorMessage = "Calendar authorization failed: " + msg.Err.Error()
+			return m, nil
+		}
+		// Token saved — retry the sync
+		m.isLoading = true
+		m.statusMessage = "Authorized! Syncing calendar..."
+		return m, calendarSyncCmd(m.config, m.service)
 
 	case AutocompleteDataLoadedMsg:
 		if msg.Err != nil {
@@ -676,6 +729,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleTaskValidationKeys(msg)
 	case StateTokenExpired:
 		return m.handleTokenExpiredKeys(msg)
+	case StateWaitingForCalendarAuth:
+		return m.handleWaitingForCalendarAuthKeys(msg)
 	}
 
 	return m, nil
@@ -1806,6 +1861,46 @@ func (m Model) handleTokenExpiredKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, calendarSyncCmd(m.config, m.service)
 	}
 	return m, nil
+}
+
+// handleWaitingForCalendarAuthKeys handles keys while the OAuth2 browser flow is in progress.
+// Only Esc / Ctrl+C is actionable — everything else is ignored.
+func (m Model) handleWaitingForCalendarAuthKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		if m.calendarAuthServer != nil {
+			m.calendarAuthServer.Cancel()
+			m.calendarAuthServer = nil
+		}
+		m.calendarAuthURL = ""
+		m.state = StateNormal
+		m.statusMessage = "Calendar authorization cancelled"
+		return m, nil
+	}
+	return m, nil
+}
+
+// openBrowserCmd opens the given URL in the system browser as a fire-and-forget tea.Cmd.
+func openBrowserCmd(url string) tea.Cmd {
+	return func() tea.Msg {
+		calendar.OpenBrowser(url)
+		return nil
+	}
+}
+
+// waitForCalendarAuthCmd blocks until the user completes the OAuth2 flow, then saves
+// the token and returns a CalendarAuthTokenReadyMsg.
+func waitForCalendarAuthCmd(authServer *calendar.AuthServer, tokenPath string) tea.Cmd {
+	return func() tea.Msg {
+		token, err := authServer.WaitForToken()
+		if err != nil {
+			return CalendarAuthTokenReadyMsg{Err: err}
+		}
+		if err := calendar.SaveToken(tokenPath, token); err != nil {
+			return CalendarAuthTokenReadyMsg{Err: fmt.Errorf("failed to save token: %w", err)}
+		}
+		return CalendarAuthTokenReadyMsg{}
+	}
 }
 
 // handleModifyKeys handles keys in modify input state
