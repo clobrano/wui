@@ -75,6 +75,8 @@ const (
 	StateResourcePicker
 	// StateTaskValidation is active when user is shown task validation warnings (TODOs or blocking tasks)
 	StateTaskValidation
+	// StateTokenExpired is active when the calendar token is expired and user is prompted to refresh it
+	StateTokenExpired
 )
 
 // String returns the string representation of AppState
@@ -98,6 +100,8 @@ func (s AppState) String() string {
 		return "resource_picker"
 	case StateTaskValidation:
 		return "task_validation"
+	case StateTokenExpired:
+		return "token_expired"
 	default:
 		return "unknown"
 	}
@@ -186,8 +190,9 @@ type Model struct {
 	blockingTasks    []string    // Descriptions of tasks blocking the selected tasks
 
 	// Calendar sync state
-	syncingBeforeQuit bool                 // true when syncing before quit
-	syncWarnings      *calendar.SyncResult // warnings to print after quit
+	syncingBeforeQuit    bool                 // true when syncing before quit
+	syncWarnings         *calendar.SyncResult // warnings to print after quit
+	tokenExpiredMessage  string               // error message shown in the token-expired popup
 
 	// Shortcut override warnings (custom commands overriding internal shortcuts)
 	shortcutWarnings []string
@@ -493,6 +498,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false
 		m.syncingBeforeQuit = false
 		if msg.Err != nil {
+			if calendar.IsTokenExpiredError(msg.Err) {
+				m.tokenExpiredMessage = msg.Err.Error()
+				m.state = StateTokenExpired
+				return m, nil
+			}
 			m.errorMessage = "Calendar sync failed: " + msg.Err.Error()
 			// Don't quit on sync error, let user see the error
 			return m, nil
@@ -664,6 +674,8 @@ func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleNewTaskKeys(msg)
 	case StateTaskValidation:
 		return m.handleTaskValidationKeys(msg)
+	case StateTokenExpired:
+		return m.handleTokenExpiredKeys(msg)
 	}
 
 	return m, nil
@@ -1763,6 +1775,35 @@ func (m Model) handleConfirmKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		m.confirmAction = ""
 		return m, nil
+	}
+	return m, nil
+}
+
+// handleTokenExpiredKeys handles keys in the token-expired popup state.
+// Y: delete the expired token and re-run the sync (which triggers re-authorization).
+// N/Esc: dismiss the popup without taking action.
+func (m Model) handleTokenExpiredKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "n", "N":
+		m.state = StateNormal
+		m.tokenExpiredMessage = ""
+		return m, nil
+	case "y", "Y":
+		m.state = StateNormal
+		m.tokenExpiredMessage = ""
+
+		// Determine token path from config
+		if m.config.CalendarSync == nil {
+			m.errorMessage = "Calendar sync not configured"
+			return m, nil
+		}
+		tokenPath := m.config.CalendarSync.TokenPath
+		if err := calendar.DeleteToken(tokenPath); err != nil {
+			m.errorMessage = "Failed to delete token: " + err.Error()
+			return m, nil
+		}
+		m.isLoading = true
+		return m, calendarSyncCmd(m.config, m.service)
 	}
 	return m, nil
 }

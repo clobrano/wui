@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"golang.org/x/oauth2"
@@ -164,6 +165,27 @@ func openBrowser(url string) error {
 	}
 
 	return cmd.Start()
+}
+
+// IsTokenExpiredError returns true if the error indicates that the OAuth2 token
+// has expired or been revoked and cannot be refreshed automatically.
+func IsTokenExpiredError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "invalid_grant") ||
+		strings.Contains(msg, "oauth2: token expired") ||
+		strings.Contains(msg, "token has been expired") ||
+		strings.Contains(msg, "Token has been expired")
+}
+
+// DeleteToken removes the token file from disk.
+func DeleteToken(tokenPath string) error {
+	if err := os.Remove(tokenPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("unable to delete token file: %w", err)
+	}
+	return nil
 }
 
 // saveToken saves a token to a file path
