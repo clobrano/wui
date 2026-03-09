@@ -266,6 +266,73 @@ func TestConfigMergeWithDefaults(t *testing.T) {
 	}
 }
 
+func TestExpandTildeInConfigPaths(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("Cannot determine home directory")
+	}
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `task_bin: ~/bin/task
+taskrc_path: ~/.taskrc
+calendar_sync:
+  credentials_path: ~/creds.json
+  token_path: ~/token.json
+`
+
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if cfg.TaskBin != filepath.Join(homeDir, "bin/task") {
+		t.Errorf("Expected TaskBin %s, got %s", filepath.Join(homeDir, "bin/task"), cfg.TaskBin)
+	}
+	if cfg.TaskrcPath != filepath.Join(homeDir, ".taskrc") {
+		t.Errorf("Expected TaskrcPath %s, got %s", filepath.Join(homeDir, ".taskrc"), cfg.TaskrcPath)
+	}
+	if cfg.CalendarSync == nil {
+		t.Fatal("Expected CalendarSync to be set")
+	}
+	if cfg.CalendarSync.CredentialsPath != filepath.Join(homeDir, "creds.json") {
+		t.Errorf("Expected CredentialsPath %s, got %s", filepath.Join(homeDir, "creds.json"), cfg.CalendarSync.CredentialsPath)
+	}
+	if cfg.CalendarSync.TokenPath != filepath.Join(homeDir, "token.json") {
+		t.Errorf("Expected TokenPath %s, got %s", filepath.Join(homeDir, "token.json"), cfg.CalendarSync.TokenPath)
+	}
+}
+
+func TestExpandTildeHelper(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("Cannot determine home directory")
+	}
+
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"~/foo/bar", filepath.Join(homeDir, "foo/bar")},
+		{"~", homeDir},
+		{"/absolute/path", "/absolute/path"},
+		{"relative/path", "relative/path"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		result := expandTilde(tt.input)
+		if result != tt.expected {
+			t.Errorf("expandTilde(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
 func TestConfigMergeNarrowViewFields(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
