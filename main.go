@@ -111,6 +111,11 @@ func runTUI() error {
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
 
+	// If the user explicitly passed --config, the file must exist
+	if err := checkExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
@@ -237,6 +242,19 @@ func initLogging(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
+// checkExplicitConfigPath returns an error if the user explicitly passed a
+// --config path that does not exist. The default path is allowed to be absent
+// (LoadConfig will create it), but an explicit path must already exist.
+func checkExplicitConfigPath(explicitFlag, resolvedPath string) error {
+	if explicitFlag == "" {
+		return nil
+	}
+	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
+		return fmt.Errorf("config file not found: %s", resolvedPath)
+	}
+	return nil
+}
+
 // checkTaskrcPath verifies that the taskrc file exists
 func checkTaskrcPath(taskrcPath string) error {
 	if _, err := os.Stat(taskrcPath); err != nil {
@@ -280,6 +298,11 @@ Visit https://taskwarrior.org for more information.`, err)
 func runSync() error {
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
+
+	// If the user explicitly passed --config, the file must exist
+	if err := checkExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
 
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
