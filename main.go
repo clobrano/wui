@@ -150,6 +150,12 @@ func runTUI() error {
 		return err
 	}
 
+	// Check if taskrc file exists
+	if err := checkTaskrcPath(cfg.TaskrcPath); err != nil {
+		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
+		return err
+	}
+
 	// Create Taskwarrior client
 	client, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
 	if err != nil {
@@ -231,6 +237,25 @@ func initLogging(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
+// checkTaskrcPath verifies that the taskrc file exists if a path is configured
+func checkTaskrcPath(taskrcPath string) error {
+	if taskrcPath == "" {
+		return nil
+	}
+	if _, err := os.Stat(taskrcPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf(`taskrc file not found: %s
+
+Please verify the path is correct. You can:
+  • Check the path in your config file (~/.config/wui/config.yaml)
+  • Override it with: wui --taskrc /path/to/.taskrc
+  • Create the file if it does not exist yet`, taskrcPath)
+		}
+		return fmt.Errorf("cannot access taskrc file %s: %w", taskrcPath, err)
+	}
+	return nil
+}
+
 // checkTaskBinary verifies that the task binary exists and is executable
 func checkTaskBinary(taskBin string) error {
 	// Use exec.LookPath to check if the binary is in PATH or at the specified location
@@ -309,6 +334,12 @@ func runSync() error {
 
 	// Check if task binary exists
 	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		return err
+	}
+
+	// Check if taskrc file exists
+	if err := checkTaskrcPath(cfg.TaskrcPath); err != nil {
+		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
 		return err
 	}
 
