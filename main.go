@@ -237,11 +237,8 @@ func initLogging(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
-// checkTaskrcPath verifies that the taskrc file exists if a path is configured
+// checkTaskrcPath verifies that the taskrc file exists
 func checkTaskrcPath(taskrcPath string) error {
-	if taskrcPath == "" {
-		return nil
-	}
 	if _, err := os.Stat(taskrcPath); err != nil {
 		if os.IsNotExist(err) {
 			return fmt.Errorf(`taskrc file not found: %s
