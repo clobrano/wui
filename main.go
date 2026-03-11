@@ -112,7 +112,7 @@ func runTUI() error {
 	cfgPath := config.ResolveConfigPath(configPath)
 
 	// If the user explicitly passed --config, the file must exist
-	if err := checkExplicitConfigPath(configPath, cfgPath); err != nil {
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
 		return err
 	}
 
@@ -156,7 +156,7 @@ func runTUI() error {
 	}
 
 	// Check if taskrc file exists
-	if err := checkTaskrcPath(cfg.TaskrcPath); err != nil {
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
 		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
 		return err
 	}
@@ -242,35 +242,6 @@ func initLogging(cfg *config.Config) {
 	slog.SetDefault(slog.New(handler))
 }
 
-// checkExplicitConfigPath returns an error if the user explicitly passed a
-// --config path that does not exist. The default path is allowed to be absent
-// (LoadConfig will create it), but an explicit path must already exist.
-func checkExplicitConfigPath(explicitFlag, resolvedPath string) error {
-	if explicitFlag == "" {
-		return nil
-	}
-	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
-		return fmt.Errorf("config file not found: %s", resolvedPath)
-	}
-	return nil
-}
-
-// checkTaskrcPath verifies that the taskrc file exists
-func checkTaskrcPath(taskrcPath string) error {
-	if _, err := os.Stat(taskrcPath); err != nil {
-		if os.IsNotExist(err) {
-			return fmt.Errorf(`taskrc file not found: %s
-
-Please verify the path is correct. You can:
-  • Check the path in your config file (~/.config/wui/config.yaml)
-  • Override it with: wui --taskrc /path/to/.taskrc
-  • Create the file if it does not exist yet`, taskrcPath)
-		}
-		return fmt.Errorf("cannot access taskrc file %s: %w", taskrcPath, err)
-	}
-	return nil
-}
-
 // checkTaskBinary verifies that the task binary exists and is executable
 func checkTaskBinary(taskBin string) error {
 	// Use exec.LookPath to check if the binary is in PATH or at the specified location
@@ -300,7 +271,7 @@ func runSync() error {
 	cfgPath := config.ResolveConfigPath(configPath)
 
 	// If the user explicitly passed --config, the file must exist
-	if err := checkExplicitConfigPath(configPath, cfgPath); err != nil {
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
 		return err
 	}
 
@@ -358,7 +329,7 @@ func runSync() error {
 	}
 
 	// Check if taskrc file exists
-	if err := checkTaskrcPath(cfg.TaskrcPath); err != nil {
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
 		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
 		return err
 	}

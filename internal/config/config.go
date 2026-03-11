@@ -141,6 +141,30 @@ func expandTildePaths(cfg *Config) {
 	}
 }
 
+// ValidateExplicitConfigPath returns an error if the user explicitly provided a
+// config path that does not exist. When no explicit path is given (empty string),
+// validation is skipped because LoadConfig handles the default path by creating it.
+func ValidateExplicitConfigPath(explicitFlag, resolvedPath string) error {
+	if explicitFlag == "" {
+		return nil
+	}
+	if _, err := os.Stat(resolvedPath); os.IsNotExist(err) {
+		return fmt.Errorf("config file not found: %s", resolvedPath)
+	}
+	return nil
+}
+
+// ValidateTaskrcPath verifies that the taskrc file exists.
+func ValidateTaskrcPath(taskrcPath string) error {
+	if _, err := os.Stat(taskrcPath); err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("taskrc file not found: %s\n\nPlease verify the path is correct. You can:\n  • Check the path in your config file (~/.config/wui/config.yaml)\n  • Override it with: wui --taskrc /path/to/.taskrc\n  • Create the file if it does not exist yet", taskrcPath)
+		}
+		return fmt.Errorf("cannot access taskrc file %s: %w", taskrcPath, err)
+	}
+	return nil
+}
+
 // mergeWithDefaults merges loaded config with defaults
 // Fields that are not set in loaded config will use default values
 func mergeWithDefaults(defaults, loaded *Config) *Config {
