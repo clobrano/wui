@@ -50,6 +50,9 @@ That's it. Press `?` for help.
 | **Short view** | Compact multi-line layout for narrow terminals (auto or forced) |
 | **Theme engine** | Dark and light base themes with full ANSI 256-color customization |
 | **Custom keybindings** | Remap every action to your preferred keys |
+| **Date & time picker** | Interactive calendar widget for selecting due/scheduled dates with time support |
+| **Autocomplete** | Tab-completion for projects and tags when creating or modifying tasks |
+| **Task validation** | Configurable guards: warn before completing tasks with TODO annotations or unresolved blockers |
 | **Google Calendar sync** | One-way sync to Google Calendar with priority color-coding |
 | **CLI integration** | `--search` flag to open with a pre-applied filter (great for scripts and aliases) |
 
