@@ -111,6 +111,11 @@ func runTUI() error {
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
 
+	// If the user explicitly passed --config, the file must exist
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
@@ -147,6 +152,12 @@ func runTUI() error {
 	// Check if task binary exists and is executable
 	if err := checkTaskBinary(cfg.TaskBin); err != nil {
 		slog.Error("Task binary not found or not executable", "error", err, "path", cfg.TaskBin)
+		return err
+	}
+
+	// Check if taskrc file exists
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
+		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
 		return err
 	}
 
@@ -259,6 +270,11 @@ func runSync() error {
 	// Resolve config path
 	cfgPath := config.ResolveConfigPath(configPath)
 
+	// If the user explicitly passed --config, the file must exist
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
 	// Load configuration
 	cfg, err := config.LoadConfig(cfgPath)
 	if err != nil {
@@ -309,6 +325,12 @@ func runSync() error {
 
 	// Check if task binary exists
 	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		return err
+	}
+
+	// Check if taskrc file exists
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
+		slog.Error("Taskrc file not found", "error", err, "path", cfg.TaskrcPath)
 		return err
 	}
 

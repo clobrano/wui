@@ -333,6 +333,63 @@ func TestExpandTildeHelper(t *testing.T) {
 	}
 }
 
+func TestValidateExplicitConfigPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	existing := filepath.Join(tmpDir, "config.yaml")
+	if err := os.WriteFile(existing, []byte("{}"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(tmpDir, "notexist.yaml")
+
+	tests := []struct {
+		name         string
+		explicitFlag string
+		resolvedPath string
+		wantErr      bool
+	}{
+		{"no flag set", "", missing, false},
+		{"flag set, file exists", existing, existing, false},
+		{"flag set, file missing", missing, missing, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateExplicitConfigPath(tt.explicitFlag, tt.resolvedPath)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateExplicitConfigPath(%q, %q) error = %v, wantErr %v",
+					tt.explicitFlag, tt.resolvedPath, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestValidateTaskrcPath(t *testing.T) {
+	tmpDir := t.TempDir()
+	existing := filepath.Join(tmpDir, ".taskrc")
+	if err := os.WriteFile(existing, []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(tmpDir, "notexist.taskrc")
+
+	tests := []struct {
+		name    string
+		path    string
+		wantErr bool
+	}{
+		{"file exists", existing, false},
+		{"file missing", missing, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateTaskrcPath(tt.path)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateTaskrcPath(%q) error = %v, wantErr %v", tt.path, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestConfigMergeNarrowViewFields(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
