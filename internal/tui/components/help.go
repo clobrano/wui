@@ -210,8 +210,8 @@ func defaultKeybindingGroups() []KeybindingGroup {
 			Bindings: []Keybinding{
 				{Keys: []string{"J"}, Description: "Scroll down one line"},
 				{Keys: []string{"K"}, Description: "Scroll up one line"},
-				{Keys: []string{"Ctrl+d"}, Description: "Jump to bottom"},
-				{Keys: []string{"Ctrl+u"}, Description: "Jump to top"},
+				{Keys: []string{"Ctrl+d"}, Description: "Scroll down half page"},
+				{Keys: []string{"Ctrl+u"}, Description: "Scroll up half page"},
 				{Keys: []string{"Ctrl+f", "PgDn"}, Description: "Scroll down full page"},
 				{Keys: []string{"Ctrl+b", "PgUp"}, Description: "Scroll up full page"},
 			},
@@ -294,8 +294,8 @@ func keybindingGroupsFromConfig(keybindings map[string]string) []KeybindingGroup
 			Bindings: []Keybinding{
 				{Keys: []string{"J"}, Description: "Scroll down one line"},
 				{Keys: []string{"K"}, Description: "Scroll up one line"},
-				{Keys: []string{"Ctrl+d"}, Description: "Jump to bottom"},
-				{Keys: []string{"Ctrl+u"}, Description: "Jump to top"},
+				{Keys: []string{"Ctrl+d"}, Description: "Scroll down half page"},
+				{Keys: []string{"Ctrl+u"}, Description: "Scroll up half page"},
 				{Keys: []string{"Ctrl+f", "PgDn"}, Description: "Scroll down full page"},
 				{Keys: []string{"Ctrl+b", "PgUp"}, Description: "Scroll up full page"},
 			},
