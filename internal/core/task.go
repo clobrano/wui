@@ -61,7 +61,7 @@ func (t *Task) GetProperty(name string) (string, bool) {
 	switch name {
 	case "id":
 		if t.ID == 0 {
-			return "-", true
+			return "X", true
 		}
 		return fmt.Sprintf("%d", t.ID), true
 	case "uuid":
