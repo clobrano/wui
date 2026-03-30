@@ -299,6 +299,12 @@ func (s Sidebar) renderMainContent(contentWidth int) string {
 func (s Sidebar) renderMetadata() string {
 	var lines []string
 
+	// UUID (show short form when task has no numeric ID, i.e. completed/deleted)
+	if s.task.ID == 0 {
+		shortUUID, _ := s.task.GetProperty("short_uuid")
+		lines = append(lines, s.renderField("UUID", shortUUID))
+	}
+
 	// Status
 	lines = append(lines, s.renderStatusField())
 
