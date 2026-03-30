@@ -121,6 +121,7 @@ type Model struct {
 
 	// Task data
 	tasks            []core.Task
+	depTasks         []core.Task          // Dependency tasks not in the main task list (e.g., completed deps)
 	currentSection   *core.Section
 	projectSummaries []core.ProjectSummary // Project summaries for Projects tab
 
@@ -410,6 +411,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.tasks = msg.Tasks
+		m.depTasks = nil // Reset cached dependency tasks on reload
 		m.errorMessage = ""
 
 		// Note: Projects/tags for autocompletion are loaded separately via AutocompleteDataLoadedMsg
@@ -424,7 +426,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// For Projects view, load summaries to get completion percentages
 				// We'll build groups when summaries arrive
 				m.isLoading = true
-				return m, loadProjectSummaryCmd(m.service)
+				depCmd := loadMissingDepTasksCmd(m.service, m.tasks)
+				return m, tea.Batch(loadProjectSummaryCmd(m.service), depCmd)
 			} else if m.sections.IsTagsView() {
 				m.groups = core.GroupByTag(m.tasks)
 				// Show group list in the task list component
@@ -450,6 +453,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateSidebar()
 		}
 
+		// Load dependency tasks that aren't in the current task list
+		return m, loadMissingDepTasksCmd(m.service, m.tasks)
+
+	case DepTasksLoadedMsg:
+		if msg.Err == nil && len(msg.Tasks) > 0 {
+			m.depTasks = msg.Tasks
+			// Merge main tasks and dependency tasks for sidebar lookups
+			merged := make([]core.Task, 0, len(m.tasks)+len(m.depTasks))
+			merged = append(merged, m.tasks...)
+			merged = append(merged, m.depTasks...)
+			m.sidebar.SetAllTasks(merged)
+		}
 		return m, nil
 
 	case ProjectSummaryLoadedMsg:
@@ -2206,6 +2221,47 @@ func loadTasksCmd(service core.TaskService, filter string, isSearchTab bool) tea
 			Tasks: tasks,
 			Err:   err,
 		}
+	}
+}
+
+// loadMissingDepTasksCmd collects dependency UUIDs not present in the current
+// task list and loads them so the sidebar can display their descriptions.
+func loadMissingDepTasksCmd(service core.TaskService, tasks []core.Task) tea.Cmd {
+	// Build set of known UUIDs
+	known := make(map[string]struct{}, len(tasks))
+	for _, t := range tasks {
+		known[t.UUID] = struct{}{}
+	}
+
+	// Collect missing dependency UUIDs
+	missing := make(map[string]struct{})
+	for _, t := range tasks {
+		for _, dep := range t.Depends {
+			if _, ok := known[dep]; !ok {
+				missing[dep] = struct{}{}
+			}
+		}
+	}
+
+	if len(missing) == 0 {
+		return nil
+	}
+
+	// Build a filter to fetch all missing deps in one call
+	var parts []string
+	for uuid := range missing {
+		parts = append(parts, uuid)
+	}
+
+	return func() tea.Msg {
+		var allTasks []core.Task
+		for _, uuid := range parts {
+			fetched, err := service.Export(uuid)
+			if err == nil {
+				allTasks = append(allTasks, fetched...)
+			}
+		}
+		return DepTasksLoadedMsg{Tasks: allTasks}
 	}
 }
 

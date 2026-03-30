@@ -624,6 +624,16 @@ func TestCompletedDependencyDisplay(t *testing.T) {
 		t.Error("Expected pending dependency to show with ID")
 	}
 
+	// Verify completed dependencies appear after pending ones
+	pendingIdx := strings.Index(view, "Pending dependency task")
+	completedIdx := strings.Index(view, "Completed dependency task")
+	if pendingIdx == -1 || completedIdx == -1 {
+		t.Fatal("Expected both pending and completed dependency to be in view")
+	}
+	if completedIdx < pendingIdx {
+		t.Error("Expected completed dependencies to appear after pending ones")
+	}
+
 	// Verify the "Blocked by" label is present
 	if !strings.Contains(view, "Blocked by:") {
 		t.Error("Expected 'Blocked by:' label in view")

@@ -62,3 +62,9 @@ type AutocompleteDataLoadedMsg struct {
 	Tags     []string
 	Err      error
 }
+
+// DepTasksLoadedMsg is sent when dependency tasks (not in the main task list) have been loaded
+type DepTasksLoadedMsg struct {
+	Tasks []core.Task
+	Err   error
+}

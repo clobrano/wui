@@ -468,11 +468,12 @@ func (s Sidebar) renderDependencies() string {
 	var lines []string
 	lines = append(lines, s.styles.Label.Underline(true).Render("Dependencies"))
 
+	var completedLines []string
 	for _, uuid := range s.task.Depends {
 		depTask := s.findTaskByUUID(uuid)
 		if depTask != nil {
 			if depTask.Status == "completed" {
-				lines = append(lines, fmt.Sprintf("  ✓ %s", depTask.Description))
+				completedLines = append(completedLines, fmt.Sprintf("  ✓ %s", depTask.Description))
 			} else {
 				lines = append(lines, fmt.Sprintf("  ○ #%d: %s", depTask.ID, depTask.Description))
 			}
@@ -484,6 +485,7 @@ func (s Sidebar) renderDependencies() string {
 			lines = append(lines, fmt.Sprintf("  ○ %s", shortUUID))
 		}
 	}
+	lines = append(lines, completedLines...)
 
 	return strings.Join(lines, "\n")
 }
