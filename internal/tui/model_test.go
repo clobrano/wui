@@ -329,3 +329,48 @@ func TestInitWithSearchFilterWithStatus(t *testing.T) {
 		t.Errorf("Expected filter 'status:completed due:today' to be used, got '%s'", filterCalled)
 	}
 }
+
+func TestLoadMissingDepTasksCmd(t *testing.T) {
+	t.Run("returns nil when no missing deps", func(t *testing.T) {
+		tasks := []core.Task{
+			{UUID: "aaa", Depends: []string{"bbb"}},
+			{UUID: "bbb", Description: "Already loaded"},
+		}
+		service := &core.MockTaskService{}
+		cmd := loadMissingDepTasksCmd(service, tasks)
+		if cmd != nil {
+			t.Error("Expected nil command when all deps are present")
+		}
+	})
+
+	t.Run("loads missing dependency tasks", func(t *testing.T) {
+		tasks := []core.Task{
+			{UUID: "aaa", Depends: []string{"completed-uuid"}},
+		}
+		service := &core.MockTaskService{
+			ExportFunc: func(filter string) ([]core.Task, error) {
+				if filter == "completed-uuid" {
+					return []core.Task{
+						{UUID: "completed-uuid", Description: "Completed dep", Status: "completed"},
+					}, nil
+				}
+				return nil, nil
+			},
+		}
+		cmd := loadMissingDepTasksCmd(service, tasks)
+		if cmd == nil {
+			t.Fatal("Expected command for missing deps")
+		}
+		msg := cmd()
+		depMsg, ok := msg.(DepTasksLoadedMsg)
+		if !ok {
+			t.Fatalf("Expected DepTasksLoadedMsg, got %T", msg)
+		}
+		if len(depMsg.Tasks) != 1 {
+			t.Fatalf("Expected 1 dep task, got %d", len(depMsg.Tasks))
+		}
+		if depMsg.Tasks[0].Description != "Completed dep" {
+			t.Errorf("Expected description 'Completed dep', got '%s'", depMsg.Tasks[0].Description)
+		}
+	})
+}
