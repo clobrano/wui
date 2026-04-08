@@ -13,6 +13,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/clobrano/wui/internal/calendar"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
@@ -1653,13 +1654,14 @@ func (m *Model) updateComponentSizes() {
 	// Update help component size
 	m.help.SetSize(m.width, m.height)
 
-	// Calculate available height (subtract sections bar, footer, bottom border, and spacing)
-	// Note: The actual space calculation must match view.go's trimming logic
-	// - Sections bar: 1 line
-	// - Footer: 3 lines (1 pad top + 1 content + 1 pad bottom)
-	// - Bottom border: 1 line (added in renderTaskListWithComponents)
-	// - Additional spacing/margins: 2 lines (empirically determined to prevent trimming)
-	availableHeight := m.height - 7 // sections(1) + footer(3) + bottom border(1) + spacing(2)
+	// Calculate available height by measuring actual rendered component heights.
+	// This accounts for footer text wrapping on small screens.
+	sectionsBar := m.renderSections()
+	sectionsHeight := lipgloss.Height(sectionsBar)
+	footer := m.renderFooter()
+	footerHeight := lipgloss.Height(footer)
+	bottomBorderHeight := 1 // Added in renderTaskListWithComponents
+	availableHeight := m.height - sectionsHeight - footerHeight - bottomBorderHeight
 
 	// If in input mode, subtract input prompt area (2 lines: separator + input)
 	if m.state == StateFilterInput || m.state == StateModifyInput ||

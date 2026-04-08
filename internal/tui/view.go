@@ -19,10 +19,10 @@ func (m Model) View() string {
 	footer := m.renderFooter()
 
 	// Calculate actual heights
-	sectionsHeight := strings.Count(sectionsBar, "\n") + 1
+	sectionsHeight := lipgloss.Height(sectionsBar)
 	contentLines := strings.Split(content, "\n")
-	// Footer has padding(1,1) which adds 2 extra lines (top and bottom)
-	footerHeight := strings.Count(footer, "\n") + 1 + 2 // +2 for vertical padding
+	// lipgloss.Height accounts for padding already included in the rendered string
+	footerHeight := lipgloss.Height(footer)
 
 	// Ensure content doesn't exceed available space
 	// Reserve space for the bottom border line (1 line)
