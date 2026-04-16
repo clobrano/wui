@@ -546,15 +546,34 @@ func (t *TaskList) updateScroll() {
 		maxOffset = 0
 	}
 
-	// Ensure cursor row is visible
-	// If cursor start is above viewport, scroll up
-	if cursorStartLine < t.offset {
-		t.offset = cursorStartLine
+	// Calculate buffer zone in lines: include scrollBuffer tasks above/below cursor
+	bufferAboveLine := cursorStartLine
+	if t.scrollBuffer > 0 {
+		bufferStart := t.cursor - t.scrollBuffer
+		if bufferStart < 0 {
+			bufferStart = 0
+		}
+		bufferAboveLine = t.getRowStartLine(bufferStart)
 	}
 
-	// If cursor end is below viewport, scroll down
-	if cursorEndLine > t.offset+visibleHeight {
-		t.offset = cursorEndLine - visibleHeight
+	bufferBelowLine := cursorEndLine
+	if t.scrollBuffer > 0 {
+		bufferEnd := t.cursor + t.scrollBuffer + 1
+		if bufferEnd > len(t.rowHeights) {
+			bufferEnd = len(t.rowHeights)
+		}
+		bufferBelowLine = t.getRowStartLine(bufferEnd)
+	}
+
+	// Ensure cursor row plus buffer is visible
+	// If buffer zone above cursor is above viewport, scroll up
+	if bufferAboveLine < t.offset {
+		t.offset = bufferAboveLine
+	}
+
+	// If buffer zone below cursor is below viewport, scroll down
+	if bufferBelowLine > t.offset+visibleHeight {
+		t.offset = bufferBelowLine - visibleHeight
 	}
 
 	// Clamp offset
@@ -585,7 +604,7 @@ func (t *TaskList) updateScrollSimple() {
 	// Calculate how many tasks can fit in viewport
 	visibleTasks := visibleHeight
 	if isSmallScreen {
-		visibleTasks = visibleHeight / 2 // Each task takes 2 lines
+		visibleTasks = visibleHeight / t.smallScreenLinesPerTask()
 	}
 
 	// Ensure we have at least 1 visible task
@@ -679,8 +698,8 @@ func (t TaskList) renderTaskList() string {
 	visibleHeight := t.height - headerHeight
 
 	if isSmallScreen {
-		// Small screen mode: fixed 2 lines per task
-		maxVisibleTasks := visibleHeight / 2
+		// Small screen mode: lines per task depends on configured narrow view fields
+		maxVisibleTasks := visibleHeight / t.smallScreenLinesPerTask()
 		endIdx := t.offset + maxVisibleTasks
 		if endIdx > len(t.tasks) {
 			endIdx = len(t.tasks)
@@ -919,6 +938,12 @@ func (t TaskList) needsSmallScreenMode() bool {
 		}
 	}
 	return t.width < requiredWidth
+}
+
+// smallScreenLinesPerTask returns the number of lines each task occupies in small screen mode.
+// This is 1 line for the description plus 1 line per configured narrow view field.
+func (t TaskList) smallScreenLinesPerTask() int {
+	return 1 + len(t.narrowViewFields)
 }
 
 // calculateColumnWidths determines column widths based on available space
