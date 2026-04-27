@@ -2217,6 +2217,15 @@ func loadTasksCmd(service core.TaskService, filter string, isSearchTab bool) tea
 		}
 
 		tasks, err := service.Export(actualFilter)
+		if err == nil && !isSearchTab {
+			filtered := tasks[:0]
+			for _, t := range tasks {
+				if t.Status != "recurring" {
+					filtered = append(filtered, t)
+				}
+			}
+			tasks = filtered
+		}
 		return TasksLoadedMsg{
 			Tasks: tasks,
 			Err:   err,
