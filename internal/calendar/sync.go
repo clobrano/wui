@@ -68,6 +68,16 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 		return nil, fmt.Errorf("failed to get tasks: %w", err)
 	}
 
+	// Exclude recurring template tasks — they are internal Taskwarrior templates,
+	// not actual task instances, and should never be synced to the calendar.
+	filtered := tasks[:0]
+	for _, t := range tasks {
+		if t.Status != "recurring" {
+			filtered = append(filtered, t)
+		}
+	}
+	tasks = filtered
+
 	slog.Info("Retrieved tasks", "count", len(tasks))
 
 	// Get existing events from calendar
