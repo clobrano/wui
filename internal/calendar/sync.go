@@ -196,6 +196,24 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 		}
 	}
 
+	// Delete any existing calendar events that belong to recurring template tasks.
+	// These templates may have been synced before this exclusion was enforced.
+	recurringTemplates, err := s.taskClient.Export("status:recurring")
+	if err != nil {
+		slog.Warn("Could not fetch recurring templates for cleanup", "error", err)
+	} else {
+		for _, rt := range recurringTemplates {
+			if existingEvent, exists := eventMap[rt.UUID]; exists {
+				slog.Info("Deleting calendar event for recurring template task", "uuid", rt.UUID, "description", rt.Description)
+				if err := s.deleteEvent(ctx, calendarID, existingEvent.Id); err != nil {
+					slog.Error("Failed to delete event for recurring template", "uuid", rt.UUID, "error", err)
+				} else {
+					deleted++
+				}
+			}
+		}
+	}
+
 	// Populate result
 	result.Total = len(tasks)
 	result.Created = created
