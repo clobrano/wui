@@ -6,7 +6,8 @@
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features-at-a-glance">Features</a> &bull;
   <a href="#configuration">Configuration</a> &bull;
-  <a href="#google-calendar-sync">Calendar Sync</a>
+  <a href="#google-calendar-sync">Calendar Sync</a> &bull;
+  <a href="#api-server">API Server</a>
 </p>
 
 ---
@@ -30,6 +31,7 @@ That's it. Press `?` for help.
 - **Batch operations** &mdash; select multiple tasks with `Space`, then act on all of them at once
 - **Custom commands** &mdash; wire up any key to run a shell command with task data (`xdg-open {{.url}}`, copy to clipboard, git clone, etc.)
 - **Google Calendar sync** &mdash; push tasks to your calendar with `wui sync`
+- **REST API server** &mdash; run `wui serve` to expose the Taskwarrior backend over HTTP for Flutter, web, or any other client
 - **Fully configurable** &mdash; tabs, columns, keybindings, themes, sort order &mdash; your workflow, your rules
 - **Respects your `.taskrc`** &mdash; reads your existing Taskwarrior contexts and settings
 
@@ -90,6 +92,9 @@ wui --search "project:Home +urgent"
 
 # Sync tasks to Google Calendar
 wui sync
+
+# Start the REST API server (default: localhost:7007)
+wui serve
 
 # Show version
 wui version
@@ -426,14 +431,20 @@ On first run, you'll authorize via browser. The token is saved to `~/.config/wui
 wui                              Launch the TUI
 wui version                      Print version info
 wui sync                         Sync tasks to Google Calendar
+wui serve                        Start the REST API server
 
-Flags:
+Flags (all commands):
   --config string                Config file path (default: ~/.config/wui/config.yaml)
   --taskrc string                Taskrc file path (default: ~/.taskrc)
   --task-bin string              Task binary path (default: /usr/local/bin/task)
-  --search string                Open in Search tab with a pre-applied filter
   --log-level string             Log level: debug, info, warn, error (default: error)
   --log-format string            Log format: text, json (default: text)
+
+wui flags:
+  --search string                Open in Search tab with a pre-applied filter
+
+wui serve flags:
+  --addr string                  Address to listen on (default: localhost:7007)
 ```
 
 ### Logging
@@ -466,6 +477,105 @@ wui is inspired by [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui
 | Multi-select | Batch operations on selected tasks | &mdash; |
 | Markdown export | Copy tasks to clipboard | &mdash; |
 | Short view | Auto-adapts to narrow terminals | &mdash; |
+
+## API Server
+
+`wui serve` starts a lightweight REST/JSON HTTP server backed by the same Taskwarrior client that the TUI uses. This lets any HTTP-capable client — Flutter, a web app, scripts, other terminals — drive the same business logic without running the TUI.
+
+```bash
+# Listen on localhost only (default)
+wui serve
+
+# Listen on all interfaces (e.g. to reach from a phone on the same network)
+wui serve --addr :7007
+```
+
+The server shuts down cleanly on `Ctrl+C`.
+
+### Endpoints
+
+All paths are under `/api/v1`. Requests and responses use JSON.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/api/v1/tasks` | List tasks. Optional `?filter=` query param uses Taskwarrior filter syntax. |
+| `POST` | `/api/v1/tasks` | Create a task. Body: `{"description": "Buy milk +shopping"}` |
+| `PUT` | `/api/v1/tasks/{uuid}` | Modify a task. Body: `{"modifications": "priority:H due:tomorrow"}` |
+| `DELETE` | `/api/v1/tasks/{uuid}` | Delete a task. |
+| `POST` | `/api/v1/tasks/{uuid}/done` | Mark a task done. |
+| `POST` | `/api/v1/tasks/{uuid}/start` | Start a task. |
+| `POST` | `/api/v1/tasks/{uuid}/stop` | Stop a task. |
+| `POST` | `/api/v1/tasks/{uuid}/annotate` | Add an annotation. Body: `{"text": "See ticket #42"}` |
+| `POST` | `/api/v1/undo` | Undo the last Taskwarrior operation. |
+| `GET` | `/api/v1/projects` | List project summaries with completion percentages. |
+
+### Quick Examples
+
+```bash
+# List pending tasks in a project
+curl "http://localhost:7007/api/v1/tasks?filter=project:Home+status:pending"
+
+# Add a task
+curl -X POST http://localhost:7007/api/v1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"description": "Fix the leak +home"}'
+
+# Mark a task done
+curl -X POST http://localhost:7007/api/v1/tasks/<uuid>/done
+
+# Modify priority and due date
+curl -X PUT http://localhost:7007/api/v1/tasks/<uuid> \
+  -H "Content-Type: application/json" \
+  -d '{"modifications": "priority:H due:friday"}'
+```
+
+### Response Format
+
+`GET /api/v1/tasks` returns a JSON array of task objects. All date fields use RFC 3339 (UTC):
+
+```json
+[
+  {
+    "id": 1,
+    "uuid": "a1b2c3d4-...",
+    "description": "Fix the leak",
+    "project": "Home",
+    "tags": ["home"],
+    "priority": "H",
+    "status": "pending",
+    "due": "2026-05-15T00:00:00Z",
+    "entry": "2026-05-10T08:00:00Z",
+    "urgency": 8.5,
+    "annotations": [
+      { "entry": "2026-05-10T09:00:00Z", "description": "Called plumber" }
+    ]
+  }
+]
+```
+
+### Using from Flutter
+
+Add the `http` package to your Flutter project and point it at `wui serve`:
+
+```dart
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+const base = 'http://localhost:7007/api/v1';
+
+Future<List<dynamic>> fetchTasks({String filter = ''}) async {
+  final uri = Uri.parse('$base/tasks').replace(
+    queryParameters: filter.isNotEmpty ? {'filter': filter} : null,
+  );
+  final res = await http.get(uri);
+  return jsonDecode(res.body) as List<dynamic>;
+}
+
+Future<void> completeTask(String uuid) =>
+    http.post(Uri.parse('$base/tasks/$uuid/done'));
+```
+
+> **Security note:** The server has no built-in authentication. Run it on `localhost` (the default) or inside a trusted network. Do not expose it directly to the internet.
 
 ## Development
 
