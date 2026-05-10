@@ -6,7 +6,11 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"os/signal"
+	"syscall"
+	"time"
 
+	"github.com/clobrano/wui/internal/api"
 	"github.com/clobrano/wui/internal/calendar"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/taskwarrior"
@@ -51,6 +55,41 @@ var (
 	syncTaskFilter   string
 )
 
+var serveAddr string
+
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "Start the REST API server",
+	Long: `Start the wui REST/JSON API server.
+
+The server exposes the Taskwarrior backend over HTTP so that alternative UIs
+(Flutter, web, CLI scripts) can drive the same business logic as the TUI.
+
+API base: http://<addr>/api/v1
+
+Endpoints:
+  GET    /api/v1/tasks               list tasks (optional ?filter= query param)
+  POST   /api/v1/tasks               create a task  {"description":"..."}
+  PUT    /api/v1/tasks/{uuid}         modify a task  {"modifications":"priority:H"}
+  DELETE /api/v1/tasks/{uuid}         delete a task
+  POST   /api/v1/tasks/{uuid}/done    mark done
+  POST   /api/v1/tasks/{uuid}/start   start
+  POST   /api/v1/tasks/{uuid}/stop    stop
+  POST   /api/v1/tasks/{uuid}/annotate add annotation  {"text":"..."}
+  POST   /api/v1/undo                undo last operation
+  GET    /api/v1/projects            list project summaries
+
+Examples:
+  wui serve                    # Listen on localhost:7007
+  wui serve --addr :7007       # Listen on all interfaces`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := runServe(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync Taskwarrior tasks to Google Calendar",
@@ -85,6 +124,10 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(serveCmd)
+
+	// Serve command flags
+	serveCmd.Flags().StringVar(&serveAddr, "addr", "localhost:7007", "address to listen on (host:port)")
 
 	// Sync command flags (optional - override config file values)
 	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
@@ -263,6 +306,62 @@ Visit https://taskwarrior.org for more information.`, err)
 
 	slog.Debug("Task binary found", "path", path)
 	return nil
+}
+
+// runServe starts the REST API server backed by the local Taskwarrior installation.
+func runServe() error {
+	cfgPath := config.ResolveConfigPath(configPath)
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		initLogging(nil)
+		slog.Error("Failed to load config", "error", err, "path", cfgPath)
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	initLogging(cfg)
+	slog.Info("Starting wui API server", "version", version.GetVersion())
+
+	if taskBinPath != "" {
+		cfg.TaskBin = taskBinPath
+	}
+	if taskrcPath != "" {
+		cfg.TaskrcPath = taskrcPath
+	}
+
+	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		return err
+	}
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
+		return err
+	}
+
+	client, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
+	if err != nil {
+		return fmt.Errorf("failed to create taskwarrior client: %w", err)
+	}
+
+	srv := api.NewServer(client, serveAddr)
+
+	// Graceful shutdown on SIGINT / SIGTERM
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.Start() }()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-stop:
+		fmt.Println("\nShutting down...")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return srv.Shutdown(ctx)
+	}
 }
 
 // runSync performs the Google Calendar sync operation
