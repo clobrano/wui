@@ -136,6 +136,7 @@ func DefaultKeybindings() map[string]string {
 		"edit":     "e",
 		"modify":   "m",
 		"annotate": "a",
+		"todo":     "t",
 		"new":      "n",
 		"undo":     "u",
 		"open_url": "o",
@@ -179,6 +180,7 @@ func GetInternalShortcuts(keybindings map[string]string) map[string]string {
 	shortcuts[getKey("edit", "e")] = "edit"
 	shortcuts[getKey("modify", "m")] = "modify"
 	shortcuts[getKey("annotate", "a")] = "annotate"
+	shortcuts[getKey("todo", "t")] = "add TODO annotation"
 	shortcuts[getKey("new", "n")] = "new task"
 	shortcuts[getKey("undo", "u")] = "undo"
 	shortcuts[getKey("open_url", "o")] = "open URL/file from annotation"
