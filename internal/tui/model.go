@@ -1509,6 +1509,18 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.keyMatches(keyPressed, "todo") {
+		// Add TODO annotation to task(s)
+		selectedTasks := m.taskList.GetSelectedTasks()
+		if len(selectedTasks) > 0 {
+			m.state = StateAnnotateInput
+			m.annotateInput.SetValue("TODO: ")
+			m.updateComponentSizes()
+			return m, m.annotateInput.Focus()
+		}
+		return m, nil
+	}
+
 	if m.keyMatches(keyPressed, "open_url") {
 		// Open URL or file from task annotations
 		if !m.inGroupView {

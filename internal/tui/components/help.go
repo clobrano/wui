@@ -276,6 +276,7 @@ func keybindingGroupsFromConfig(keybindings map[string]string) []KeybindingGroup
 				{Keys: []string{getKey("modify", "m")}, Description: "Modify task(s) (quick edit)"},
 				{Keys: []string{"M"}, Description: "Export task(s) as markdown (to clipboard)"},
 				{Keys: []string{getKey("annotate", "a")}, Description: "Add annotation to task(s)"},
+				{Keys: []string{getKey("todo", "t")}, Description: "Add TODO annotation to task(s)"},
 				{Keys: []string{getKey("open_url", "o")}, Description: "Open URL from annotations"},
 				{Keys: []string{getKey("undo", "u")}, Description: "Undo last operation"},
 			},
