@@ -68,6 +68,16 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 		return nil, fmt.Errorf("failed to get tasks: %w", err)
 	}
 
+	// Exclude recurring template tasks — they are internal Taskwarrior templates,
+	// not actual task instances, and should never be synced to the calendar.
+	filtered := tasks[:0]
+	for _, t := range tasks {
+		if t.Status != "recurring" {
+			filtered = append(filtered, t)
+		}
+	}
+	tasks = filtered
+
 	slog.Info("Retrieved tasks", "count", len(tasks))
 
 	// Get existing events from calendar
@@ -183,6 +193,24 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 				continue
 			}
 			created++
+		}
+	}
+
+	// Delete any existing calendar events that belong to recurring template tasks.
+	// These templates may have been synced before this exclusion was enforced.
+	recurringTemplates, err := s.taskClient.Export("status:recurring")
+	if err != nil {
+		slog.Warn("Could not fetch recurring templates for cleanup", "error", err)
+	} else {
+		for _, rt := range recurringTemplates {
+			if existingEvent, exists := eventMap[rt.UUID]; exists {
+				slog.Info("Deleting calendar event for recurring template task", "uuid", rt.UUID, "description", rt.Description)
+				if err := s.deleteEvent(ctx, calendarID, existingEvent.Id); err != nil {
+					slog.Error("Failed to delete event for recurring template", "uuid", rt.UUID, "error", err)
+				} else {
+					deleted++
+				}
+			}
 		}
 	}
 
