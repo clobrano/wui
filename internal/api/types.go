@@ -67,6 +67,17 @@ type ErrorResponse struct {
 	Error string `json:"error"`
 }
 
+// VersionResponse is the response for GET /api/v1/version.
+type VersionResponse struct {
+	WuiVersion  string `json:"wui_version"`
+	TaskVersion string `json:"task_version"`
+}
+
+// DenotateRequest is the body for DELETE /api/v1/tasks/{uuid}/annotate.
+type DenotateRequest struct {
+	Description string `json:"description"`
+}
+
 // taskToDTO converts a core.Task to a TaskDTO.
 func taskToDTO(t core.Task) TaskDTO {
 	dto := TaskDTO{

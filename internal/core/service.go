@@ -51,4 +51,16 @@ type TaskService interface {
 	// GetProjectSummary retrieves project completion data from task summary
 	// Returns a slice of ProjectSummary or an error if the operation fails
 	GetProjectSummary() ([]ProjectSummary, error)
+
+	// GetTags returns all tags currently in use across tasks
+	GetTags() ([]string, error)
+
+	// GetUdas returns the names of all User Defined Attributes configured in taskwarrior
+	GetUdas() ([]string, error)
+
+	// GetVersion returns the version string of the underlying taskwarrior installation
+	GetVersion() (string, error)
+
+	// Denotate removes an annotation from a task matching the given description
+	Denotate(uuid, description string) error
 }

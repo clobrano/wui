@@ -256,6 +256,60 @@ func (c *Client) runCommand(args ...string) ([]byte, error) {
 	return stdout.Bytes(), nil
 }
 
+// GetTags returns all tags currently in use across tasks
+func (c *Client) GetTags() ([]string, error) {
+	args := c.buildArgs("_tags")
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tags: %w", err)
+	}
+	return parseLines(output), nil
+}
+
+// GetUdas returns the names of all User Defined Attributes configured in taskwarrior
+func (c *Client) GetUdas() ([]string, error) {
+	args := c.buildArgs("_udas")
+	output, err := c.runCommand(args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get UDAs: %w", err)
+	}
+	return parseLines(output), nil
+}
+
+// GetVersion returns the version string of the underlying taskwarrior installation
+func (c *Client) GetVersion() (string, error) {
+	cmd := exec.Command(c.taskBin, "--version")
+	if c.taskrcPath != "" {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("TASKRC=%s", c.taskrcPath))
+	}
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get taskwarrior version: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// Denotate removes an annotation from a task matching the given description
+func (c *Client) Denotate(uuid, description string) error {
+	args := c.buildArgs(uuid, "denotate", description)
+	_, err := c.runCommand(args...)
+	if err != nil {
+		return fmt.Errorf("failed to denotate task %s: %w", uuid, err)
+	}
+	return nil
+}
+
+// parseLines splits newline-delimited output into a trimmed, non-empty slice
+func parseLines(output []byte) []string {
+	var result []string
+	for _, line := range strings.Split(string(output), "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			result = append(result, line)
+		}
+	}
+	return result
+}
+
 // GetProjectSummary retrieves project completion data from task summary
 func (c *Client) GetProjectSummary() ([]core.ProjectSummary, error) {
 	args := c.buildArgs("summary")

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/clobrano/wui/internal/core"
+	"github.com/clobrano/wui/internal/version"
 )
 
 // handlers holds the TaskService and provides HTTP handler methods.
@@ -206,4 +207,66 @@ func (h *handlers) listProjects(w http.ResponseWriter, r *http.Request) {
 		dtos[i] = projectSummaryToDTO(s)
 	}
 	writeJSON(w, http.StatusOK, dtos)
+}
+
+// listTags handles GET /api/v1/tags
+func (h *handlers) listTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := h.svc.GetTags()
+	if err != nil {
+		slog.Error("GetTags failed", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, tags)
+}
+
+// listUdas handles GET /api/v1/udas
+func (h *handlers) listUdas(w http.ResponseWriter, r *http.Request) {
+	udas, err := h.svc.GetUdas()
+	if err != nil {
+		slog.Error("GetUdas failed", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, udas)
+}
+
+// getVersion handles GET /api/v1/version
+func (h *handlers) getVersion(w http.ResponseWriter, r *http.Request) {
+	taskVersion, err := h.svc.GetVersion()
+	if err != nil {
+		slog.Error("GetVersion failed", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, VersionResponse{
+		WuiVersion:  version.GetVersion(),
+		TaskVersion: taskVersion,
+	})
+}
+
+// denotateTask handles DELETE /api/v1/tasks/{uuid}/annotate
+func (h *handlers) denotateTask(w http.ResponseWriter, r *http.Request) {
+	uuid := r.PathValue("uuid")
+	if uuid == "" {
+		writeError(w, http.StatusBadRequest, "uuid is required")
+		return
+	}
+
+	var req DenotateRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if strings.TrimSpace(req.Description) == "" {
+		writeError(w, http.StatusBadRequest, "description is required")
+		return
+	}
+
+	if err := h.svc.Denotate(uuid, req.Description); err != nil {
+		slog.Error("Denotate task failed", "uuid", uuid, "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

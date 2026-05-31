@@ -4,16 +4,20 @@
 //
 // API base path: /api/v1
 //
-//	GET    /api/v1/tasks               list tasks (optional ?filter= query param)
-//	POST   /api/v1/tasks               create a task
-//	PUT    /api/v1/tasks/{uuid}         modify a task
-//	DELETE /api/v1/tasks/{uuid}         delete a task
-//	POST   /api/v1/tasks/{uuid}/done    mark a task done
-//	POST   /api/v1/tasks/{uuid}/start   start a task
-//	POST   /api/v1/tasks/{uuid}/stop    stop a task
-//	POST   /api/v1/tasks/{uuid}/annotate add an annotation
-//	POST   /api/v1/undo                undo last operation
-//	GET    /api/v1/projects            list project summaries
+//	GET    /api/v1/tasks                    list tasks (optional ?filter= query param)
+//	POST   /api/v1/tasks                    create a task
+//	PUT    /api/v1/tasks/{uuid}              modify a task
+//	DELETE /api/v1/tasks/{uuid}              delete a task
+//	POST   /api/v1/tasks/{uuid}/done         mark a task done
+//	POST   /api/v1/tasks/{uuid}/start        start a task
+//	POST   /api/v1/tasks/{uuid}/stop         stop a task
+//	POST   /api/v1/tasks/{uuid}/annotate     add an annotation
+//	DELETE /api/v1/tasks/{uuid}/annotate     remove an annotation (denotate)
+//	POST   /api/v1/undo                     undo last operation
+//	GET    /api/v1/projects                 list project summaries
+//	GET    /api/v1/tags                     list all tags in use
+//	GET    /api/v1/udas                     list User Defined Attribute names
+//	GET    /api/v1/version                  wui and taskwarrior version info
 package api
 
 import (
@@ -61,8 +65,12 @@ func registerRoutes(mux *http.ServeMux, h *handlers) {
 	mux.HandleFunc("POST /api/v1/tasks/{uuid}/start", h.startTask)
 	mux.HandleFunc("POST /api/v1/tasks/{uuid}/stop", h.stopTask)
 	mux.HandleFunc("POST /api/v1/tasks/{uuid}/annotate", h.annotateTask)
+	mux.HandleFunc("DELETE /api/v1/tasks/{uuid}/annotate", h.denotateTask)
 	mux.HandleFunc("POST /api/v1/undo", h.undoLast)
 	mux.HandleFunc("GET /api/v1/projects", h.listProjects)
+	mux.HandleFunc("GET /api/v1/tags", h.listTags)
+	mux.HandleFunc("GET /api/v1/udas", h.listUdas)
+	mux.HandleFunc("GET /api/v1/version", h.getVersion)
 }
 
 // Start begins listening and serving requests. It blocks until the server stops.

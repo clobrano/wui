@@ -15,6 +15,10 @@ type MockTaskService struct {
 	StartFunc            func(uuid string) error
 	StopFunc             func(uuid string) error
 	GetProjectSummaryFunc func() ([]ProjectSummary, error)
+	GetTagsFunc           func() ([]string, error)
+	GetUdasFunc           func() ([]string, error)
+	GetVersionFunc        func() (string, error)
+	DenotateFunc          func(uuid, description string) error
 }
 
 func (m *MockTaskService) Export(filter string) ([]Task, error) {
@@ -92,4 +96,32 @@ func (m *MockTaskService) GetProjectSummary() ([]ProjectSummary, error) {
 		return m.GetProjectSummaryFunc()
 	}
 	return nil, errors.New("not implemented")
+}
+
+func (m *MockTaskService) GetTags() ([]string, error) {
+	if m.GetTagsFunc != nil {
+		return m.GetTagsFunc()
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockTaskService) GetUdas() ([]string, error) {
+	if m.GetUdasFunc != nil {
+		return m.GetUdasFunc()
+	}
+	return nil, errors.New("not implemented")
+}
+
+func (m *MockTaskService) GetVersion() (string, error) {
+	if m.GetVersionFunc != nil {
+		return m.GetVersionFunc()
+	}
+	return "", errors.New("not implemented")
+}
+
+func (m *MockTaskService) Denotate(uuid, description string) error {
+	if m.DenotateFunc != nil {
+		return m.DenotateFunc(uuid, description)
+	}
+	return errors.New("not implemented")
 }
