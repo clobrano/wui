@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
 	"github.com/clobrano/wui/internal/core"
@@ -125,35 +126,31 @@ func (c *Client) Delete(uuid string) error {
 }
 
 // Add creates a new task
+var createdTaskIDRe = regexp.MustCompile(`Created task (\d+)`)
+
 func (c *Client) Add(description string) (string, error) {
-	// Split description into separate arguments so taskwarrior parses them correctly
-	// e.g., "Buy milk project:home +shopping" becomes ["Buy", "milk", "project:home", "+shopping"]
 	descArgs := strings.Fields(description)
 	args := append([]string{"add"}, descArgs...)
 	args = c.buildArgs(args...)
-	_, err := c.runCommand(args...)
+	output, err := c.runCommand(args...)
 	if err != nil {
 		return "", fmt.Errorf("failed to add task: %w", err)
 	}
 
-	// Extract UUID from output
-	// Taskwarrior outputs: "Created task <id>."
-	// We need to export the task to get the UUID
-	// For now, we'll parse it from the last task added
-	// A better approach would be to export with specific filter
-
-	// Run export to get the newly created task
-	// Use a heuristic: get the most recent task
-	tasks, err := c.Export("status:pending limit:1")
-	if err != nil {
-		return "", fmt.Errorf("failed to retrieve new task UUID: %w", err)
+	// Parse the numeric task ID from "Created task N." in stdout, then export
+	// that specific task to get its UUID — avoids the unreliable "most urgent" heuristic.
+	if m := createdTaskIDRe.FindSubmatch(output); m != nil {
+		taskID := string(m[1])
+		tasks, err := c.Export(taskID)
+		if err == nil && len(tasks) > 0 {
+			return tasks[0].UUID, nil
+		}
+		slog.Warn("Could not export task by ID after add", "taskID", taskID, "err", err)
+	} else {
+		slog.Warn("Could not parse task ID from 'task add' output", "output", string(output))
 	}
 
-	if len(tasks) == 0 {
-		return "", errors.New("no task found after add")
-	}
-
-	return tasks[0].UUID, nil
+	return "", errors.New("could not determine UUID of the newly created task")
 }
 
 // Undo reverts the last task operation
