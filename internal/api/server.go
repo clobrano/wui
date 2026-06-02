@@ -33,11 +33,14 @@ import (
 // Server is the HTTP API server.
 type Server struct {
 	httpServer *http.Server
+	tlsCert    string
+	tlsKey     string
 }
 
 // NewServer creates a new Server that wraps the given TaskService and listens on addr.
 // addr format: "host:port", e.g. "localhost:7007" or ":7007".
-func NewServer(svc core.TaskService, addr string) *Server {
+// When tlsCert and tlsKey are both non-empty the server uses TLS (HTTPS).
+func NewServer(svc core.TaskService, addr, tlsCert, tlsKey string) *Server {
 	h := &handlers{svc: svc}
 
 	mux := http.NewServeMux()
@@ -46,12 +49,29 @@ func NewServer(svc core.TaskService, addr string) *Server {
 	return &Server{
 		httpServer: &http.Server{
 			Addr:         addr,
-			Handler:      mux,
+			Handler:      corsMiddleware(mux),
 			ReadTimeout:  30 * time.Second,
 			WriteTimeout: 30 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
+		tlsCert: tlsCert,
+		tlsKey:  tlsKey,
 	}
+}
+
+// corsMiddleware adds permissive CORS headers so browser-based clients
+// (e.g. the Flutter web build) can reach the API from any origin.
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // registerRoutes wires all API endpoints into the mux.
@@ -74,10 +94,22 @@ func registerRoutes(mux *http.ServeMux, h *handlers) {
 }
 
 // Start begins listening and serving requests. It blocks until the server stops.
+// Uses TLS if both tlsCert and tlsKey were provided to NewServer.
 func (s *Server) Start() error {
-	slog.Info("API server listening", "addr", s.httpServer.Addr)
-	fmt.Printf("wui API server listening on %s\n", s.httpServer.Addr)
-	if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	scheme := "http"
+	if s.tlsCert != "" && s.tlsKey != "" {
+		scheme = "https"
+	}
+	slog.Info("API server listening", "addr", s.httpServer.Addr, "scheme", scheme)
+	fmt.Printf("wui API server listening on %s://%s\n", scheme, s.httpServer.Addr)
+
+	var err error
+	if scheme == "https" {
+		err = s.httpServer.ListenAndServeTLS(s.tlsCert, s.tlsKey)
+	} else {
+		err = s.httpServer.ListenAndServe()
+	}
+	if err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
 	}
 	return nil

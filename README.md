@@ -445,6 +445,8 @@ wui flags:
 
 wui serve flags:
   --addr string                  Address to listen on (default: localhost:7007)
+  --tls-cert string              Path to TLS certificate file (enables HTTPS)
+  --tls-key string               Path to TLS private key file (enables HTTPS)
 ```
 
 ### Logging
@@ -506,8 +508,12 @@ All paths are under `/api/v1`. Requests and responses use JSON.
 | `POST` | `/api/v1/tasks/{uuid}/start` | Start a task. |
 | `POST` | `/api/v1/tasks/{uuid}/stop` | Stop a task. |
 | `POST` | `/api/v1/tasks/{uuid}/annotate` | Add an annotation. Body: `{"text": "See ticket #42"}` |
+| `DELETE` | `/api/v1/tasks/{uuid}/annotate` | Remove an annotation. Body: `{"description": "exact text"}` |
 | `POST` | `/api/v1/undo` | Undo the last Taskwarrior operation. |
 | `GET` | `/api/v1/projects` | List project summaries with completion percentages. |
+| `GET` | `/api/v1/tags` | List all tags in use. Returns `["tag1", "tag2", ...]` |
+| `GET` | `/api/v1/udas` | List User Defined Attribute names. Returns `["uda1", "uda2", ...]` |
+| `GET` | `/api/v1/version` | wui and Taskwarrior version info. |
 
 ### Quick Examples
 
@@ -553,7 +559,39 @@ curl -X PUT http://localhost:7007/api/v1/tasks/<uuid> \
 ]
 ```
 
-### Using from Flutter
+### Using from the wui-android Flutter app (Android, Linux, Web)
+
+[wui-android](https://github.com/clobrano/wui-android) is a Flutter front-end that can connect to `wui serve` instead of running the Taskwarrior binary locally. It supports Android, Linux desktop, and browser (web) builds.
+
+**Android / Linux desktop**
+
+```bash
+# In the wui-android repo
+flutter pub get
+
+# Android APK
+flutter build apk --release --split-per-abi
+adb install build/app/outputs/flutter-apk/app-release-arm64-v8a.apk
+
+# Linux desktop
+flutter build linux --release
+```
+
+Open Settings in the app and set the **Remote server URL** to `http://<host>:7007/api/v1`.
+
+**Web (browser)**
+
+```bash
+flutter build web --release
+# Serve the output with any static file server, e.g.:
+python3 -m http.server 8080 --directory build/web
+```
+
+Then open `http://localhost:8080` in a browser. Set the Remote server URL in Settings the same way.
+
+The web build cannot run the local Taskwarrior binary, so a running `wui serve` instance is required. The server already includes CORS headers, so browser requests work without any extra configuration.
+
+### Using from Flutter (custom integration)
 
 Add the `http` package to your Flutter project and point it at `wui serve`:
 
@@ -576,6 +614,38 @@ Future<void> completeTask(String uuid) =>
 ```
 
 > **Security note:** The server has no built-in authentication. Run it on `localhost` (the default) or inside a trusted network. Do not expose it directly to the internet.
+
+### Secure access with Tailscale
+
+When accessing `wui serve` from a mobile device or across machines, [Tailscale](https://tailscale.com) is the recommended approach. Tailscale creates a WireGuard-encrypted mesh VPN between your devices — all traffic through it is encrypted at the network layer, so plain HTTP over a Tailscale connection does not expose data in transit.
+
+**1. Install Tailscale** on both the server machine and the client device, then sign in:
+
+```bash
+tailscale up
+```
+
+**2. Find your server's Tailscale IP:**
+
+```bash
+tailscale ip -4   # e.g. 100.94.12.34
+```
+
+**3. Bind `wui serve` to the Tailscale interface** so it is unreachable from the LAN or internet:
+
+```bash
+wui serve --addr $(tailscale ip -4):7007
+```
+
+**4. Connect from clients** using the Tailscale IP:
+
+```
+http://100.94.12.34:7007/api/v1
+```
+
+Tailscale must be running on both machines whenever the server is in use.
+
+> **HTTPS with a TLS certificate:** if your Tailscale plan supports `tailscale cert`, or if you have a certificate from another source ([mkcert](https://github.com/FiloSottile/mkcert), [Caddy](https://caddyserver.com), etc.), pass it via `--tls-cert` and `--tls-key` to enable native HTTPS. The flags accept any PEM-encoded certificate and RSA/ECDSA private key.
 
 ## Development
 

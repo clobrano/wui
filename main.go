@@ -56,6 +56,8 @@ var (
 )
 
 var serveAddr string
+var serveTLSCert string
+var serveTLSKey string
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
@@ -128,6 +130,8 @@ func init() {
 
 	// Serve command flags
 	serveCmd.Flags().StringVar(&serveAddr, "addr", "localhost:7007", "address to listen on (host:port)")
+	serveCmd.Flags().StringVar(&serveTLSCert, "tls-cert", "", "path to TLS certificate file (enables HTTPS)")
+	serveCmd.Flags().StringVar(&serveTLSKey, "tls-key", "", "path to TLS private key file (enables HTTPS)")
 
 	// Sync command flags (optional - override config file values)
 	syncCmd.Flags().StringVar(&syncCalendarName, "calendar", "", "Google Calendar name (overrides config)")
@@ -344,7 +348,7 @@ func runServe() error {
 		return fmt.Errorf("failed to create taskwarrior client: %w", err)
 	}
 
-	srv := api.NewServer(client, serveAddr)
+	srv := api.NewServer(client, serveAddr, serveTLSCert, serveTLSKey)
 
 	// Graceful shutdown on SIGINT / SIGTERM
 	stop := make(chan os.Signal, 1)
