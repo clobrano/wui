@@ -1256,7 +1256,7 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// In task detail view, handle detail-specific keys
 	if m.viewMode == ViewModeTaskDetail {
 		switch keyPressed {
-		case "esc":
+		case "esc", "enter":
 			m.viewMode = ViewModeList
 			m.updateComponentSizes()
 			return m, nil
@@ -1312,6 +1312,20 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskList.ToggleSelection()
 		}
 		return m, nil
+	}
+
+	// Enter key to return from task detail views
+	if keyPressed == "enter" {
+		if m.viewMode == ViewModeSmallTaskDetail {
+			m.viewMode = ViewModeSmall
+			m.updateComponentSizes()
+			return m, nil
+		}
+		if m.viewMode == ViewModeTaskDetail {
+			m.viewMode = ViewModeList
+			m.updateComponentSizes()
+			return m, nil
+		}
 	}
 
 	// Escape key for clearing selections/going back (not configurable)
