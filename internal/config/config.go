@@ -19,6 +19,11 @@ type CalendarSync struct {
 	AutoSyncOnQuit  bool   `yaml:"auto_sync_on_quit"`
 }
 
+// ServeConfig holds configuration for the wui serve REST API server.
+type ServeConfig struct {
+	Port int `yaml:"port"`
+}
+
 // Config represents the wui configuration
 type Config struct {
 	TaskBin             string        `yaml:"task_bin"`
@@ -26,6 +31,7 @@ type Config struct {
 	LogLevel            string        `yaml:"log_level,omitempty"`
 	TUI                 *TUIConfig    `yaml:"tui"`
 	CalendarSync        *CalendarSync `yaml:"calendar_sync,omitempty"`
+	Serve               *ServeConfig  `yaml:"serve,omitempty"`
 	InitialSearchFilter string        `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
 
@@ -141,6 +147,12 @@ func expandTildePaths(cfg *Config) {
 	}
 }
 
+// ConfigDir returns the default wui configuration directory (~/.config/wui).
+func ConfigDir() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, ".config", "wui")
+}
+
 // ValidateExplicitConfigPath returns an error if the user explicitly provided a
 // config path that does not exist. When no explicit path is given (empty string),
 // validation is skipped because LoadConfig handles the default path by creating it.
@@ -221,6 +233,16 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 	// Merge CalendarSync config
 	if loaded.CalendarSync != nil {
 		result.CalendarSync = loaded.CalendarSync
+	}
+
+	// Merge Serve config
+	if loaded.Serve != nil {
+		if result.Serve == nil {
+			result.Serve = &ServeConfig{}
+		}
+		if loaded.Serve.Port > 0 {
+			result.Serve.Port = loaded.Serve.Port
+		}
 	}
 
 	return result

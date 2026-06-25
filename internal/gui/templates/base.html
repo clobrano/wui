@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wui — Warrior UI</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+</head>
+<body>
+  {{block "content" .}}{{end}}
+
+  <!-- Reconnection overlay (shown by app.js on API errors) -->
+  <div id="reconnect-overlay" class="reconnect-overlay hidden">
+    <div class="reconnect-box">
+      <span class="reconnect-icon">⚠</span>
+      <p>Lost connection to wui serve — retrying…</p>
+    </div>
+  </div>
+
+  <!-- Undo toast (shown by app.js after destructive actions) -->
+  <div id="undo-toast" class="undo-toast hidden">
+    <span id="undo-toast-msg"></span>
+    <button id="undo-btn" onclick="wuiUndo()">Undo</button>
+    <button onclick="wuiDismissToast()">✕</button>
+  </div>
+
+  <!-- Multi-select action bar -->
+  <div id="multiselect-bar" class="multiselect-bar hidden">
+    <span id="multiselect-count"></span>
+    <button onclick="wuiBulkDone()">Done</button>
+    <button onclick="wuiBulkDelete()">Delete</button>
+    <button onclick="wuiExitMultiselect()">✕</button>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

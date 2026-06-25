@@ -1,18 +1,24 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/clobrano/wui/internal/api"
 	"github.com/clobrano/wui/internal/calendar"
 	"github.com/clobrano/wui/internal/config"
+	"github.com/clobrano/wui/internal/gui"
 	"github.com/clobrano/wui/internal/taskwarrior"
 	"github.com/clobrano/wui/internal/tui"
 	"github.com/clobrano/wui/internal/version"
@@ -58,6 +64,36 @@ var (
 var serveAddr string
 var serveTLSCert string
 var serveTLSKey string
+
+var (
+	guiPort    int
+	guiAPIPort int
+)
+
+var guiCmd = &cobra.Command{
+	Use:   "gui",
+	Short: "Start the web GUI",
+	Long: `Start the wui web-based GUI.
+
+The GUI launches a local HTTP server and opens your default browser. It requires
+wui serve (the REST API) to be reachable; if it is not already running, wui gui
+starts it automatically as a child process.
+
+Ports:
+  --port      GUI HTTP server port  (default 7008)
+  --api-port  wui serve API port    (default 7007)
+
+Examples:
+  wui gui                     # GUI on :7008, API on :7007
+  wui gui --port 8080         # GUI on :8080
+  wui gui --api-port 9000     # Connect to API on :9000`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := runGUI(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
 
 var serveCmd = &cobra.Command{
 	Use:   "serve",
@@ -127,6 +163,11 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(syncCmd)
 	rootCmd.AddCommand(serveCmd)
+	rootCmd.AddCommand(guiCmd)
+
+	// GUI command flags
+	guiCmd.Flags().IntVar(&guiPort, "port", 7008, "port for the GUI HTTP server")
+	guiCmd.Flags().IntVar(&guiAPIPort, "api-port", 0, "port of the wui serve API (0 = use config or default 7007)")
 
 	// Serve command flags
 	serveCmd.Flags().StringVar(&serveAddr, "addr", "localhost:7007", "address to listen on (host:port)")
@@ -366,6 +407,180 @@ func runServe() error {
 		defer cancel()
 		return srv.Shutdown(ctx)
 	}
+}
+
+// resolveAPIPort implements the --api-port fallback: flag (non-zero) → config.Serve.Port → 7007.
+func resolveAPIPort(flag int, cfg *config.Config) int {
+	if flag != 0 {
+		return flag
+	}
+	if cfg.Serve != nil && cfg.Serve.Port > 0 {
+		return cfg.Serve.Port
+	}
+	return 7007
+}
+
+// portInUse returns true when something is already listening on localhost:<port>.
+func portInUse(port int) bool {
+	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), time.Second)
+	if err != nil {
+		return false
+	}
+	conn.Close()
+	return true
+}
+
+// apiReachable returns true when GET /api/v1/version on localhost:<port> responds with 2xx.
+func apiReachable(port int) bool {
+	url := fmt.Sprintf("http://localhost:%d/api/v1/version", port)
+	resp, err := http.Get(url) //nolint:gosec // localhost only
+	if err != nil {
+		return false
+	}
+	resp.Body.Close()
+	return resp.StatusCode < 300
+}
+
+// waitForAPI polls GET /api/v1/version every 200 ms for up to 10 s.
+func waitForAPI(port int) error {
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		if apiReachable(port) {
+			return nil
+		}
+		time.Sleep(200 * time.Millisecond)
+	}
+	return fmt.Errorf("wui serve on :%d did not become ready within 10 s", port)
+}
+
+// openBrowser opens the default browser on the given URL (cross-platform).
+func openBrowser(url string) {
+	var cmd *exec.Cmd
+	switch runtime.GOOS {
+	case "darwin":
+		cmd = exec.Command("open", url)
+	case "windows":
+		cmd = exec.Command("cmd", "/c", "start", url)
+	default:
+		cmd = exec.Command("xdg-open", url)
+	}
+	// Best-effort; ignore errors (missing browser is not fatal).
+	_ = cmd.Start()
+}
+
+// runGUI starts the web GUI server and manages the wui serve child process.
+func runGUI() error {
+	cfgPath := config.ResolveConfigPath(configPath)
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		initLogging(nil)
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	initLogging(cfg)
+
+	apiPort := resolveAPIPort(guiAPIPort, cfg)
+	guiAddr := fmt.Sprintf("localhost:%d", guiPort)
+
+	// Task 1.3: fail fast if the GUI port is already occupied.
+	if portInUse(guiPort) {
+		return fmt.Errorf("port %d is already in use; choose another with --port", guiPort)
+	}
+
+	// Task 1.4: start wui serve as a child process if the API is not already up.
+	var child *exec.Cmd
+	if !apiReachable(apiPort) {
+		args := []string{"serve", "--addr", fmt.Sprintf("localhost:%d", apiPort)}
+		if configPath != "" {
+			args = append(args, "--config", cfgPath)
+		}
+		child = exec.Command(os.Args[0], args...)
+
+		// Task 1.7: relay child output with a [wui serve] prefix.
+		child.Stdout = &prefixWriter{w: os.Stderr, prefix: "[wui serve] "}
+		child.Stderr = &prefixWriter{w: os.Stderr, prefix: "[wui serve] "}
+
+		if err := child.Start(); err != nil {
+			return fmt.Errorf("failed to start wui serve: %w", err)
+		}
+		slog.Info("Started wui serve child process", "pid", child.Process.Pid, "api-port", apiPort)
+	} else {
+		slog.Info("wui serve already running", "api-port", apiPort)
+	}
+
+	// Task 1.5: wait for the API to become reachable.
+	if err := waitForAPI(apiPort); err != nil {
+		if child != nil {
+			_ = child.Process.Kill()
+		}
+		return err
+	}
+
+	// Build the GUI server.
+	apiClient := gui.NewAPIClient(fmt.Sprintf("http://localhost:%d/api/v1", apiPort))
+	filterHistory := gui.NewFilterHistory(config.ConfigDir())
+	guiServer := gui.NewServer(apiClient, cfg, filterHistory)
+
+	// Task 1.6: open the browser.
+	guiURL := "http://" + guiAddr
+	openBrowser(guiURL)
+	fmt.Printf("wui GUI listening on %s\n", guiURL)
+
+	// Task 1.8: graceful shutdown on SIGINT / SIGTERM.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- guiServer.Start(guiAddr) }()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-stop:
+		fmt.Println("\nShutting down wui GUI...")
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = guiServer.Shutdown(ctx)
+
+		if child != nil {
+			slog.Info("Stopping wui serve child process")
+			_ = child.Process.Signal(syscall.SIGTERM)
+			done := make(chan struct{})
+			go func() { _ = child.Wait(); close(done) }()
+			select {
+			case <-done:
+			case <-time.After(5 * time.Second):
+				_ = child.Process.Kill()
+			}
+		}
+	}
+	return nil
+}
+
+// prefixWriter prefixes each line written to it before forwarding to w.
+type prefixWriter struct {
+	w      io.Writer
+	prefix string
+	buf    []byte
+}
+
+func (pw *prefixWriter) Write(p []byte) (n int, err error) {
+	pw.buf = append(pw.buf, p...)
+	for {
+		idx := bytes.IndexByte(pw.buf, '\n')
+		if idx < 0 {
+			break
+		}
+		line := pw.buf[:idx+1]
+		if _, err := fmt.Fprintf(pw.w, "%s%s", pw.prefix, line); err != nil {
+			return 0, err
+		}
+		pw.buf = pw.buf[idx+1:]
+	}
+	return len(p), nil
 }
 
 // runSync performs the Google Calendar sync operation

@@ -1,0 +1,122 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="app-layout">
+  <!-- Tab bar -->
+  <nav class="tab-bar" id="tab-bar">
+    {{range .Tabs}}
+    <button class="tab-btn{{if eq .Name $.ActiveTab}} active{{end}}"
+            hx-get="/tasks?tab={{.Name}}"
+            hx-target="#task-list-container"
+            hx-swap="innerHTML"
+            hx-push-url="true">{{.Name}}</button>
+    {{end}}
+  </nav>
+
+  <div class="toolbar">
+    <!-- Search -->
+    <input type="search" id="search-input" class="search-input"
+           placeholder="Search…"
+           hx-get="/api/gui/tasks"
+           hx-trigger="input delay:300ms, search"
+           hx-target="#task-list-container"
+           hx-include="[name='tab'],[name='filter']"
+           name="q">
+
+    <!-- Filter toggle -->
+    <button class="filter-btn{{if .ActiveFilter}} filter-active{{end}}" onclick="wuiToggleFilter()">
+      Filter{{if .ActiveFilter}} ●{{end}}
+    </button>
+
+    <!-- Refresh -->
+    <button class="refresh-btn" title="Refresh"
+            hx-get="/api/gui/tasks"
+            hx-target="#task-list-container"
+            hx-include="[name='tab'],[name='filter']">↺</button>
+
+    <!-- FAB new task -->
+    <a href="/tasks/new" class="fab" title="New task">+</a>
+  </div>
+
+  <!-- Hidden fields carry active tab / filter for HTMX requests -->
+  <input type="hidden" name="tab" value="{{.ActiveTab}}">
+  <input type="hidden" name="filter" value="{{.ActiveFilter}}">
+
+  <!-- Filter panel -->
+  <div id="filter-panel" class="filter-panel{{if not .ShowFilter}} hidden{{end}}">
+    <div class="filter-panel-inner">
+      <input type="text" id="filter-input" class="filter-input"
+             placeholder="Taskwarrior filter…"
+             value="{{.ActiveFilter}}">
+      <div class="filter-panel-actions">
+        <button onclick="wuiApplyFilter()">Apply</button>
+        {{if .ActiveFilter}}<button onclick="wuiClearFilter()">Clear filter</button>{{end}}
+      </div>
+      {{if .FilterHistory}}
+      <div class="filter-history">
+        <div class="filter-history-header">
+          <span>Recent filters</span>
+          <button class="link-btn" onclick="wuiClearAllFilters()">Clear all</button>
+        </div>
+        {{range .FilterHistory}}
+        <div class="filter-history-entry">
+          <button class="link-btn" onclick="wuiFillFilter(this)" data-filter="{{.}}">{{.}}</button>
+          <button class="filter-delete-btn" onclick="wuiDeleteFilter(this)" data-filter="{{.}}">✕</button>
+        </div>
+        {{end}}
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Task list -->
+  <main id="task-list-container">
+    {{template "task-rows" .}}
+  </main>
+</div>
+{{end}}
+
+{{define "task-rows"}}
+{{if .Tasks}}
+<table class="task-table">
+  <thead>
+    <tr>
+      <th class="col-check"></th>
+      <th class="col-urg">Urg</th>
+      <th class="col-desc">Description</th>
+      <th class="col-proj">Project</th>
+      <th class="col-due">Due</th>
+      <th class="col-tags">Tags</th>
+      <th class="col-pri">P</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{range .Tasks}}
+    <tr class="task-row priority-{{lower .Priority}} {{dueCSSClass .Due}}"
+        data-uuid="{{.UUID}}"
+        onclick="wuiRowClick(event, this)"
+        ontouchstart="wuiTouchStart(event, this)"
+        ontouchmove="wuiTouchMove(event)"
+        ontouchend="wuiTouchEnd(event, this)">
+      <td class="col-check">
+        <input type="checkbox" class="task-checkbox"
+               onclick="event.stopPropagation(); wuiToggleSelect(this)"
+               data-uuid="{{.UUID}}">
+      </td>
+      <td class="col-urg">{{printf "%.1f" .Urgency}}</td>
+      <td class="col-desc">
+        <a href="/tasks/{{.UUID}}?tab={{$.ActiveTab}}" class="task-link">{{.Description}}</a>
+        {{if .Start}}<span class="icon-started" title="Started">▶</span>{{end}}
+        {{if .Annotations}}<span class="icon-notes" title="{{len .Annotations}} annotation(s)">🗒 {{len .Annotations}}</span>{{end}}
+      </td>
+      <td class="col-proj">{{.Project}}</td>
+      <td class="col-due">{{shortRelDate .Due}}</td>
+      <td class="col-tags">{{joinTags .Tags}}</td>
+      <td class="col-pri">{{.Priority}}</td>
+    </tr>
+    {{end}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty-state">No tasks match the current filter.</p>
+{{end}}
+{{end}}

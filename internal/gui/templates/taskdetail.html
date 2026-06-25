@@ -1,0 +1,108 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="detail-layout">
+  <div class="detail-header">
+    <a href="/?tab={{.ActiveTab}}" class="back-link">← Back</a>
+    {{if eq .Task.Status "pending"}}
+    <div class="action-bar">
+      {{if .Task.Start}}
+      <button hx-post="/api/gui/tasks/{{.Task.UUID}}/stop"
+              hx-swap="none"
+              onclick="window.location.reload()">Stop</button>
+      {{else}}
+      <button hx-post="/api/gui/tasks/{{.Task.UUID}}/start"
+              hx-swap="none"
+              onclick="window.location.reload()">Start</button>
+      {{end}}
+      <a href="/tasks/{{.Task.UUID}}/edit?tab={{.ActiveTab}}" class="btn">Edit</a>
+      <button onclick="wuiMarkDone('{{.Task.UUID}}')">Mark done</button>
+      <button class="btn-danger" onclick="wuiConfirmDelete('{{.Task.UUID}}')">Delete</button>
+    </div>
+    {{end}}
+  </div>
+
+  <h1 class="task-description">{{.Task.Description}}</h1>
+
+  <table class="detail-table">
+    {{if .Task.Project}}<tr><th>Project</th><td>{{.Task.Project}}</td></tr>{{end}}
+    {{if .Task.Priority}}<tr><th>Priority</th><td class="priority-{{lower .Task.Priority}}">{{.Task.Priority}}</td></tr>{{end}}
+    <tr><th>Status</th><td>{{.Task.Status}}</td></tr>
+    {{if .Task.Tags}}<tr><th>Tags</th><td>{{joinTags .Task.Tags}}</td></tr>{{end}}
+    <tr><th>Urgency</th><td>{{printf "%.2f" .Task.Urgency}}</td></tr>
+    <tr><th>ID</th><td>{{.Task.ID}}</td></tr>
+    <tr><th>UUID</th><td class="uuid-cell">{{.Task.UUID}}</td></tr>
+    <tr><th>Created</th><td>{{absDate .Task.Entry}} · {{longRelDate .Task.Entry}}</td></tr>
+    {{if .Task.Due}}<tr><th>Due</th><td>{{absDate .Task.Due}} · {{longRelDatePtr .Task.Due}}</td></tr>{{end}}
+    {{if .Task.Scheduled}}<tr><th>Scheduled</th><td>{{absDate .Task.Scheduled}} · {{longRelDatePtr .Task.Scheduled}}</td></tr>{{end}}
+    {{if .Task.Wait}}<tr><th>Wait</th><td>{{absDate .Task.Wait}} · {{longRelDatePtr .Task.Wait}}</td></tr>{{end}}
+    {{if .Task.Start}}<tr><th>Started</th><td>{{absDate .Task.Start}} · {{longRelDatePtr .Task.Start}}</td></tr>{{end}}
+    {{if .Task.Modified}}<tr><th>Modified</th><td>{{absDate .Task.Modified}} · {{longRelDatePtr .Task.Modified}}</td></tr>{{end}}
+    {{if .Task.End}}<tr><th>Ended</th><td>{{absDate .Task.End}}</td></tr>{{end}}
+  </table>
+
+  {{if .Task.Annotations}}
+  <section class="detail-section">
+    <h2>Annotations</h2>
+    <ul class="annotation-list">
+      {{range .Task.Annotations}}
+      <li class="annotation-item">
+        <span class="annotation-ts">{{.Entry.Format "2006-01-02 15:04"}}</span>
+        <span class="annotation-text">{{urlify .Description}}</span>
+        <button class="link-btn annotation-delete"
+                hx-delete="/api/v1/tasks/{{$.Task.UUID}}/annotate"
+                hx-vals='{"description": "{{.Description}}"}'
+                hx-swap="none"
+                hx-on::after-request="window.location.reload()">✕</button>
+      </li>
+      {{end}}
+    </ul>
+    <div class="add-annotation">
+      <input type="text" id="new-annotation" placeholder="Add annotation…">
+      <button onclick="wuiAddAnnotation('{{.Task.UUID}}')">Add</button>
+    </div>
+  </section>
+  {{else}}
+  <section class="detail-section">
+    <h2>Annotations</h2>
+    <p class="empty-state">No annotations.</p>
+    <div class="add-annotation">
+      <input type="text" id="new-annotation" placeholder="Add annotation…">
+      <button onclick="wuiAddAnnotation('{{.Task.UUID}}')">Add</button>
+    </div>
+  </section>
+  {{end}}
+
+  {{if .Task.Depends}}
+  <section class="detail-section">
+    <h2>Dependencies</h2>
+    <ul class="dep-list">
+      {{range .DependsTasks}}
+      <li><a href="/tasks/{{.UUID}}?tab={{$.ActiveTab}}">{{.Description}}</a></li>
+      {{end}}
+    </ul>
+  </section>
+  {{end}}
+
+  {{if .Recur}}
+  <section class="detail-section">
+    <h2>Recurrence</h2>
+    <table class="detail-table">
+      <tr><th>Interval</th><td>{{.Recur.Interval}}</td></tr>
+      {{if .Recur.Type}}<tr><th>Type</th><td>{{.Recur.Type}}</td></tr>{{end}}
+      {{if .Recur.Until}}<tr><th>Until</th><td>{{.Recur.Until}}</td></tr>{{end}}
+    </table>
+  </section>
+  {{end}}
+
+  {{if .UDAs}}
+  <section class="detail-section">
+    <h2>Custom Fields</h2>
+    <table class="detail-table">
+      {{range $k, $v := .UDAs}}
+      <tr><th>{{$k}}</th><td>{{$v}}</td></tr>
+      {{end}}
+    </table>
+  </section>
+  {{end}}
+</div>
+{{end}}

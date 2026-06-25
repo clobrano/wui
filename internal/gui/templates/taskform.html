@@ -1,0 +1,122 @@
+{{template "base.html" .}}
+{{define "content"}}
+<div class="form-layout">
+  <div class="form-header">
+    <a href="/?tab={{.ActiveTab}}" class="back-link">← Back</a>
+    <h1>{{if .IsNew}}New Task{{else}}Edit Task{{end}}</h1>
+  </div>
+
+  {{if .Error}}
+  <div class="form-error">{{.Error}}</div>
+  {{end}}
+
+  <!-- Mode toggle: Raw / Form -->
+  <div class="mode-toggle">
+    <button class="mode-btn active" id="btn-form" onclick="wuiSetMode('form')">Form</button>
+    <button class="mode-btn" id="btn-raw" onclick="wuiSetMode('raw')">Raw</button>
+  </div>
+
+  <form method="POST" action="{{.Action}}">
+    <!-- Form mode -->
+    <div id="mode-form">
+      <div class="field-group">
+        <label for="f-desc">Description *</label>
+        <input type="text" id="f-desc" name="description" required
+               value="{{.Task.Description}}" placeholder="What needs to be done?">
+      </div>
+
+      <div class="field-group">
+        <label for="f-proj">Project</label>
+        <input type="text" id="f-proj" name="project"
+               value="{{.Task.Project}}" list="project-list" placeholder="project.name">
+        <datalist id="project-list">
+          {{range .Projects}}<option value="{{.Name}}">{{end}}
+        </datalist>
+      </div>
+
+      <div class="field-group">
+        <label>Tags</label>
+        <div class="tag-chip-input" id="tag-chip-container">
+          {{range .Task.Tags}}
+          <span class="tag-chip">{{.}}<button type="button" onclick="wuiRemoveTag(this)">✕</button>
+            <input type="hidden" name="tags" value="{{.}}">
+          </span>
+          {{end}}
+          <input type="text" id="tag-input" placeholder="Add tag…" onkeydown="wuiTagKeydown(event)">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-pri">Priority</label>
+          <select id="f-pri" name="priority">
+            <option value="">None</option>
+            <option value="H"{{if eq .Task.Priority "H"}} selected{{end}}>High</option>
+            <option value="M"{{if eq .Task.Priority "M"}} selected{{end}}>Medium</option>
+            <option value="L"{{if eq .Task.Priority "L"}} selected{{end}}>Low</option>
+          </select>
+        </div>
+
+        <div class="field-group">
+          <label for="f-due">Due</label>
+          <input type="date" id="f-due" name="due" value="{{formatDateInput .Task.Due}}">
+        </div>
+
+        <div class="field-group">
+          <label for="f-sched">Scheduled</label>
+          <input type="date" id="f-sched" name="scheduled" value="{{formatDateInput .Task.Scheduled}}">
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label for="f-wait">Wait</label>
+          <input type="date" id="f-wait" name="wait" value="{{formatDateInput .Task.Wait}}">
+        </div>
+
+        <div class="field-group">
+          <label for="f-until">Until</label>
+          <input type="date" id="f-until" name="until" value="{{formatDateInput .Task.Until}}">
+        </div>
+
+        <div class="field-group">
+          <label for="f-recur">Recur</label>
+          <input type="text" id="f-recur" name="recur" value="{{.Task.Recur}}" placeholder="weekly">
+        </div>
+      </div>
+
+      <div class="field-group" id="depends-field">
+        <label>Depends on</label>
+        <div id="dep-chips">
+          {{range .DependsTasks}}
+          <span class="tag-chip dep-chip">{{.Description}}
+            <input type="hidden" name="depends" value="{{.UUID}}">
+            <button type="button" onclick="wuiRemoveDep(this)">✕</button>
+          </span>
+          {{end}}
+        </div>
+        <input type="text" id="dep-search" placeholder="Search tasks…"
+               hx-get="/api/gui/tasks"
+               hx-trigger="input delay:300ms"
+               hx-target="#dep-results"
+               hx-vals='{"q": event.target.value, "tab": "all"}'>
+        <div id="dep-results" class="dep-results"></div>
+      </div>
+    </div>
+
+    <!-- Raw mode -->
+    <div id="mode-raw" class="hidden">
+      <div class="field-group">
+        <label for="f-raw">Taskwarrior arguments</label>
+        <textarea id="f-raw" name="raw" rows="4"
+                  placeholder="{{if .IsNew}}Buy milk project:home +shopping due:tomorrow{{else}}priority:H +urgent{{end}}">{{.RawValue}}</textarea>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
+      <a href="{{.CancelURL}}" class="btn">Cancel</a>
+    </div>
+  </form>
+</div>
+{{end}}
