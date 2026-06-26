@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -81,9 +82,15 @@ func (s *Server) filterForTab(tabName string) string {
 }
 
 func (s *Server) renderTemplate(w http.ResponseWriter, name string, data any) {
+	tmpl, ok := s.templates[name]
+	if !ok {
+		http.Error(w, "no template: "+name, http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, name, data); err != nil {
-		http.Error(w, fmt.Sprintf("template error: %v", err), http.StatusInternalServerError)
+	if err := tmpl.ExecuteTemplate(w, name, data); err != nil {
+		// Log to stderr so it's visible regardless of log-level config.
+		fmt.Fprintf(os.Stderr, "gui: template %s error: %v\n", name, err)
 	}
 }
 
@@ -139,8 +146,9 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.ExecuteTemplate(w, "task-rows", data); err != nil {
-		http.Error(w, fmt.Sprintf("template error: %v", err), http.StatusInternalServerError)
+	// task-rows is defined inside tasklist.html, so use that template set.
+	if err := s.templates["tasklist.html"].ExecuteTemplate(w, "task-rows", data); err != nil {
+		fmt.Fprintf(os.Stderr, "gui: template task-rows error: %v\n", err)
 	}
 }
 

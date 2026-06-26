@@ -159,10 +159,19 @@ func FormatAbsDate(t *time.Time) string {
 // Classes: "due-overdue", "due-today", "due-soon" (< 7 days), or "".
 // Comparison is done at day granularity (midnight local time).
 func DueCSSClass(t *time.Time) string {
+	return dueCSSClassFrom(t, time.Now())
+}
+
+// DueCSSClassFrom is the testable variant with an explicit reference time.
+func DueCSSClassFrom(t *time.Time, now time.Time) string {
+	return dueCSSClassFrom(t, now)
+}
+
+func dueCSSClassFrom(t *time.Time, now time.Time) string {
 	if t == nil {
 		return ""
 	}
-	localNow := time.Now().Local()
+	localNow := now.Local()
 	nowDay := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), 0, 0, 0, 0, localNow.Location())
 	localT := t.Local()
 	tDay := time.Date(localT.Year(), localT.Month(), localT.Day(), 0, 0, 0, 0, localT.Location())

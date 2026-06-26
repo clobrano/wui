@@ -26,7 +26,9 @@ type Server struct {
 	cfg           *config.Config
 	filterHistory *FilterHistory
 	httpServer    *http.Server
-	tmpl          *template.Template
+	// Each page gets its own template set (base.html + page.html) to avoid
+	// {{define "content"}} conflicts that occur when all pages share one set.
+	templates map[string]*template.Template
 }
 
 // NewServer creates a new GUI server.
@@ -36,30 +38,40 @@ func NewServer(svc core.TaskService, cfg *config.Config, fh *FilterHistory) *Ser
 		cfg:           cfg,
 		filterHistory: fh,
 	}
-	s.tmpl = s.buildTemplates()
+	s.templates = s.buildTemplates()
 	return s
 }
 
-func (s *Server) buildTemplates() *template.Template {
-	funcs := template.FuncMap{
-		"lower":         strings.ToLower,
-		"shortRelDate":  ShortRelDate,
-		"longRelDate":   func(t time.Time) string { return LongRelDate(&t) },
+func (s *Server) templateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"lower":        strings.ToLower,
+		"shortRelDate": ShortRelDate,
+		// longRelDate accepts time.Time (Entry field); longRelDatePtr accepts *time.Time
+		"longRelDate":    func(t time.Time) string { return LongRelDate(&t) },
 		"longRelDatePtr": LongRelDate,
-		"absDate":       func(t time.Time) string { return FormatAbsDate(&t) },
-		"absDatePtr":    FormatAbsDate,
-		"dueCSSClass":   DueCSSClass,
+		// absDate accepts time.Time; absDatePtr accepts *time.Time
+		"absDate":    func(t time.Time) string { return FormatAbsDate(&t) },
+		"absDatePtr": FormatAbsDate,
+		"dueCSSClass": DueCSSClass,
 		"joinTags": func(tags []string) string {
 			return strings.Join(tags, " ")
 		},
 		"urlify":          urlify,
 		"formatDateInput": formatDateInput,
-		"not": func(b bool) bool { return !b },
+		"not":             func(b bool) bool { return !b },
 	}
+}
 
-	tmpl := template.New("").Funcs(funcs)
-	tmpl = template.Must(tmpl.ParseFS(templateFS, "templates/*.html"))
-	return tmpl
+func (s *Server) buildTemplates() map[string]*template.Template {
+	pages := []string{"tasklist.html", "taskdetail.html", "taskform.html"}
+	result := make(map[string]*template.Template, len(pages))
+	funcs := s.templateFuncs()
+	for _, page := range pages {
+		t := template.New("").Funcs(funcs)
+		t = template.Must(t.ParseFS(templateFS, "templates/base.html", "templates/"+page))
+		result[page] = t
+	}
+	return result
 }
 
 // Start begins listening and serving requests. It blocks until the server stops.

@@ -524,10 +524,7 @@ func runGUI() error {
 	filterHistory := gui.NewFilterHistory(config.ConfigDir())
 	guiServer := gui.NewServer(apiClient, cfg, filterHistory)
 
-	// Task 1.6: open the browser.
 	guiURL := "http://" + guiAddr
-	openBrowser(guiURL)
-	fmt.Printf("wui GUI listening on %s\n", guiURL)
 
 	// Task 1.8: graceful shutdown on SIGINT / SIGTERM.
 	stop := make(chan os.Signal, 1)
@@ -535,6 +532,24 @@ func runGUI() error {
 
 	errCh := make(chan error, 1)
 	go func() { errCh <- guiServer.Start(guiAddr) }()
+
+	// Wait until the GUI port is actually bound before opening the browser.
+	// This avoids a race where the browser connects before ListenAndServe is ready.
+	for i := 0; i < 50; i++ {
+		select {
+		case err := <-errCh:
+			return fmt.Errorf("GUI server failed to start: %w", err)
+		default:
+		}
+		if portInUse(guiPort) {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Task 1.6: open the browser.
+	fmt.Fprintf(os.Stderr, "wui GUI listening on %s\n", guiURL)
+	openBrowser(guiURL)
 
 	select {
 	case err := <-errCh:

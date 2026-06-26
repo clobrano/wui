@@ -73,6 +73,7 @@ func TestLongRelDate(t *testing.T) {
 func TestDueCSSClass(t *testing.T) {
 	now := time.Date(2026, 6, 25, 12, 0, 0, 0, time.UTC)
 	overdue := now.AddDate(0, 0, -1)
+	// today at midnight — before "now" clock-wise but same calendar day
 	today := time.Date(2026, 6, 25, 0, 0, 0, 0, time.UTC)
 	soon := now.AddDate(0, 0, 3)
 	far := now.AddDate(0, 0, 30)
@@ -89,9 +90,9 @@ func TestDueCSSClass(t *testing.T) {
 	}
 
 	for _, tc := range cases {
-		got := gui.DueCSSClass(tc.t)
+		got := gui.DueCSSClassFrom(tc.t, now)
 		if got != tc.want {
-			t.Errorf("DueCSSClass(%v) = %q, want %q", tc.t, got, tc.want)
+			t.Errorf("DueCSSClassFrom(%v) = %q, want %q", tc.t, got, tc.want)
 		}
 	}
 }
