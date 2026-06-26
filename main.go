@@ -483,7 +483,9 @@ func runGUI() error {
 	initLogging(cfg)
 
 	apiPort := resolveAPIPort(guiAPIPort, cfg)
-	guiAddr := fmt.Sprintf("localhost:%d", guiPort)
+	// Bind on all interfaces so the GUI is reachable over the LAN (e.g. from
+	// other devices on the same WiFi). The browser is still opened via localhost.
+	guiAddr := fmt.Sprintf(":%d", guiPort)
 
 	// Task 1.3: fail fast if the GUI port is already occupied.
 	if portInUse(guiPort) {
@@ -524,7 +526,7 @@ func runGUI() error {
 	filterHistory := gui.NewFilterHistory(config.ConfigDir())
 	guiServer := gui.NewServer(apiClient, cfg, filterHistory)
 
-	guiURL := "http://" + guiAddr
+	guiURL := fmt.Sprintf("http://localhost:%d", guiPort)
 
 	// Task 1.8: graceful shutdown on SIGINT / SIGTERM.
 	stop := make(chan os.Signal, 1)
