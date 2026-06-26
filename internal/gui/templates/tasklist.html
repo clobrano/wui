@@ -5,10 +5,10 @@
   <nav class="tab-bar" id="tab-bar">
     {{range .Tabs}}
     <button class="tab-btn{{if eq .Name $.ActiveTab}} active{{end}}"
-            hx-get="/tasks?tab={{.Name}}"
+            hx-get="/api/gui/tasks?tab={{.Name}}"
             hx-target="#task-list-container"
             hx-swap="innerHTML"
-            hx-push-url="true">{{.Name}}</button>
+            onclick="wuiActivateTab(this, '{{.Name}}')">{{.Name}}</button>
     {{end}}
   </nav>
 

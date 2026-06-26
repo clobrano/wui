@@ -1,5 +1,16 @@
 'use strict';
 
+/* ── Tab switching ───────────────────────────────────────────────────────── */
+function wuiActivateTab(btn, tabName) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const tabInput = document.querySelector('[name="tab"]');
+  if (tabInput) tabInput.value = tabName;
+  // Clear any active filter when switching tabs.
+  const filterInput = document.querySelector('[name="filter"]');
+  if (filterInput) filterInput.value = '';
+}
+
 /* ── Multi-select state ─────────────────────────────────────────────────── */
 let _selected = new Set();
 let _multiselectActive = false;

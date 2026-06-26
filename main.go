@@ -524,7 +524,7 @@ func runGUI() error {
 	// Build the GUI server.
 	apiClient := gui.NewAPIClient(fmt.Sprintf("http://localhost:%d/api/v1", apiPort))
 	filterHistory := gui.NewFilterHistory(config.ConfigDir())
-	guiServer := gui.NewServer(apiClient, cfg, filterHistory)
+	guiServer := gui.NewServer(apiClient, cfg, filterHistory, fmt.Sprintf("http://localhost:%d", apiPort))
 
 	guiURL := fmt.Sprintf("http://localhost:%d", guiPort)
 

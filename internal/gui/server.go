@@ -7,6 +7,8 @@ import (
 	"html/template"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,6 +27,7 @@ type Server struct {
 	svc           core.TaskService
 	cfg           *config.Config
 	filterHistory *FilterHistory
+	apiProxy      *httputil.ReverseProxy
 	httpServer    *http.Server
 	// Each page gets its own template set (base.html + page.html) to avoid
 	// {{define "content"}} conflicts that occur when all pages share one set.
@@ -32,11 +35,15 @@ type Server struct {
 }
 
 // NewServer creates a new GUI server.
-func NewServer(svc core.TaskService, cfg *config.Config, fh *FilterHistory) *Server {
+// apiOrigin is the scheme+host of the wui serve API, e.g. "http://localhost:7007".
+// The GUI server proxies /api/v1/ requests there so browser JS can use the same origin.
+func NewServer(svc core.TaskService, cfg *config.Config, fh *FilterHistory, apiOrigin string) *Server {
+	target, _ := url.Parse(apiOrigin)
 	s := &Server{
 		svc:           svc,
 		cfg:           cfg,
 		filterHistory: fh,
+		apiProxy:      httputil.NewSingleHostReverseProxy(target),
 	}
 	s.templates = s.buildTemplates()
 	return s
@@ -103,6 +110,15 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) registerRoutes(mux *http.ServeMux) {
+	// Proxy /api/v1/ to wui serve so browser JS can call the same origin.
+	// Register each HTTP method explicitly to satisfy Go 1.22+ mux conflict rules.
+	apiHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.apiProxy.ServeHTTP(w, r)
+	})
+	for _, method := range []string{"GET", "POST", "PUT", "DELETE"} {
+		mux.Handle(method+" /api/v1/", apiHandler)
+	}
+
 	// Static assets
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
