@@ -178,6 +178,21 @@ main { flex: 1; overflow-y: auto; }
 .due-today   { background: var(--due-today-bg) !important; }
 .due-soon    { background: var(--due-soon-bg) !important; }
 
+/* Completed / deleted rows */
+.status-completed,
+.status-deleted {
+  opacity: .45;
+}
+.status-completed .task-link,
+.status-deleted .task-link {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+.status-completed:hover,
+.status-deleted:hover {
+  opacity: .65;
+}
+
 .task-link { color: var(--text); }
 .task-link:hover { color: var(--primary); text-decoration: none; }
 .icon-started { margin-left: .3rem; font-size: 11px; color: var(--success); }

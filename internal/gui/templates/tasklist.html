@@ -91,7 +91,7 @@
   </thead>
   <tbody>
     {{range .Tasks}}
-    <tr class="task-row priority-{{lower .Priority}} {{dueCSSClass .Due}}"
+    <tr class="task-row priority-{{lower .Priority}} {{dueCSSClass .Due}} status-{{.Status}}"
         data-uuid="{{.UUID}}"
         onclick="wuiRowClick(event, this)"
         ontouchstart="wuiTouchStart(event, this)"

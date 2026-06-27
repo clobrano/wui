@@ -17,8 +17,9 @@ func SortTasks(tasks []core.Task, method string, reverse bool) []core.Task {
 	sort.SliceStable(sorted, func(i, j int) bool {
 		ti, tj := sorted[i], sorted[j]
 
-		// Completed tasks always sink to the bottom.
-		ci, cj := ti.Status == "completed", tj.Status == "completed"
+		// Completed/deleted tasks always sink to the bottom.
+		ci := ti.Status == "completed" || ti.Status == "deleted"
+		cj := tj.Status == "completed" || tj.Status == "deleted"
 		if ci != cj {
 			return !ci
 		}
