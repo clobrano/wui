@@ -108,13 +108,28 @@ function wuiTouchEnd(event, row) {
 
 /* ── Long-press (mobile multi-select) ───────────────────────────────────── */
 let _longPressTimer = null;
+let _longPressStartX = 0;
+let _longPressStartY = 0;
+const _LONGPRESS_MOVE_THRESHOLD = 8; // px — more than this cancels the timer
 
 document.addEventListener('touchstart', e => {
   const row = e.target.closest('.task-row');
   if (!row) return;
+  _longPressStartX = e.touches[0].clientX;
+  _longPressStartY = e.touches[0].clientY;
   _longPressTimer = setTimeout(() => {
     _enterMultiselect(row.dataset.uuid);
   }, 500);
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (_longPressTimer === null) return;
+  const dx = Math.abs(e.touches[0].clientX - _longPressStartX);
+  const dy = Math.abs(e.touches[0].clientY - _longPressStartY);
+  if (dx > _LONGPRESS_MOVE_THRESHOLD || dy > _LONGPRESS_MOVE_THRESHOLD) {
+    clearTimeout(_longPressTimer);
+    _longPressTimer = null;
+  }
 }, { passive: true });
 
 document.addEventListener('touchend', () => {
