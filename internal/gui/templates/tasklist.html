@@ -15,7 +15,7 @@
   <div class="toolbar">
     <!-- Search -->
     <input type="search" id="search-input" class="search-input"
-           placeholder="Search…"
+           placeholder="Filter… (project:name, +tag, due:today, status:waiting, …)"
            hx-get="/api/gui/tasks"
            hx-trigger="input delay:300ms, search"
            hx-target="#task-list-container"

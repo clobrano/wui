@@ -141,9 +141,9 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	tabFilter := s.filterForTab(tab)
 	switch {
 	case q != "" && tabFilter != "":
-		filter = "( " + tabFilter + " ) description.contains:" + q
+		filter = "( " + tabFilter + " ) " + q
 	case q != "":
-		filter = "description.contains:" + q
+		filter = q
 	case filter == "":
 		filter = tabFilter
 	}
