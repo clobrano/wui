@@ -138,10 +138,14 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("filter")
 	q := r.URL.Query().Get("q")
 
-	if q != "" {
+	tabFilter := s.filterForTab(tab)
+	switch {
+	case q != "" && tabFilter != "":
+		filter = "( " + tabFilter + " ) description.contains:" + q
+	case q != "":
 		filter = "description.contains:" + q
-	} else if filter == "" {
-		filter = s.filterForTab(tab)
+	case filter == "":
+		filter = tabFilter
 	}
 
 	tasks, err := s.svc.Export(filter)
