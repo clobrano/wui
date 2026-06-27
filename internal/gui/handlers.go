@@ -81,6 +81,15 @@ func (s *Server) filterForTab(tabName string) string {
 	return ""
 }
 
+func (s *Server) sortForTab(tabName string) (method string, reverse bool) {
+	for _, t := range s.cfg.TUI.Tabs {
+		if t.Name == tabName {
+			return t.Sort, t.Reverse
+		}
+	}
+	return "", false
+}
+
 func (s *Server) renderTemplate(w http.ResponseWriter, name string, data any) {
 	tmpl, ok := s.templates[name]
 	if !ok {
@@ -107,6 +116,9 @@ func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	sortMethod, reverse := s.sortForTab(tab)
+	tasks = SortTasks(tasks, sortMethod, reverse)
 
 	history, _ := s.filterHistory.Load()
 
@@ -137,6 +149,9 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	sortMethod, reverse := s.sortForTab(tab)
+	tasks = SortTasks(tasks, sortMethod, reverse)
 
 	data := taskListData{
 		Tabs:         s.cfg.TUI.Tabs,
