@@ -249,17 +249,16 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	tab := r.FormValue("tab")
 
-	description, args := s.buildTaskArgs(r, true)
-	if description == "" {
-		s.renderFormWithError(w, r, tab, true, "Description is required")
-		return
-	}
-
 	raw := r.FormValue("raw")
 	var taskSpec string
 	if raw != "" {
 		taskSpec = raw
 	} else {
+		description, args := s.buildTaskArgs(r, true)
+		if description == "" {
+			s.renderFormWithError(w, r, tab, true, "Description is required")
+			return
+		}
 		taskSpec = description
 		if args != "" {
 			taskSpec += " " + args
