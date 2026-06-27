@@ -14,7 +14,7 @@
               hx-swap="none"
               onclick="window.location.reload()">Start</button>
       {{end}}
-      <a href="/tasks/{{.Task.UUID}}/edit?tab={{.ActiveTab}}" class="btn">Edit</a>
+      <button onclick="window.location='/tasks/{{.Task.UUID}}/edit?tab={{.ActiveTab}}'">Edit</button>
       <button onclick="wuiMarkDone('{{.Task.UUID}}')">Mark done</button>
       <button class="btn-danger" onclick="wuiConfirmDelete('{{.Task.UUID}}')">Delete</button>
     </div>

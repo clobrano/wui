@@ -115,7 +115,7 @@
 
     <div class="form-actions">
       <button type="submit" class="btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
-      <a href="{{.CancelURL}}" class="btn">Cancel</a>
+      <button onclick="window.location='{{.CancelURL}}'">Cancel</button>
     </div>
   </form>
 </div>
