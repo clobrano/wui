@@ -18,6 +18,7 @@
 //	GET    /api/v1/tags                     list all tags in use
 //	GET    /api/v1/udas                     list User Defined Attribute names
 //	GET    /api/v1/version                  wui and taskwarrior version info
+//	POST   /api/v1/sync                     run task sync (no-op if no taskserver configured)
 package api
 
 import (
@@ -91,6 +92,7 @@ func registerRoutes(mux *http.ServeMux, h *handlers) {
 	mux.HandleFunc("GET /api/v1/tags", h.listTags)
 	mux.HandleFunc("GET /api/v1/udas", h.listUdas)
 	mux.HandleFunc("GET /api/v1/version", h.getVersion)
+	mux.HandleFunc("POST /api/v1/sync", h.syncTasks)
 }
 
 // Start begins listening and serving requests. It blocks until the server stops.

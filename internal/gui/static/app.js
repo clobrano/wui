@@ -95,13 +95,8 @@ function wuiTouchEnd(event, row) {
   } else {
     // Swipe left → confirm delete
     if (confirm('Delete this task?')) {
-      _apiPost(`/api/v1/tasks/${uuid}/done`, null, () => {
-        wuiShowToast('Task deleted — Undo', uuid, 'delete');
-        _refreshTaskList();
-      });
-      // Actually delete
       fetch(`/api/v1/tasks/${uuid}`, { method: 'DELETE' })
-        .then(() => { wuiShowToast('Task deleted — Undo', uuid, 'delete'); _refreshTaskList(); });
+        .then(() => { wuiShowToast('Task deleted — Undo', [uuid], 'delete'); _syncAfterAction(); _refreshTaskList(); });
     }
   }
 }
@@ -143,6 +138,7 @@ function wuiBulkDone() {
   Promise.all(uuids.map(u => fetch(`/api/v1/tasks/${u}/done`, { method: 'POST' })))
     .then(() => {
       wuiShowToast(`${uuids.length} task${uuids.length > 1 ? 's' : ''} marked done — Undo`, uuids, 'done');
+      _syncAfterAction();
       wuiExitMultiselect();
       _refreshTaskList();
     });
@@ -154,9 +150,15 @@ function wuiBulkDelete() {
   Promise.all(uuids.map(u => fetch(`/api/v1/tasks/${u}`, { method: 'DELETE' })))
     .then(() => {
       wuiShowToast(`${uuids.length} task${uuids.length > 1 ? 's' : ''} deleted — Undo`, uuids, 'delete');
+      _syncAfterAction();
       wuiExitMultiselect();
       _refreshTaskList();
     });
+}
+
+/* ── Sync (fire-and-forget after every modification) ─────────────────────── */
+function _syncAfterAction() {
+  fetch('/api/v1/sync', { method: 'POST' }).catch(() => {});
 }
 
 /* ── Mark done / delete (single task) ───────────────────────────────────── */
@@ -165,6 +167,7 @@ function wuiMarkDone(uuid) {
     .then(r => {
       if (r.ok) {
         wuiShowToast('Task marked done — Undo', [uuid], 'done');
+        _syncAfterAction();
         _refreshTaskList();
       }
     });
@@ -176,6 +179,7 @@ function wuiConfirmDelete(uuid) {
     .then(r => {
       if (r.ok) {
         wuiShowToast('Task deleted — Undo', [uuid], 'delete');
+        _syncAfterAction();
         history.back();
       }
     });
@@ -189,7 +193,7 @@ function wuiAddAnnotation(uuid) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text }),
-  }).then(r => { if (r.ok) window.location.reload(); });
+  }).then(r => { if (r.ok) { _syncAfterAction(); window.location.reload(); } });
 }
 
 /* ── Undo toast ──────────────────────────────────────────────────────────── */
@@ -212,7 +216,7 @@ function wuiDismissToast() {
 
 function wuiUndo() {
   fetch('/api/v1/undo', { method: 'POST' })
-    .then(() => { wuiDismissToast(); _refreshTaskList(); });
+    .then(() => { wuiDismissToast(); _syncAfterAction(); _refreshTaskList(); });
 }
 
 /* ── Filter panel ────────────────────────────────────────────────────────── */

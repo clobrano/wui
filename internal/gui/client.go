@@ -234,6 +234,11 @@ func (c *APIClient) Edit(_ string) error {
 	return fmt.Errorf("Edit is not supported in the web GUI")
 }
 
+// Sync implements core.TaskService.
+func (c *APIClient) Sync() error {
+	return c.do(http.MethodPost, "/sync", nil, nil)
+}
+
 // GetProjectSummary implements core.TaskService.
 func (c *APIClient) GetProjectSummary() ([]core.ProjectSummary, error) {
 	var dtos []struct {

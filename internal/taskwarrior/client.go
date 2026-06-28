@@ -296,6 +296,16 @@ func (c *Client) Denotate(uuid, description string) error {
 	return nil
 }
 
+// Sync runs "task sync" to synchronise with the configured taskserver.
+// If no taskserver is configured taskwarrior exits non-zero; we treat that as a no-op.
+func (c *Client) Sync() error {
+	args := c.buildArgs("sync")
+	if _, err := c.runCommand(args...); err != nil {
+		slog.Warn("task sync failed (no taskserver configured?)", "error", err)
+	}
+	return nil
+}
+
 // parseLines splits newline-delimited output into a trimmed, non-empty slice
 func parseLines(output []byte) []string {
 	var result []string

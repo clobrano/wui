@@ -270,6 +270,7 @@ func (s *Server) handleCreateTask(w http.ResponseWriter, r *http.Request) {
 		s.renderFormWithError(w, r, tab, true, err.Error())
 		return
 	}
+	_ = s.svc.Sync()
 
 	http.Redirect(w, r, fmt.Sprintf("/tasks/%s?tab=%s", uuid, tab), http.StatusSeeOther)
 }
@@ -339,6 +340,7 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 			s.renderFormWithError(w, r, tab, false, err.Error())
 			return
 		}
+		_ = s.svc.Sync()
 	}
 
 	http.Redirect(w, r, fmt.Sprintf("/tasks/%s?tab=%s", uuid, tab), http.StatusSeeOther)

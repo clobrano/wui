@@ -245,6 +245,16 @@ func (h *handlers) getVersion(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// syncTasks handles POST /api/v1/sync
+func (h *handlers) syncTasks(w http.ResponseWriter, r *http.Request) {
+	if err := h.svc.Sync(); err != nil {
+		slog.Error("Sync failed", "error", err)
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // denotateTask handles DELETE /api/v1/tasks/{uuid}/annotate
 func (h *handlers) denotateTask(w http.ResponseWriter, r *http.Request) {
 	uuid := r.PathValue("uuid")

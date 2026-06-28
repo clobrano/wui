@@ -63,4 +63,8 @@ type TaskService interface {
 
 	// Denotate removes an annotation from a task matching the given description
 	Denotate(uuid, description string) error
+
+	// Sync synchronises the local task database with the configured taskserver.
+	// It is a no-op (returns nil) when no taskserver is configured.
+	Sync() error
 }

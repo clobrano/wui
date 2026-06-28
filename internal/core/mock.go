@@ -19,6 +19,7 @@ type MockTaskService struct {
 	GetUdasFunc           func() ([]string, error)
 	GetVersionFunc        func() (string, error)
 	DenotateFunc          func(uuid, description string) error
+	SyncFunc              func() error
 }
 
 func (m *MockTaskService) Export(filter string) ([]Task, error) {
@@ -124,4 +125,11 @@ func (m *MockTaskService) Denotate(uuid, description string) error {
 		return m.DenotateFunc(uuid, description)
 	}
 	return errors.New("not implemented")
+}
+
+func (m *MockTaskService) Sync() error {
+	if m.SyncFunc != nil {
+		return m.SyncFunc()
+	}
+	return nil
 }
