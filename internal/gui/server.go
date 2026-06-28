@@ -153,10 +153,10 @@ func urlify(text string) template.HTML {
 	return template.HTML(strings.Join(words, " "))
 }
 
-// formatDateInput formats a *time.Time for an HTML date input (YYYY-MM-DD).
+// formatDateInput formats a *time.Time for an HTML datetime-local input (YYYY-MM-DDThh:mm).
 func formatDateInput(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.Local().Format("2006-01-02")
+	return t.Local().Format("2006-01-02T15:04")
 }

@@ -59,24 +59,24 @@
 
         <div class="field-group">
           <label for="f-due">Due</label>
-          <input type="date" id="f-due" name="due" value="{{formatDateInput .Task.Due}}">
+          <input type="datetime-local" id="f-due" name="due" value="{{formatDateInput .Task.Due}}">
         </div>
 
         <div class="field-group">
           <label for="f-sched">Scheduled</label>
-          <input type="date" id="f-sched" name="scheduled" value="{{formatDateInput .Task.Scheduled}}">
+          <input type="datetime-local" id="f-sched" name="scheduled" value="{{formatDateInput .Task.Scheduled}}">
         </div>
       </div>
 
       <div class="field-row">
         <div class="field-group">
           <label for="f-wait">Wait</label>
-          <input type="date" id="f-wait" name="wait" value="{{formatDateInput .Task.Wait}}">
+          <input type="datetime-local" id="f-wait" name="wait" value="{{formatDateInput .Task.Wait}}">
         </div>
 
         <div class="field-group">
           <label for="f-until">Until</label>
-          <input type="date" id="f-until" name="until" value="{{formatDateInput .Task.Until}}">
+          <input type="datetime-local" id="f-until" name="until" value="{{formatDateInput .Task.Until}}">
         </div>
 
         <div class="field-group">

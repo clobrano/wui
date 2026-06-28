@@ -147,12 +147,13 @@ func plural(n int) string {
 	return "s"
 }
 
-// FormatAbsDate formats a time.Time as "Jan 2, 2006" for the detail view.
+// FormatAbsDate formats a time.Time as "Jan 2, 2006 15:04" for the detail view.
+// The time portion is included because taskwarrior stores timestamps with time components.
 func FormatAbsDate(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.Local().Format("Jan 2, 2006")
+	return t.Local().Format("Jan 2, 2006 15:04")
 }
 
 // DueCSSClass returns a CSS class name for due-date row tinting.
