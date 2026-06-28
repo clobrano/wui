@@ -15,8 +15,9 @@ import (
 
 // Client implements core.TaskService for Taskwarrior
 type Client struct {
-	taskBin    string
-	taskrcPath string
+	taskBin       string
+	taskrcPath    string
+	wuiConfigPath string // passed to "wui sync" subprocess; empty → default config
 }
 
 // NewClient creates a new Taskwarrior client
@@ -32,6 +33,10 @@ func NewClient(taskBin, taskrcPath string) (*Client, error) {
 		taskrcPath: taskrcPath,
 	}, nil
 }
+
+// SetWuiConfigPath tells the client which wui config file to pass when running
+// the "wui sync" subprocess.
+func (c *Client) SetWuiConfigPath(p string) { c.wuiConfigPath = p }
 
 // Export retrieves tasks matching the given filter
 func (c *Client) Export(filter string) ([]core.Task, error) {
@@ -296,12 +301,23 @@ func (c *Client) Denotate(uuid, description string) error {
 	return nil
 }
 
-// Sync runs "task sync" to synchronise with the configured taskserver.
-// If no taskserver is configured taskwarrior exits non-zero; we treat that as a no-op.
+// Sync runs "wui sync" as a subprocess to push tasks to Google Calendar.
+// Errors are logged but not returned — a failed sync never blocks a task operation.
 func (c *Client) Sync() error {
-	args := c.buildArgs("sync")
-	if _, err := c.runCommand(args...); err != nil {
-		slog.Warn("task sync failed (no taskserver configured?)", "error", err)
+	exe, err := os.Executable()
+	if err != nil {
+		slog.Warn("sync: cannot locate wui binary", "error", err)
+		return nil
+	}
+	args := []string{"sync"}
+	if c.wuiConfigPath != "" {
+		args = append(args, "--config", c.wuiConfigPath)
+	}
+	cmd := exec.Command(exe, args...)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		slog.Warn("wui sync failed", "error", err, "output", string(out))
+	} else {
+		slog.Info("wui sync completed", "output", string(out))
 	}
 	return nil
 }

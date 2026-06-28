@@ -388,6 +388,7 @@ func runServe() error {
 	if err != nil {
 		return fmt.Errorf("failed to create taskwarrior client: %w", err)
 	}
+	client.SetWuiConfigPath(cfgPath)
 
 	srv := api.NewServer(client, serveAddr, serveTLSCert, serveTLSKey)
 
