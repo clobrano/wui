@@ -441,23 +441,23 @@ func (s Sidebar) renderDatesCompact() string {
 		if s.task.IsOverdue() {
 			style = style.Foreground(s.styles.DueOverdue)
 		}
-		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(formatCompactDate(*s.task.Due))))
+		lines = append(lines, fmt.Sprintf("  Due: %s", style.Render(formatDateWithRelative(*s.task.Due))))
 	}
 	if s.task.Scheduled != nil {
-		lines = append(lines, fmt.Sprintf("  Sched: %s", formatCompactDate(*s.task.Scheduled)))
+		lines = append(lines, fmt.Sprintf("  Sched: %s", formatDateWithRelative(*s.task.Scheduled)))
 	}
 	if s.task.Wait != nil {
-		lines = append(lines, fmt.Sprintf("  Wait: %s", formatCompactDate(*s.task.Wait)))
+		lines = append(lines, fmt.Sprintf("  Wait: %s", formatDateWithRelative(*s.task.Wait)))
 	}
 	if s.task.Start != nil {
-		lines = append(lines, fmt.Sprintf("  Started: %s", formatCompactDate(*s.task.Start)))
+		lines = append(lines, fmt.Sprintf("  Started: %s", formatDateWithRelative(*s.task.Start)))
 	}
-	lines = append(lines, fmt.Sprintf("  Created: %s", formatCompactDate(s.task.Entry)))
+	lines = append(lines, fmt.Sprintf("  Created: %s", formatDateWithRelative(s.task.Entry)))
 	if s.task.Modified != nil {
-		lines = append(lines, fmt.Sprintf("  Modified: %s", formatCompactDate(*s.task.Modified)))
+		lines = append(lines, fmt.Sprintf("  Modified: %s", formatDateWithRelative(*s.task.Modified)))
 	}
 	if s.task.End != nil {
-		lines = append(lines, fmt.Sprintf("  Done: %s", formatCompactDate(*s.task.End)))
+		lines = append(lines, fmt.Sprintf("  Done: %s", formatDateWithRelative(*s.task.End)))
 	}
 
 	return strings.Join(lines, "\n")
@@ -529,15 +529,6 @@ func (s Sidebar) renderUDAs() string {
 	}
 
 	return strings.Join(lines, "\n")
-}
-
-// formatCompactDate formats a date compactly: relative time or date only
-func formatCompactDate(t time.Time) string {
-	relative := formatRelativeTime(t)
-	if relative != "" {
-		return relative
-	}
-	return t.Local().Format("2006-01-02")
 }
 
 // formatDateWithRelative formats a date with relative time
