@@ -101,9 +101,10 @@ func GroupByProject(tasks []Task) []TaskGroup {
 	var groups []TaskGroup
 	for projectName, projectTasks := range projectMap {
 		groups = append(groups, TaskGroup{
-			Name:  projectName,
-			Count: len(projectTasks),
-			Tasks: projectTasks,
+			Name:       projectName,
+			Count:      len(projectTasks),
+			Tasks:      projectTasks,
+			Percentage: -1,
 		})
 	}
 
@@ -147,9 +148,10 @@ func GroupByTag(tasks []Task) []TaskGroup {
 	var groups []TaskGroup
 	for tagName, tagTasks := range tagMap {
 		groups = append(groups, TaskGroup{
-			Name:  tagName,
-			Count: len(tagTasks),
-			Tasks: tagTasks,
+			Name:       tagName,
+			Count:      len(tagTasks),
+			Tasks:      tagTasks,
+			Percentage: -1,
 		})
 	}
 
