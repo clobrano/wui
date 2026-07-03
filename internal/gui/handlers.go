@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"time"
 
@@ -20,6 +21,16 @@ type taskListData struct {
 	FilterHistory []string
 	ActiveFilter  string
 	ShowFilter    bool
+	IsGroupView   bool
+	Groups        []groupItem
+	GroupType     string // "Project" or "Tag"
+}
+
+// groupItem is one row in the Projects or Tags group list.
+type groupItem struct {
+	Name   string
+	Count  int
+	Filter string // taskwarrior filter, e.g. "project:home" or "+urgent"
 }
 
 // taskDetailData is the template data for the task detail page.
@@ -64,12 +75,30 @@ type taskFormTask struct {
 	Recur       string
 }
 
+// allTabs returns the full tab list with a "Search" tab always first.
+func (s *Server) allTabs() []config.Tab {
+	tabs := make([]config.Tab, 0, len(s.cfg.TUI.Tabs)+1)
+	tabs = append(tabs, config.Tab{Name: "Search"})
+	for _, t := range s.cfg.TUI.Tabs {
+		if t.Name != "Search" {
+			tabs = append(tabs, t)
+		}
+	}
+	return tabs
+}
+
 func (s *Server) activeTab(r *http.Request) string {
 	tab := r.URL.Query().Get("tab")
-	if tab == "" && len(s.cfg.TUI.Tabs) > 0 {
-		tab = s.cfg.TUI.Tabs[0].Name
+	if tab != "" {
+		return tab
 	}
-	return tab
+	// Default to first non-Search tab so the initial view is useful.
+	for _, t := range s.cfg.TUI.Tabs {
+		if t.Name != "Search" {
+			return t.Name
+		}
+	}
+	return "Search"
 }
 
 func (s *Server) filterForTab(tabName string) string {
@@ -105,30 +134,56 @@ func (s *Server) renderTemplate(w http.ResponseWriter, name string, data any) {
 
 // handleTaskList serves GET / and GET /tasks (full page).
 func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
+	allTabs := s.allTabs()
 	tab := s.activeTab(r)
 	filter := r.URL.Query().Get("filter")
-	if filter == "" {
-		filter = s.filterForTab(tab)
-	}
-
-	tasks, err := s.svc.Export(filter)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	sortMethod, reverse := s.sortForTab(tab)
-	tasks = SortTasks(tasks, sortMethod, reverse)
-
 	history, _ := s.filterHistory.Load()
 
 	data := taskListData{
-		Tabs:          s.cfg.TUI.Tabs,
+		Tabs:          allTabs,
 		ActiveTab:     tab,
-		Tasks:         tasks,
 		FilterHistory: history,
-		ActiveFilter:  r.URL.Query().Get("filter"),
+		ActiveFilter:  filter,
 	}
+
+	switch tab {
+	case "Projects":
+		groups, err := s.buildProjectGroups()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data.IsGroupView = true
+		data.Groups = groups
+		data.GroupType = "Project"
+
+	case "Tags":
+		groups, err := s.buildTagGroups()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		data.IsGroupView = true
+		data.Groups = groups
+		data.GroupType = "Tag"
+
+	default:
+		// "Search" tab with no filter shows empty state; all other tabs load tasks.
+		effectiveFilter := filter
+		if effectiveFilter == "" {
+			effectiveFilter = s.filterForTab(tab)
+		}
+		if effectiveFilter != "" {
+			tasks, err := s.svc.Export(effectiveFilter)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			sortMethod, reverse := s.sortForTab(tab)
+			data.Tasks = SortTasks(tasks, sortMethod, reverse)
+		}
+	}
+
 	s.renderTemplate(w, "tasklist.html", data)
 }
 
@@ -138,6 +193,34 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("filter")
 	q := r.URL.Query().Get("q")
 
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	execRows := func(data taskListData) {
+		if err := s.templates["tasklist.html"].ExecuteTemplate(w, "task-rows", data); err != nil {
+			fmt.Fprintf(os.Stderr, "gui: template task-rows error: %v\n", err)
+		}
+	}
+
+	switch tab {
+	case "Projects":
+		groups, err := s.buildProjectGroups()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Project"})
+		return
+
+	case "Tags":
+		groups, err := s.buildTagGroups()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Tag"})
+		return
+	}
+
+	// Regular tab or Search tab with/without filter.
 	tabFilter := s.filterForTab(tab)
 	switch {
 	case q != "" && tabFilter != "":
@@ -148,6 +231,12 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 		filter = tabFilter
 	}
 
+	// Search tab with no filter → empty state.
+	if tab == "Search" && filter == "" {
+		execRows(taskListData{ActiveTab: tab})
+		return
+	}
+
 	tasks, err := s.svc.Export(filter)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -157,18 +246,59 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	sortMethod, reverse := s.sortForTab(tab)
 	tasks = SortTasks(tasks, sortMethod, reverse)
 
-	data := taskListData{
-		Tabs:         s.cfg.TUI.Tabs,
+	execRows(taskListData{
 		ActiveTab:    tab,
 		Tasks:        tasks,
 		ActiveFilter: r.URL.Query().Get("filter"),
-	}
+	})
+}
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// task-rows is defined inside tasklist.html, so use that template set.
-	if err := s.templates["tasklist.html"].ExecuteTemplate(w, "task-rows", data); err != nil {
-		fmt.Fprintf(os.Stderr, "gui: template task-rows error: %v\n", err)
+// buildProjectGroups returns project groups ordered alphabetically.
+func (s *Server) buildProjectGroups() ([]groupItem, error) {
+	filter := s.filterForTab("Projects")
+	if filter == "" {
+		filter = "status:pending or status:active"
 	}
+	tasks, err := s.svc.Export(filter)
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int)
+	for _, t := range tasks {
+		if t.Project != "" {
+			counts[t.Project]++
+		}
+	}
+	groups := make([]groupItem, 0, len(counts))
+	for name, count := range counts {
+		groups = append(groups, groupItem{Name: name, Count: count, Filter: "project:" + name})
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].Name < groups[j].Name })
+	return groups, nil
+}
+
+// buildTagGroups returns tag groups ordered alphabetically.
+func (s *Server) buildTagGroups() ([]groupItem, error) {
+	filter := s.filterForTab("Tags")
+	if filter == "" {
+		filter = "status:pending or status:active"
+	}
+	tasks, err := s.svc.Export(filter)
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int)
+	for _, t := range tasks {
+		for _, tag := range t.Tags {
+			counts[tag]++
+		}
+	}
+	groups := make([]groupItem, 0, len(counts))
+	for name, count := range counts {
+		groups = append(groups, groupItem{Name: name, Count: count, Filter: "+" + name})
+	}
+	sort.Slice(groups, func(i, j int) bool { return groups[i].Name < groups[j].Name })
+	return groups, nil
 }
 
 // handleTaskDetail serves GET /tasks/{uuid}.

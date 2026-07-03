@@ -667,7 +667,9 @@ func (m Model) renderFooter() string {
 	} else {
 		switch m.state {
 		case StateNormal:
-			if m.viewMode == ViewModeTaskDetail {
+			if m.inGroupView {
+				keybindings = "enter: open in Search | j/k: navigate | tab: next section"
+			} else if m.viewMode == ViewModeTaskDetail {
 				keybindings = "k/j: scroll | K/J: prev/next task | esc: back | d: done | s: start/stop | e: edit | m: modify | a: annotate"
 			} else {
 				keybindings = "d: done | s: start/stop | x: delete | e: edit | n: new | m: modify | a: annotate | u: undo"

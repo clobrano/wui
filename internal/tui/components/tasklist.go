@@ -60,6 +60,7 @@ type TaskList struct {
 	emptyMessage      string // Custom message to show when list is empty
 	rowHeights        []int  // Cached height (in lines) of each rendered row
 	rowHeightsWidth   int    // Width used when calculating row heights (invalidate on resize)
+	groupTitle        string // Column header label shown in group list (e.g. "PROJECT" or "TAG")
 }
 
 // NewTaskList creates a new task list component
@@ -240,6 +241,11 @@ func compareTasks(taskI, taskJ core.Task, sortMethod string) int {
 		// Unknown sort method, maintain original order
 		return 0
 	}
+}
+
+// SetGroupTitle sets the column header label shown in the group list header.
+func (t *TaskList) SetGroupTitle(title string) {
+	t.groupTitle = title
 }
 
 // SetGroups updates the groups and switches to group display mode
@@ -1382,7 +1388,11 @@ func (t TaskList) renderSmallScreenTaskLines(task core.Task, isCursor bool, isMu
 
 // renderGroupHeader renders the header for group list view
 func (t TaskList) renderGroupHeader() string {
-	header := "  PROJECT                                           TASK COUNT"
+	title := t.groupTitle
+	if title == "" {
+		title = "PROJECT"
+	}
+	header := fmt.Sprintf("  %-50s TASK COUNT", title)
 
 	styledHeader := t.styles.Header.Width(t.width).Render(header)
 	separator := strings.Repeat("─", t.width)

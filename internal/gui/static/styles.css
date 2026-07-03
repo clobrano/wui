@@ -160,6 +160,7 @@ main { flex: 1; overflow-y: auto; }
 .task-table tbody tr { border-bottom: 1px solid var(--border); }
 .task-table tbody tr:hover { background: var(--row-hover-bg); }
 .task-table td { padding: .45rem .6rem; vertical-align: middle; }
+.group-row { cursor: pointer; }
 .col-check { width: 32px; }
 .col-urg   { width: 48px; text-align: right; color: var(--text-dim); font-size: 12px; }
 .col-desc  { min-width: 200px; }

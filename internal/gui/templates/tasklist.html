@@ -76,7 +76,28 @@
 {{end}}
 
 {{define "task-rows"}}
-{{if .Tasks}}
+{{if .IsGroupView}}
+  {{if .Groups}}
+  <table class="task-table group-table">
+    <thead>
+      <tr>
+        <th class="col-desc">{{.GroupType}}</th>
+        <th class="col-urg">Tasks</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{range .Groups}}
+      <tr class="task-row group-row" onclick="wuiOpenGroup('{{.Filter}}')">
+        <td class="col-desc">{{.Name}}</td>
+        <td class="col-urg">{{.Count}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+  {{else}}
+  <p class="empty-state">No {{.GroupType | lower}}s found.</p>
+  {{end}}
+{{else if .Tasks}}
 <table class="task-table">
   <thead>
     <tr>
@@ -116,6 +137,8 @@
     {{end}}
   </tbody>
 </table>
+{{else if eq .ActiveTab "Search"}}
+<p class="empty-state">Type a filter above to search across all tasks.<br><small>Examples: <code>bug</code> &nbsp; <code>project:home</code> &nbsp; <code>+urgent due.before:eom</code></small></p>
 {{else}}
 <p class="empty-state">No tasks match the current filter.</p>
 {{end}}

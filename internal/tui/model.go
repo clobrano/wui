@@ -431,7 +431,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Batch(loadProjectSummaryCmd(m.service), depCmd)
 			} else if m.sections.IsTagsView() {
 				m.groups = core.GroupByTag(m.tasks)
-				// Show group list in the task list component
+				m.taskList.SetGroupTitle("TAG")
 				m.taskList.SetGroups(m.groups)
 			}
 		} else {
@@ -480,7 +480,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Build project groups using hierarchy with percentages
 		m.groups = core.GroupProjectsByHierarchy(m.projectSummaries, m.tasks)
 
-		// Show group list in the task list component
+		m.taskList.SetGroupTitle("PROJECT")
 		m.taskList.SetGroups(m.groups)
 
 		return m, nil
@@ -1347,19 +1347,6 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.taskList.ClearSelection()
 			return m, nil
 		}
-		// Go back to group list if we drilled into a group
-		if !m.inGroupView && m.selectedGroup != nil && (m.sections.IsProjectsView() || m.sections.IsTagsView()) {
-			m.inGroupView = true
-			m.selectedGroup = nil
-			// Recompute groups from all tasks and display them
-			if m.sections.IsProjectsView() {
-				m.groups = core.GroupByProject(m.tasks)
-			} else if m.sections.IsTagsView() {
-				m.groups = core.GroupByTag(m.tasks)
-			}
-			m.taskList.SetGroups(m.groups)
-			return m, nil
-		}
 		return m, nil
 	}
 
@@ -1384,22 +1371,31 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Enter key for sidebar toggle/group drill-down (not configurable)
 	if keyPressed == "enter" {
-		// If in group view, drill into selected group
+		// If in group view (Projects/Tags), redirect to Search tab with the appropriate filter
 		if m.inGroupView && len(m.groups) > 0 {
-			// Get the selected group index from task list cursor
 			selectedIndex := m.taskList.Cursor()
 			if selectedIndex >= 0 && selectedIndex < len(m.groups) {
-				m.selectedGroup = &m.groups[selectedIndex]
-				m.inGroupView = false
-				// Set tasks to the tasks in this group
-				sortMethod := ""
-				reverse := false
-				if m.currentSection != nil {
-					sortMethod = m.currentSection.Sort
-					reverse = m.currentSection.Reverse
+				group := m.groups[selectedIndex]
+				var searchFilter string
+				if m.sections.IsProjectsView() {
+					searchFilter = "project:" + group.Name
+				} else if m.sections.IsTagsView() {
+					searchFilter = "+" + group.Name
 				}
-				m.taskList.SetTasksWithSort(m.selectedGroup.Tasks, sortMethod, reverse)
-				m.updateSidebar()
+				if searchFilter != "" && len(m.sections.Items) > 0 {
+					m.sections.ActiveIndex = 0
+					searchSection := m.sections.Items[0]
+					m.currentSection = &searchSection
+					m.searchTabFilter = searchFilter
+					m.activeFilter = searchFilter
+					m.inGroupView = false
+					m.selectedGroup = nil
+					m.groups = []core.TaskGroup{}
+					m.isLoading = true
+					m.errorMessage = ""
+					m.statusMessage = ""
+					return m, loadTasksCmd(m.service, searchFilter, true)
+				}
 			}
 			return m, nil
 		}

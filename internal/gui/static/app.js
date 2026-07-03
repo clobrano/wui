@@ -1,14 +1,34 @@
 'use strict';
 
 /* ── Tab switching ───────────────────────────────────────────────────────── */
+const _SEARCH_FILTER_KEY = 'wui-search-filter';
+
 function wuiActivateTab(btn, tabName) {
+  // Persist the Search tab filter before leaving it.
+  const currentTab = document.querySelector('[name="tab"]')?.value;
+  if (currentTab === 'Search') {
+    const f = document.querySelector('[name="filter"]')?.value || '';
+    sessionStorage.setItem(_SEARCH_FILTER_KEY, f);
+  }
+
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   const tabInput = document.querySelector('[name="tab"]');
   if (tabInput) tabInput.value = tabName;
-  // Clear any active filter when switching tabs.
+
   const filterInput = document.querySelector('[name="filter"]');
-  if (filterInput) filterInput.value = '';
+  if (tabName === 'Search') {
+    // Restore saved Search filter (if any).
+    if (filterInput) filterInput.value = sessionStorage.getItem(_SEARCH_FILTER_KEY) || '';
+  } else {
+    if (filterInput) filterInput.value = '';
+  }
+}
+
+/* ── Group list (Projects / Tags) ───────────────────────────────────────── */
+function wuiOpenGroup(filter) {
+  sessionStorage.setItem(_SEARCH_FILTER_KEY, filter);
+  window.location = '/?tab=Search&filter=' + encodeURIComponent(filter);
 }
 
 /* ── Multi-select state ─────────────────────────────────────────────────── */
