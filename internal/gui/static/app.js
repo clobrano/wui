@@ -196,6 +196,14 @@ function wuiAddAnnotation(uuid) {
   }).then(r => { if (r.ok) { _syncAfterAction(); window.location.reload(); } });
 }
 
+function wuiRemoveAnnotation(uuid, description) {
+  fetch(`/api/v1/tasks/${uuid}/annotate`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ description }),
+  }).then(r => { if (r.ok) { _syncAfterAction(); window.location.reload(); } });
+}
+
 /* ── Undo toast ──────────────────────────────────────────────────────────── */
 let _toastTimer = null;
 let _lastUndoAction = null;
@@ -295,19 +303,39 @@ function wuiSetMode(mode) {
   const rawDiv  = document.getElementById('mode-raw');
   const btnForm = document.getElementById('btn-form');
   const btnRaw  = document.getElementById('btn-raw');
+  const descInput = document.getElementById('f-desc');
 
   if (mode === 'raw') {
     formDiv.classList.add('hidden');
     rawDiv.classList.remove('hidden');
     btnRaw.classList.add('active');
     btnForm.classList.remove('active');
+    // Remove required so the hidden description field doesn't block submission.
+    if (descInput) descInput.removeAttribute('required');
   } else {
     rawDiv.classList.add('hidden');
     formDiv.classList.remove('hidden');
     btnForm.classList.add('active');
     btnRaw.classList.remove('active');
+    if (descInput) descInput.setAttribute('required', '');
   }
 }
+
+/* ── Auto-commit pending tag on form submit ──────────────────────────────── */
+document.addEventListener('submit', function() {
+  const input = document.getElementById('tag-input');
+  if (!input) return;
+  const tag = input.value.trim().replace(/\s+/g, '_');
+  if (!tag) return;
+  const container = document.getElementById('tag-chip-container');
+  if (!container.querySelector(`input[value="${CSS.escape(tag)}"]`)) {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip';
+    chip.innerHTML = `${tag}<button type="button" onclick="wuiRemoveTag(this)">✕</button><input type="hidden" name="tags" value="${tag}">`;
+    container.insertBefore(chip, input);
+  }
+  input.value = '';
+});
 
 /* ── Task list refresh ───────────────────────────────────────────────────── */
 function _refreshTaskList() {

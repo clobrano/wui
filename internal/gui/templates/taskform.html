@@ -12,16 +12,16 @@
 
   <!-- Mode toggle: Raw / Form -->
   <div class="mode-toggle">
-    <button class="mode-btn active" id="btn-form" onclick="wuiSetMode('form')">Form</button>
-    <button class="mode-btn" id="btn-raw" onclick="wuiSetMode('raw')">Raw</button>
+    <button class="mode-btn" id="btn-form" onclick="wuiSetMode('form')">Form</button>
+    <button class="mode-btn active" id="btn-raw" onclick="wuiSetMode('raw')">Raw</button>
   </div>
 
   <form method="POST" action="{{.Action}}">
     <!-- Form mode -->
-    <div id="mode-form">
+    <div id="mode-form" class="hidden">
       <div class="field-group">
         <label for="f-desc">Description *</label>
-        <input type="text" id="f-desc" name="description" required
+        <input type="text" id="f-desc" name="description"
                value="{{.Task.Description}}" placeholder="What needs to be done?">
       </div>
 
@@ -105,7 +105,7 @@
     </div>
 
     <!-- Raw mode -->
-    <div id="mode-raw" class="hidden">
+    <div id="mode-raw">
       <div class="field-group">
         <label for="f-raw">Taskwarrior arguments</label>
         <textarea id="f-raw" name="raw" rows="4"
@@ -115,7 +115,7 @@
 
     <div class="form-actions">
       <button type="submit" class="btn-primary">{{if .IsNew}}Create{{else}}Save{{end}}</button>
-      <button onclick="window.location='{{.CancelURL}}'">Cancel</button>
+      <button type="button" onclick="window.location='{{.CancelURL}}'">Cancel</button>
     </div>
   </form>
 </div>

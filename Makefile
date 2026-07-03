@@ -1,5 +1,7 @@
 .PHONY: build test install clean help
 
+WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
+
 # Build variables
 BINARY_NAME=wui
 VERSION?=dev
@@ -62,3 +64,10 @@ mod-tidy:
 help:
 	@echo "Available targets:"
 	@sed -n 's/^##//p' $(MAKEFILE_LIST) | column -t -s ':' | sed -e 's/^/ /'
+
+## serve: Run the wui gui
+serve:
+	wui gui --config $(WUI_CONFIG)	
+
+## rebuild-and-serve
+rebuild-and-serve: build install serve

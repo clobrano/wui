@@ -332,7 +332,14 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	if raw != "" {
 		mods = raw
 	} else {
-		_, mods = s.buildTaskArgs(r, false)
+		description, fieldMods := s.buildTaskArgs(r, false)
+		if description != "" && fieldMods != "" {
+			mods = description + " " + fieldMods
+		} else if description != "" {
+			mods = description
+		} else {
+			mods = fieldMods
+		}
 	}
 
 	if mods != "" {

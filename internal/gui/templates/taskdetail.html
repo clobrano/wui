@@ -49,10 +49,7 @@
         <span class="annotation-ts">{{.Entry.Format "2006-01-02 15:04"}}</span>
         <span class="annotation-text">{{urlify .Description}}</span>
         <button class="link-btn annotation-delete"
-                hx-delete="/api/v1/tasks/{{$.Task.UUID}}/annotate"
-                hx-vals='{"description": "{{.Description}}"}'
-                hx-swap="none"
-                hx-on::after-request="window.location.reload()">✕</button>
+                onclick="wuiRemoveAnnotation('{{$.Task.UUID}}', '{{.Description}}')">✕</button>
       </li>
       {{end}}
     </ul>
