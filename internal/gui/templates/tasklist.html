@@ -4,6 +4,7 @@
   <!-- Tab bar -->
   <nav class="tab-bar" id="tab-bar">
     {{range .Tabs}}
+    {{if eq .Name "Search"}}<a href="/tasks/new" class="new-btn">New</a>{{end}}
     <button class="tab-btn{{if eq .Name $.ActiveTab}} active{{end}}"
             hx-get="/api/gui/tasks?tab={{.Name}}"
             hx-target="#task-list-container"
@@ -32,9 +33,6 @@
             hx-get="/api/gui/tasks"
             hx-target="#task-list-container"
             hx-include="[name='tab'],[name='filter']">↺</button>
-
-    <!-- FAB new task -->
-    <a href="/tasks/new" class="fab" title="New task">+</a>
   </div>
 
   <!-- Hidden fields carry active tab / filter for HTMX requests -->

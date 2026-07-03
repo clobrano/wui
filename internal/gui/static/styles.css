@@ -102,6 +102,17 @@ table { border-collapse: collapse; width: 100%; }
   color: var(--tab-active-fg);
   font-weight: 600;
 }
+.new-btn {
+  display: inline-block;
+  background: var(--surface);
+  color: var(--text);
+  padding: .3rem .7rem;
+  border-radius: 4px;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.new-btn:hover { background: var(--border); text-decoration: none; }
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
 .toolbar {
@@ -117,20 +128,6 @@ table { border-collapse: collapse; width: 100%; }
 .filter-btn { white-space: nowrap; }
 .filter-btn.filter-active { background: var(--accent); color: #fff; }
 .refresh-btn { font-size: 16px; }
-.fab {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px; height: 32px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: #fff;
-  font-size: 20px;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-.fab:hover { opacity: .85; }
 
 /* ── Filter panel ─────────────────────────────────────────────────────────── */
 .filter-panel { background: var(--surface); border-bottom: 1px solid var(--border); flex-shrink: 0; }
