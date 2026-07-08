@@ -351,8 +351,9 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		event.Start = &calendar.EventDateTime{
 			DateTime: eventTime.Format(time.RFC3339),
 		}
-		// Default to 15 minutes duration for timed events
-		endTime := eventTime.Add(15 * time.Minute)
+		// Duration comes from the 'dur' UDA when set and valid, otherwise
+		// falls back to the default duration.
+		endTime := eventTime.Add(eventDuration(task))
 		event.End = &calendar.EventDateTime{
 			DateTime: endTime.Format(time.RFC3339),
 		}
@@ -425,6 +426,27 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 	return event
 }
 
+// defaultEventDuration is used for timed events that have no valid 'dur' UDA.
+const defaultEventDuration = 15 * time.Minute
+
+// eventDuration returns how long a task's calendar event should last.
+//
+// It uses the Taskwarrior 'dur' UDA when present and parseable to a positive
+// duration, otherwise it falls back to defaultEventDuration. The result is
+// rounded to whole seconds so it survives the RFC3339 (second-precision)
+// round-trip used for event start/end times, keeping update comparisons stable.
+func eventDuration(task core.Task) time.Duration {
+	if raw := task.GetUDA("dur"); raw != "" {
+		d, err := ParseTaskDuration(raw)
+		if err != nil {
+			slog.Warn("Ignoring invalid 'dur' UDA", "uuid", task.UUID, "value", raw, "error", err)
+		} else if d > 0 {
+			return d.Round(time.Second)
+		}
+	}
+	return defaultEventDuration
+}
+
 // shouldUpdateEvent checks if an event needs to be updated
 func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bool {
 	slog.Debug("Comparing event with task",
@@ -493,8 +515,25 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 			// Compare DateTime for timed events
 			if event.Start.DateTime != "" {
 				eventStartTime, err := time.Parse(time.RFC3339, event.Start.DateTime)
-				if err == nil && !eventStartTime.Equal(taskTime) {
-					return true
+				if err == nil {
+					if !eventStartTime.Equal(taskTime) {
+						return true
+					}
+					// Start matches; verify the event duration still matches the
+					// task's 'dur' UDA (falling back to the default duration).
+					if event.End != nil && event.End.DateTime != "" {
+						eventEndTime, endErr := time.Parse(time.RFC3339, event.End.DateTime)
+						if endErr == nil {
+							actualDuration := eventEndTime.Sub(eventStartTime)
+							if actualDuration != eventDuration(task) {
+								slog.Debug("Event duration changed",
+									"uuid", task.UUID,
+									"expected", eventDuration(task),
+									"actual", actualDuration)
+								return true
+							}
+						}
+					}
 				}
 			} else if event.Start.Date != "" {
 				// Event is all-day but task has time, needs update

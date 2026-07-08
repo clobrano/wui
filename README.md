@@ -418,12 +418,20 @@ On first run, you'll authorize via browser. The token is saved to `~/.config/wui
 
 ### How it works
 
-- Tasks become all-day events based on due date (or scheduled date as fallback)
+- Tasks with a due (or scheduled) date at midnight become all-day events; tasks with a specific time become timed events
+- Timed events use the `dur` UDA for their length (e.g. `dur:30min`, `dur:1h30min`); without it they default to 15 minutes
 - Events include UUID, project, tags, and status in the description
 - Completed tasks show a **✓** checkmark in the title
 - Events are color-coded by priority (red = high, yellow = medium)
 - Existing events are updated when tasks change
 - Sync is **one-way**: Taskwarrior → Google Calendar
+
+> **Tip:** `dur` is a User Defined Attribute. Define it once in your `.taskrc` to use it:
+> ```
+> uda.dur.type=duration
+> uda.dur.label=Duration
+> ```
+> Then set it on a task, e.g. `task add "Standup" due:2026-03-15T09:00 dur:15min`.
 
 ## CLI Reference
 
