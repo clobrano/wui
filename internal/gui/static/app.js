@@ -324,22 +324,36 @@ function wuiSetMode(mode) {
   const btnForm = document.getElementById('btn-form');
   const btnRaw  = document.getElementById('btn-raw');
   const descInput = document.getElementById('f-desc');
+  const rawTextarea = document.getElementById('f-raw');
 
   if (mode === 'raw') {
     formDiv.classList.add('hidden');
     rawDiv.classList.remove('hidden');
     btnRaw.classList.add('active');
     btnForm.classList.remove('active');
-    // Remove required so the hidden description field doesn't block submission.
+    // Disable form inputs so they don't submit alongside raw content.
+    formDiv.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = true; });
+    if (rawTextarea) rawTextarea.disabled = false;
     if (descInput) descInput.removeAttribute('required');
   } else {
     rawDiv.classList.add('hidden');
     formDiv.classList.remove('hidden');
     btnForm.classList.add('active');
     btnRaw.classList.remove('active');
+    // Enable form inputs and disable raw textarea.
+    formDiv.querySelectorAll('input, select, textarea').forEach(el => { el.disabled = false; });
+    if (rawTextarea) rawTextarea.disabled = true;
     if (descInput) descInput.setAttribute('required', '');
   }
 }
+
+// Apply initial mode state on page load so disabled state matches the active button.
+document.addEventListener('DOMContentLoaded', function() {
+  const btnRaw = document.getElementById('btn-raw');
+  if (btnRaw) {
+    wuiSetMode(btnRaw.classList.contains('active') ? 'raw' : 'form');
+  }
+});
 
 /* ── Auto-commit pending tag on form submit ──────────────────────────────── */
 document.addEventListener('submit', function() {
