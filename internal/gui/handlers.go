@@ -3,6 +3,7 @@ package gui
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -457,7 +458,8 @@ func (s *Server) handleUpdateTask(w http.ResponseWriter, r *http.Request) {
 	}
 	tab := r.FormValue("tab")
 
-	raw := r.FormValue("raw")
+	raw := strings.TrimSpace(r.FormValue("raw"))
+	slog.Debug("handleUpdateTask", "uuid", uuid, "raw", raw, "description", r.FormValue("description"))
 	var mods string
 	if raw != "" {
 		mods = raw

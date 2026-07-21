@@ -500,6 +500,12 @@ func runGUI() error {
 		if configPath != "" {
 			args = append(args, "--config", cfgPath)
 		}
+		if taskrcPath != "" {
+			args = append(args, "--taskrc", taskrcPath)
+		}
+		if taskBinPath != "" {
+			args = append(args, "--task-bin", taskBinPath)
+		}
 		child = exec.Command(os.Args[0], args...)
 
 		// Task 1.7: relay child output with a [wui serve] prefix.
