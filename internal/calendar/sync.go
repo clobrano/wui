@@ -343,11 +343,20 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		eventTime = *task.Scheduled
 	}
 
-	// Check if the task has a specific time component (not midnight)
-	hasTime := eventTime.Hour() != 0 || eventTime.Minute() != 0 || eventTime.Second() != 0
+	// Check if user explicitly wants an all-day event via allDay UDA
+	allDayUDA := task.GetUDA("allDay")
+	forceAllDay := allDayUDA != "" && (allDayUDA == "true" || allDayUDA == "True" || allDayUDA == "TRUE" || allDayUDA == "1" || allDayUDA == "yes" || allDayUDA == "Yes")
 
-	if hasTime {
-		// Create timed event with specific time
+	if forceAllDay {
+		// Create all-day event when allDay UDA is set to true
+		event.Start = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
+		event.End = &calendar.EventDateTime{
+			Date: eventTime.Format("2006-01-02"),
+		}
+	} else {
+		// Create timed event with exact time (including midnight)
 		event.Start = &calendar.EventDateTime{
 			DateTime: eventTime.Format(time.RFC3339),
 		}
@@ -356,14 +365,6 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 		endTime := eventTime.Add(eventDuration(task))
 		event.End = &calendar.EventDateTime{
 			DateTime: endTime.Format(time.RFC3339),
-		}
-	} else {
-		// Create all-day event for tasks at midnight
-		event.Start = &calendar.EventDateTime{
-			Date: eventTime.Format("2006-01-02"),
-		}
-		event.End = &calendar.EventDateTime{
-			Date: eventTime.Format("2006-01-02"),
 		}
 	}
 
@@ -507,12 +508,24 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 		"task_due", task.Due,
 		"task_scheduled", task.Scheduled)
 
-	// Check if the task has a specific time component
-	hasTime := taskTime.Hour() != 0 || taskTime.Minute() != 0 || taskTime.Second() != 0
+	// Check if user explicitly wants an all-day event via allDay UDA
+	allDayUDA := task.GetUDA("allDay")
+	forceAllDay := allDayUDA != "" && (allDayUDA == "true" || allDayUDA == "True" || allDayUDA == "TRUE" || allDayUDA == "1" || allDayUDA == "yes" || allDayUDA == "Yes")
 
 	if event.Start != nil {
-		if hasTime {
-			// Compare DateTime for timed events
+		if forceAllDay {
+			// Task wants an all-day event - compare dates only
+			taskDate := taskTime.Format("2006-01-02")
+			if event.Start.Date != "" {
+				if event.Start.Date != taskDate {
+					return true
+				}
+			} else if event.Start.DateTime != "" {
+				// Event is timed but task wants all-day, needs update
+				return true
+			}
+		} else {
+			// Task wants a timed event - always use DateTime (even at midnight)
 			if event.Start.DateTime != "" {
 				eventStartTime, err := time.Parse(time.RFC3339, event.Start.DateTime)
 				if err == nil {
@@ -536,18 +549,7 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 					}
 				}
 			} else if event.Start.Date != "" {
-				// Event is all-day but task has time, needs update
-				return true
-			}
-		} else {
-			// Compare Date for all-day events
-			taskDate := taskTime.Format("2006-01-02")
-			if event.Start.Date != "" {
-				if event.Start.Date != taskDate {
-					return true
-				}
-			} else if event.Start.DateTime != "" {
-				// Event is timed but task is all-day, needs update
+				// Event is all-day but task wants time, needs update
 				return true
 			}
 		}
