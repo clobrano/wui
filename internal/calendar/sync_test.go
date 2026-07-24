@@ -103,10 +103,10 @@ func TestShouldUpdateEventOnDurationChange(t *testing.T) {
 	}
 }
 
-func TestTaskToEventMidnightAsTimedEvent(t *testing.T) {
+func TestTaskToEventMidnightAsAllDay(t *testing.T) {
 	s := &SyncClient{}
 
-	// Create a task with a due date at exactly midnight (no allDay UDA)
+	// Create a task with a due date at exactly midnight (default behavior)
 	midnight := time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local)
 	task := core.Task{
 		UUID:        "test-uuid",
@@ -117,9 +117,38 @@ func TestTaskToEventMidnightAsTimedEvent(t *testing.T) {
 
 	event := s.taskToEvent(task)
 
-	// Should create a timed event (DateTime), not an all-day event (Date)
+	// Should create an all-day event (Date), not a timed event
+	if event.Start.Date == "" {
+		t.Errorf("expected all-day event (Date) for midnight task, got DateTime instead")
+	}
+	if event.Start.DateTime != "" {
+		t.Errorf("unexpected DateTime field for all-day event")
+	}
+
+	// Verify the date is correct
+	if event.Start.Date != "2026-03-15" {
+		t.Errorf("start date = %q, want %q", event.Start.Date, "2026-03-15")
+	}
+}
+
+func TestTaskToEventMidnightWithTimedUDA(t *testing.T) {
+	s := &SyncClient{}
+
+	// Create a task with midnight time but timed:true UDA to force a timed event
+	midnight := time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local)
+	task := core.Task{
+		UUID:        "test-uuid",
+		Description: "Timed midnight",
+		Status:      "pending",
+		Due:         &midnight,
+		UDAs:        map[string]string{"timed": "true"},
+	}
+
+	event := s.taskToEvent(task)
+
+	// Should create a timed event (DateTime), not all-day
 	if event.Start.DateTime == "" {
-		t.Errorf("expected timed event (DateTime) for midnight task, got Date field instead")
+		t.Errorf("expected timed event (DateTime) with timed:true, got Date instead")
 	}
 	if event.Start.Date != "" {
 		t.Errorf("unexpected Date field for timed event")
@@ -135,54 +164,25 @@ func TestTaskToEventMidnightAsTimedEvent(t *testing.T) {
 	}
 }
 
-func TestTaskToEventWithAllDayUDA(t *testing.T) {
+func TestTaskToEventWithTimedUDAVariations(t *testing.T) {
 	s := &SyncClient{}
-
-	// Create a task with allDay:true UDA
-	due := time.Date(2026, 3, 15, 14, 30, 0, 0, time.Local)
-	task := core.Task{
-		UUID:        "test-uuid",
-		Description: "All-day meeting",
-		Status:      "pending",
-		Due:         &due,
-		UDAs:        map[string]string{"allDay": "true"},
-	}
-
-	event := s.taskToEvent(task)
-
-	// Should create an all-day event (Date), not a timed event
-	if event.Start.Date == "" {
-		t.Errorf("expected all-day event (Date) with allDay:true, got DateTime instead")
-	}
-	if event.Start.DateTime != "" {
-		t.Errorf("unexpected DateTime field for all-day event")
-	}
-
-	// Verify the date is correct
-	if event.Start.Date != "2026-03-15" {
-		t.Errorf("start date = %q, want %q", event.Start.Date, "2026-03-15")
-	}
-}
-
-func TestTaskToEventWithAllDayUDAVariations(t *testing.T) {
-	s := &SyncClient{}
-	due := time.Date(2026, 3, 15, 14, 30, 0, 0, time.Local)
+	midnight := time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local)
 
 	tests := []struct {
-		name        string
-		allDayValue string
-		wantAllDay  bool
+		name       string
+		timedValue string
+		wantTimed  bool
 	}{
-		{"allDay=true", "true", true},
-		{"allDay=True", "True", true},
-		{"allDay=TRUE", "TRUE", true},
-		{"allDay=1", "1", true},
-		{"allDay=yes", "yes", true},
-		{"allDay=Yes", "Yes", true},
-		{"allDay=false", "false", false},
-		{"allDay=False", "False", false},
-		{"allDay=0", "0", false},
-		{"allDay=no", "no", false},
+		{"timed=true", "true", true},
+		{"timed=True", "True", true},
+		{"timed=TRUE", "TRUE", true},
+		{"timed=1", "1", true},
+		{"timed=yes", "yes", true},
+		{"timed=Yes", "Yes", true},
+		{"timed=false", "false", false},
+		{"timed=False", "False", false},
+		{"timed=0", "0", false},
+		{"timed=no", "no", false},
 	}
 
 	for _, tt := range tests {
@@ -191,8 +191,8 @@ func TestTaskToEventWithAllDayUDAVariations(t *testing.T) {
 				UUID:        "test-uuid",
 				Description: "Test task",
 				Status:      "pending",
-				Due:         &due,
-				UDAs:        map[string]string{"allDay": tt.allDayValue},
+				Due:         &midnight,
+				UDAs:        map[string]string{"timed": tt.timedValue},
 			}
 
 			event := s.taskToEvent(task)
@@ -200,11 +200,11 @@ func TestTaskToEventWithAllDayUDAVariations(t *testing.T) {
 			hasDate := event.Start.Date != ""
 			hasDateTime := event.Start.DateTime != ""
 
-			if tt.wantAllDay && !hasDate {
-				t.Errorf("expected all-day event (Date) for allDay=%q", tt.allDayValue)
+			if tt.wantTimed && !hasDateTime {
+				t.Errorf("expected timed event (DateTime) for timed=%q", tt.timedValue)
 			}
-			if !tt.wantAllDay && !hasDateTime {
-				t.Errorf("expected timed event (DateTime) for allDay=%q", tt.allDayValue)
+			if !tt.wantTimed && !hasDate {
+				t.Errorf("expected all-day event (Date) for timed=%q", tt.timedValue)
 			}
 			if hasDate && hasDateTime {
 				t.Errorf("event has both Date and DateTime")
@@ -213,39 +213,39 @@ func TestTaskToEventWithAllDayUDAVariations(t *testing.T) {
 	}
 }
 
-func TestShouldUpdateEventWhenAllDayChanges(t *testing.T) {
+func TestShouldUpdateEventWhenTimedUDAChanges(t *testing.T) {
 	s := &SyncClient{}
 
-	// Create a timed task (no allDay UDA)
-	due := time.Date(2026, 3, 15, 14, 0, 0, 0, time.Local)
-	timedTask := core.Task{
-		UUID:        "test-uuid",
-		Description: "Meeting",
-		Status:      "pending",
-		Due:         &due,
-	}
-
-	// Create its corresponding event
-	timedEvent := s.taskToEvent(timedTask)
-
-	// Now create an all-day version of the same task
+	// Create an all-day task (midnight, no timed UDA)
+	midnight := time.Date(2026, 3, 15, 0, 0, 0, 0, time.Local)
 	allDayTask := core.Task{
 		UUID:        "test-uuid",
-		Description: "Meeting",
+		Description: "Event",
 		Status:      "pending",
-		Due:         &due,
-		UDAs:        map[string]string{"allDay": "true"},
+		Due:         &midnight,
 	}
 
-	// The all-day task should detect the need for an update when compared to the timed event
-	if !s.shouldUpdateEvent(allDayTask, timedEvent) {
-		t.Errorf("expected update needed when switching from timed to all-day event")
-	}
-
-	// Conversely, the timed task should detect the need for an update when compared to an all-day event
+	// Create its corresponding all-day event
 	allDayEvent := s.taskToEvent(allDayTask)
+
+	// Now create a timed version with timed:true UDA
+	timedTask := core.Task{
+		UUID:        "test-uuid",
+		Description: "Event",
+		Status:      "pending",
+		Due:         &midnight,
+		UDAs:        map[string]string{"timed": "true"},
+	}
+
+	// The timed task should detect the need for an update when compared to the all-day event
 	if !s.shouldUpdateEvent(timedTask, allDayEvent) {
 		t.Errorf("expected update needed when switching from all-day to timed event")
+	}
+
+	// Conversely, the all-day task should detect the need for an update when compared to the timed event
+	timedEvent := s.taskToEvent(timedTask)
+	if !s.shouldUpdateEvent(allDayTask, timedEvent) {
+		t.Errorf("expected update needed when switching from timed to all-day event")
 	}
 
 	// But if both are all-day, no update should be needed
