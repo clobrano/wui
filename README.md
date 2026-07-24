@@ -418,7 +418,8 @@ On first run, you'll authorize via browser. The token is saved to `~/.config/wui
 
 ### How it works
 
-- Tasks with a due (or scheduled) date at midnight become all-day events; tasks with a specific time become timed events
+- Tasks always sync with their exact due (or scheduled) time to Google Calendar as timed events, even if the time is midnight
+- Set `allDay:true` UDA to create an all-day event instead, which ignores the specific time
 - Timed events use the `dur` UDA for their length (e.g. `dur:30min`, `dur:1h30min`); without it they default to 15 minutes
 - Events include UUID, project, tags, and status in the description
 - Completed tasks show a **✓** checkmark in the title
@@ -426,12 +427,17 @@ On first run, you'll authorize via browser. The token is saved to `~/.config/wui
 - Existing events are updated when tasks change
 - Sync is **one-way**: Taskwarrior → Google Calendar
 
-> **Tip:** `dur` is a User Defined Attribute. Define it once in your `.taskrc` to use it:
+> **Tip:** `dur` and `allDay` are User Defined Attributes. Define them once in your `.taskrc` to use them:
 > ```
 > uda.dur.type=duration
 > uda.dur.label=Duration
+> uda.allDay.type=string
+> uda.allDay.label=All Day
 > ```
-> Then set it on a task, e.g. `task add "Standup" due:2026-03-15T09:00 dur:15min`.
+> Then set them on tasks:
+> - Timed event: `task add "Standup" due:2026-03-15T09:00 dur:15min`
+> - Timed event at midnight: `task add "Night shift" due:2026-03-15T00:00` (exact time is preserved)
+> - All-day event: `task add "Holiday" due:2026-12-25 allDay:true`
 
 ## CLI Reference
 
