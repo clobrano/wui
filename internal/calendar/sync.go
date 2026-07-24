@@ -349,11 +349,14 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 
 	if forceAllDay {
 		// Create all-day event when allDay UDA is explicitly set to true
+		// Use local time to get the correct date (ignore the time component)
+		localTime := eventTime.Local()
+		dateStr := localTime.Format("2006-01-02")
 		event.Start = &calendar.EventDateTime{
-			Date: eventTime.Format("2006-01-02"),
+			Date: dateStr,
 		}
 		event.End = &calendar.EventDateTime{
-			Date: eventTime.Format("2006-01-02"),
+			Date: dateStr,
 		}
 	} else {
 		// Create timed event with exact time (including midnight if not overridden by allDay UDA)
@@ -514,8 +517,9 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	if event.Start != nil {
 		if forceAllDay {
-			// Task should be an all-day event - compare dates only
-			taskDate := taskTime.Format("2006-01-02")
+			// Task should be an all-day event - compare dates only (use local date)
+			localTime := taskTime.Local()
+			taskDate := localTime.Format("2006-01-02")
 			if event.Start.Date != "" {
 				if event.Start.Date != taskDate {
 					return true
