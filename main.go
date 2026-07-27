@@ -22,6 +22,7 @@ import (
 	"github.com/clobrano/wui/internal/taskwarrior"
 	"github.com/clobrano/wui/internal/tui"
 	"github.com/clobrano/wui/internal/version"
+	"github.com/clobrano/wui/internal/youtube"
 	"github.com/spf13/cobra"
 )
 
@@ -128,6 +129,23 @@ Examples:
 	},
 }
 
+var youtubeCmd = &cobra.Command{
+	Use:   "youtube",
+	Short: "Sync YouTube playlists to Taskwarrior (one-shot)",
+	Long: `Fetch all configured YouTube playlists via yt-dlp and create a Taskwarrior
+task for each video not yet seen. Useful for testing your youtube_sync config
+before relying on the background poller in wui serve.
+
+Examples:
+  wui youtube                  # run sync for all enabled playlists`,
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := runYoutube(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	},
+}
+
 var syncCmd = &cobra.Command{
 	Use:   "sync",
 	Short: "Sync Taskwarrior tasks to Google Calendar",
@@ -161,6 +179,7 @@ Examples:
 func init() {
 	// Add subcommands
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(youtubeCmd)
 	rootCmd.AddCommand(syncCmd)
 	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(guiCmd)
@@ -390,6 +409,35 @@ func runServe() error {
 	}
 	client.SetWuiConfigPath(cfgPath)
 
+	// Background context cancelled on shutdown to stop any pollers.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Start one YouTube playlist poller per enabled entry.
+	if yt := cfg.YoutubeSync; yt != nil && len(yt.Playlists) > 0 {
+		if _, err := exec.LookPath(yt.YtDlpBin); err != nil {
+			return fmt.Errorf("yt-dlp binary %q not found: %w", yt.YtDlpBin, err)
+		}
+		for i := range yt.Playlists {
+			pl := &yt.Playlists[i]
+			if !pl.Enabled {
+				continue
+			}
+			if pl.PlaylistURL == "" {
+				slog.Warn("YouTube playlist entry has no playlist_url — skipping")
+				continue
+			}
+			interval, err := time.ParseDuration(pl.PollInterval)
+			if err != nil {
+				slog.Warn("Invalid poll_interval for playlist, using 30m", "playlist", pl.PlaylistURL, "value", pl.PollInterval)
+				interval = 30 * time.Minute
+			}
+			syncer := youtube.NewSyncer(pl, yt.YtDlpBin, client)
+			youtube.StartPoller(ctx, syncer, interval)
+			slog.Info("YouTube playlist poller started", "playlist", pl.PlaylistURL, "interval", interval)
+		}
+	}
+
 	srv := api.NewServer(client, serveAddr, serveTLSCert, serveTLSKey)
 
 	// Graceful shutdown on SIGINT / SIGTERM
@@ -403,10 +451,11 @@ func runServe() error {
 	case err := <-errCh:
 		return err
 	case <-stop:
+		cancel() // stop the YouTube poller
 		fmt.Println("\nShutting down...")
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		return srv.Shutdown(ctx)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer shutdownCancel()
+		return srv.Shutdown(shutdownCtx)
 	}
 }
 
@@ -605,6 +654,76 @@ func (pw *prefixWriter) Write(p []byte) (n int, err error) {
 		pw.buf = pw.buf[idx+1:]
 	}
 	return len(p), nil
+}
+
+// runYoutube performs a one-shot YouTube playlist sync and prints results to stdout.
+func runYoutube() error {
+	cfgPath := config.ResolveConfigPath(configPath)
+	if err := config.ValidateExplicitConfigPath(configPath, cfgPath); err != nil {
+		return err
+	}
+
+	cfg, err := config.LoadConfig(cfgPath)
+	if err != nil {
+		initLogging(nil)
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+	initLogging(cfg)
+
+	if taskBinPath != "" {
+		cfg.TaskBin = taskBinPath
+	}
+	if taskrcPath != "" {
+		cfg.TaskrcPath = taskrcPath
+	}
+
+	if err := checkTaskBinary(cfg.TaskBin); err != nil {
+		return err
+	}
+	if err := config.ValidateTaskrcPath(cfg.TaskrcPath); err != nil {
+		return err
+	}
+
+	yt := cfg.YoutubeSync
+	if yt == nil || len(yt.Playlists) == 0 {
+		fmt.Println("No playlists configured under youtube_sync.")
+		return nil
+	}
+
+	if _, err := exec.LookPath(yt.YtDlpBin); err != nil {
+		return fmt.Errorf("yt-dlp binary %q not found: %w", yt.YtDlpBin, err)
+	}
+
+	client, err := taskwarrior.NewClient(cfg.TaskBin, cfg.TaskrcPath)
+	if err != nil {
+		return fmt.Errorf("failed to create taskwarrior client: %w", err)
+	}
+
+	anyEnabled := false
+	for i := range yt.Playlists {
+		pl := &yt.Playlists[i]
+		if !pl.Enabled {
+			continue
+		}
+		anyEnabled = true
+		if pl.PlaylistURL == "" {
+			fmt.Fprintf(os.Stderr, "playlist entry %d: no playlist_url — skipping\n", i+1)
+			continue
+		}
+
+		fmt.Printf("syncing %s … ", pl.PlaylistURL)
+		result, err := youtube.NewSyncer(pl, yt.YtDlpBin, client).Sync()
+		if err != nil {
+			fmt.Printf("error: %v\n", err)
+			continue
+		}
+		fmt.Printf("%d added, %d skipped\n", result.Added, result.Skipped)
+	}
+
+	if !anyEnabled {
+		fmt.Println("No enabled playlists found. Set enabled: true in youtube_sync.playlists.")
+	}
+	return nil
 }
 
 // runSync performs the Google Calendar sync operation

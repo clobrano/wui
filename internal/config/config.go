@@ -19,6 +19,25 @@ type CalendarSync struct {
 	AutoSyncOnQuit  bool   `yaml:"auto_sync_on_quit"`
 }
 
+// YoutubePlaylist holds per-playlist polling settings.
+type YoutubePlaylist struct {
+	Enabled      bool     `yaml:"enabled"`
+	PlaylistURL  string   `yaml:"playlist_url"`
+	PollInterval string   `yaml:"poll_interval"`
+	StateFile    string   `yaml:"state_file,omitempty"` // auto-derived from playlist URL when empty
+	TaskTags     []string `yaml:"task_tags,omitempty"`
+	TaskProject  string   `yaml:"task_project,omitempty"`
+}
+
+// YoutubeSync represents YouTube playlist polling configuration.
+// When enabled, wui serve periodically fetches public playlists via yt-dlp
+// and creates a Taskwarrior task for each new video URL (Taskwarrior hooks
+// handle further enrichment).
+type YoutubeSync struct {
+	YtDlpBin  string            `yaml:"yt_dlp_bin"`
+	Playlists []YoutubePlaylist  `yaml:"playlists"`
+}
+
 // ServeConfig holds configuration for the wui serve REST API server.
 type ServeConfig struct {
 	Port int `yaml:"port"`
@@ -31,6 +50,7 @@ type Config struct {
 	LogLevel            string        `yaml:"log_level,omitempty"`
 	TUI                 *TUIConfig    `yaml:"tui"`
 	CalendarSync        *CalendarSync `yaml:"calendar_sync,omitempty"`
+	YoutubeSync         *YoutubeSync  `yaml:"youtube_sync,omitempty"`
 	Serve               *ServeConfig  `yaml:"serve,omitempty"`
 	InitialSearchFilter string        `yaml:"-"` // Not persisted to config file, set via CLI flag
 }
@@ -145,6 +165,12 @@ func expandTildePaths(cfg *Config) {
 		cfg.CalendarSync.CredentialsPath = expandTilde(cfg.CalendarSync.CredentialsPath)
 		cfg.CalendarSync.TokenPath = expandTilde(cfg.CalendarSync.TokenPath)
 	}
+	if cfg.YoutubeSync != nil {
+		for i := range cfg.YoutubeSync.Playlists {
+			pl := &cfg.YoutubeSync.Playlists[i]
+			pl.StateFile = expandTilde(pl.StateFile)
+		}
+	}
 }
 
 // ConfigDir returns the default wui configuration directory (~/.config/wui).
@@ -233,6 +259,16 @@ func mergeWithDefaults(defaults, loaded *Config) *Config {
 	// Merge CalendarSync config
 	if loaded.CalendarSync != nil {
 		result.CalendarSync = loaded.CalendarSync
+	}
+
+	// Merge YoutubeSync config
+	if loaded.YoutubeSync != nil {
+		if loaded.YoutubeSync.YtDlpBin != "" {
+			result.YoutubeSync.YtDlpBin = loaded.YoutubeSync.YtDlpBin
+		}
+		if len(loaded.YoutubeSync.Playlists) > 0 {
+			result.YoutubeSync.Playlists = loaded.YoutubeSync.Playlists
+		}
 	}
 
 	// Merge Serve config

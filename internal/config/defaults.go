@@ -18,6 +18,15 @@ func DefaultConfig() *Config {
 		LogLevel:     "error",
 		TUI:          DefaultTUIConfig(),
 		CalendarSync: DefaultCalendarSync(),
+		YoutubeSync:  DefaultYoutubeSync(),
+	}
+}
+
+// DefaultYoutubeSync returns default YouTube playlist sync configuration.
+func DefaultYoutubeSync() *YoutubeSync {
+	return &YoutubeSync{
+		YtDlpBin:  "yt-dlp",
+		Playlists: []YoutubePlaylist{},
 	}
 }
 
