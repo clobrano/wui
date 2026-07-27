@@ -279,10 +279,48 @@ main { flex: 1; overflow-y: auto; }
 .link-btn { background: none; border: none; padding: 0; color: var(--primary); font-size: inherit; }
 .link-btn:hover { text-decoration: underline; }
 
+/* ── Task cards (small-screen multiline layout) ──────────────────────────── */
+.task-cards { list-style: none; display: none; padding: 0; }
+.task-card {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  padding: .5rem .6rem;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.task-card:hover { background: var(--row-hover-bg); }
+.card-desc {
+  color: var(--text);
+  line-height: 1.4;
+}
+.card-desc:hover { color: var(--primary); }
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+  min-height: 0;
+}
+.card-field {
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+/* Reuse existing priority / due / status classes on cards */
+.task-card.priority-h { border-left: 3px solid var(--pri-high); }
+.task-card.priority-m { border-left: 3px solid var(--pri-medium); }
+.task-card.priority-l { border-left: 3px solid var(--pri-low); }
+.task-card.status-completed,
+.task-card.status-deleted { opacity: .45; }
+.task-card.status-completed .card-desc,
+.task-card.status-deleted .card-desc { text-decoration: line-through; color: var(--text-dim); }
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
-@media (max-width: 375px) {
-  .col-proj, .col-tags, .col-urg { display: none; }
-  .col-check { display: none; } /* checkboxes hidden on mobile; long-press activates multi-select */
+@media (max-width: 600px) {
+  .task-table { display: none; }
+  .task-cards { display: block; }
   .detail-layout, .form-layout { padding: .6rem; }
 }
 

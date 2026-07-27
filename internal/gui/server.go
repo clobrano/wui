@@ -66,6 +66,41 @@ func (s *Server) templateFuncs() template.FuncMap {
 		"urlify":          urlify,
 		"formatDateInput": formatDateInput,
 		"not":             func(b bool) bool { return !b },
+		// hasField reports whether a named field appears in a column list.
+		"hasField": func(cols []config.Column, name string) bool {
+			for _, c := range cols {
+				if c.Name == name {
+					return true
+				}
+			}
+			return false
+		},
+		// taskField returns a compact display value for a named field on a task.
+		// Date fields use short relative dates; empty/missing values return "".
+		"taskField": func(task core.Task, fieldName string) string {
+			switch fieldName {
+			case "start":
+				return "" // always shown unconditionally; not driven by field config
+			case "annotation":
+				n := len(task.Annotations)
+				if n == 0 {
+					return ""
+				}
+				return fmt.Sprintf("🗒 %d", n)
+			case "due", "scheduled", "wait", "entry", "modified", "end":
+				t := task.GetDateValue(fieldName)
+				if t == nil {
+					return ""
+				}
+				return ShortRelDate(t)
+			default:
+				val, _ := task.GetProperty(fieldName)
+				if val == "-" || val == "" {
+					return ""
+				}
+				return val
+			}
+		},
 	}
 }
 

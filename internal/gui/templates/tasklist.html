@@ -125,7 +125,7 @@
       <td class="col-desc">
         <a href="/tasks/{{.UUID}}?tab={{$.ActiveTab}}" class="task-link">{{.Description}}</a>
         {{if .Start}}<span class="icon-started" title="Started">▶</span>{{end}}
-        {{if .Annotations}}<span class="icon-notes" title="{{len .Annotations}} annotation(s)">🗒 {{len .Annotations}}</span>{{end}}
+        {{if hasField $.Columns "annotation"}}{{if .Annotations}}<span class="icon-notes" title="{{len .Annotations}} annotation(s)">🗒 {{len .Annotations}}</span>{{end}}{{end}}
       </td>
       <td class="col-proj">{{.Project}}</td>
       <td class="col-due">{{shortRelDate .Due}}</td>
@@ -135,6 +135,26 @@
     {{end}}
   </tbody>
 </table>
+<ul class="task-cards">
+  {{range .Tasks}}
+  {{$task := .}}
+  <li class="task-card priority-{{lower .Priority}} {{dueCSSClass .Due}} status-{{.Status}}"
+      data-uuid="{{.UUID}}"
+      onclick="wuiRowClick(event, this)"
+      ontouchstart="wuiTouchStart(event, this)"
+      ontouchmove="wuiTouchMove(event)"
+      ontouchend="wuiTouchEnd(event, this)">
+    <a href="/tasks/{{.UUID}}?tab={{$.ActiveTab}}" class="task-link card-desc">{{.Description}}</a>
+    <div class="card-meta">
+      {{if .Start}}<span class="card-field icon-started" title="Started">▶</span>{{end}}
+      {{range $.NarrowViewFields}}
+      {{$val := taskField $task .Name}}
+      {{if $val}}<span class="card-field">{{$val}}</span>{{end}}
+      {{end}}
+    </div>
+  </li>
+  {{end}}
+</ul>
 {{else if eq .ActiveTab "Search"}}
 <p class="empty-state">Type a filter above to search across all tasks.<br><small>Examples: <code>bug</code> &nbsp; <code>project:home</code> &nbsp; <code>+urgent due.before:eom</code></small></p>
 {{else}}

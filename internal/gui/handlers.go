@@ -16,15 +16,17 @@ import (
 
 // taskListData is the template data for the task list page and partial.
 type taskListData struct {
-	Tabs          []config.Tab
-	ActiveTab     string
-	Tasks         []core.Task
-	FilterHistory []string
-	ActiveFilter  string
-	ShowFilter    bool
-	IsGroupView   bool
-	Groups        []groupItem
-	GroupType     string // "Project" or "Tag"
+	Tabs             []config.Tab
+	ActiveTab        string
+	Tasks            []core.Task
+	FilterHistory    []string
+	ActiveFilter     string
+	ShowFilter       bool
+	IsGroupView      bool
+	Groups           []groupItem
+	GroupType        string // "Project" or "Tag"
+	Columns          []config.Column
+	NarrowViewFields []config.Column
 }
 
 // groupItem is one row in the Projects or Tags group list.
@@ -141,10 +143,12 @@ func (s *Server) handleTaskList(w http.ResponseWriter, r *http.Request) {
 	history, _ := s.filterHistory.Load()
 
 	data := taskListData{
-		Tabs:          allTabs,
-		ActiveTab:     tab,
-		FilterHistory: history,
-		ActiveFilter:  filter,
+		Tabs:             allTabs,
+		ActiveTab:        tab,
+		FilterHistory:    history,
+		ActiveFilter:     filter,
+		Columns:          s.cfg.TUI.Columns,
+		NarrowViewFields: s.cfg.TUI.NarrowViewFields,
 	}
 
 	switch tab {
@@ -208,7 +212,7 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Project"})
+		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Project", Columns: s.cfg.TUI.Columns, NarrowViewFields: s.cfg.TUI.NarrowViewFields})
 		return
 
 	case "Tags":
@@ -217,7 +221,7 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Tag"})
+		execRows(taskListData{ActiveTab: tab, IsGroupView: true, Groups: groups, GroupType: "Tag", Columns: s.cfg.TUI.Columns, NarrowViewFields: s.cfg.TUI.NarrowViewFields})
 		return
 	}
 
@@ -234,7 +238,7 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 
 	// Search tab with no filter → empty state.
 	if tab == "Search" && filter == "" {
-		execRows(taskListData{ActiveTab: tab})
+		execRows(taskListData{ActiveTab: tab, Columns: s.cfg.TUI.Columns, NarrowViewFields: s.cfg.TUI.NarrowViewFields})
 		return
 	}
 
@@ -248,9 +252,11 @@ func (s *Server) handleTaskListPartial(w http.ResponseWriter, r *http.Request) {
 	tasks = SortTasks(tasks, sortMethod, reverse)
 
 	execRows(taskListData{
-		ActiveTab:    tab,
-		Tasks:        tasks,
-		ActiveFilter: r.URL.Query().Get("filter"),
+		ActiveTab:        tab,
+		Tasks:            tasks,
+		ActiveFilter:     r.URL.Query().Get("filter"),
+		Columns:          s.cfg.TUI.Columns,
+		NarrowViewFields: s.cfg.TUI.NarrowViewFields,
 	})
 }
 
