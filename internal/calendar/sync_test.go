@@ -5,7 +5,50 @@ import (
 	"time"
 
 	"github.com/clobrano/wui/internal/core"
+	"google.golang.org/api/calendar/v3"
 )
+
+// An event is matched back to its task purely by the UUID in its description.
+// If this round-trip ever breaks, every sync creates the event again.
+func TestExtractUUIDFromEventRoundTrip(t *testing.T) {
+	s := &SyncClient{}
+
+	scheduled := time.Date(2026, 7, 8, 9, 0, 0, 0, time.Local)
+	due := time.Date(2026, 7, 8, 14, 0, 0, 0, time.Local)
+
+	tasks := []core.Task{
+		timedTask(""),
+		{UUID: "d3b07384-d9a0-4f1e-9c2b-1a2b3c4d5e6f", Description: "Full task",
+			Status: "pending", Project: "work", Tags: []string{"a", "b"}, Due: &due, Scheduled: &scheduled},
+		// scheduled after due appends a warning below the UUID line
+		{UUID: "warned-uuid", Description: "Warned", Status: "pending", Due: &scheduled, Scheduled: &due},
+		{UUID: "no-project-uuid", Description: "Bare", Status: "completed", Due: &due},
+	}
+
+	for _, task := range tasks {
+		if got := extractUUIDFromEvent(s.taskToEvent(task)); got != task.UUID {
+			t.Errorf("extractUUIDFromEvent() = %q, want %q", got, task.UUID)
+		}
+	}
+}
+
+func TestExtractUUIDFromEventIgnoresForeignEvents(t *testing.T) {
+	tests := []struct {
+		name  string
+		event *calendar.Event
+	}{
+		{"no description", &calendar.Event{Summary: "Lunch"}},
+		{"unrelated description", &calendar.Event{Description: "Dentist appointment"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := extractUUIDFromEvent(tt.event); got != "" {
+				t.Errorf("extractUUIDFromEvent() = %q, want empty", got)
+			}
+		})
+	}
+}
 
 func timedTask(dur string) core.Task {
 	due := time.Date(2026, 7, 8, 14, 0, 0, 0, time.Local)
@@ -19,75 +62,6 @@ func timedTask(dur string) core.Task {
 		task.UDAs = map[string]string{"dur": dur}
 	}
 	return task
-}
-
-func taskDueAt(due time.Time) core.Task {
-	return core.Task{
-		UUID:        "test-uuid",
-		Description: "Task",
-		Status:      "pending",
-		Due:         &due,
-	}
-}
-
-// The lookup window decides which existing events a sync can see. Any task it
-// would create an event for must fall inside it, otherwise the next run cannot
-// find that event and creates a duplicate.
-func TestEventLookupWindowCoversAllSyncedTasks(t *testing.T) {
-	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
-
-	longPast := now.Add(-400 * 24 * time.Hour)
-	farFuture := now.Add(900 * 24 * time.Hour)
-	scheduledOnly := now.Add(-200 * 24 * time.Hour)
-
-	tasks := []core.Task{
-		taskDueAt(longPast),
-		taskDueAt(farFuture),
-		{UUID: "scheduled-only", Description: "Scheduled", Status: "pending", Scheduled: &scheduledOnly},
-		{UUID: "no-dates", Description: "No dates", Status: "pending"},
-	}
-
-	timeMin, timeMax := eventLookupWindow(now, tasks)
-
-	if !timeMin.Before(longPast) {
-		t.Errorf("timeMin = %v, want strictly before oldest task time %v", timeMin, longPast)
-	}
-	if !timeMax.After(farFuture) {
-		t.Errorf("timeMax = %v, want strictly after newest task time %v", timeMax, farFuture)
-	}
-	if !timeMin.Before(scheduledOnly) {
-		t.Errorf("timeMin = %v, want strictly before scheduled-only task time %v", timeMin, scheduledOnly)
-	}
-}
-
-func TestEventLookupWindowKeepsDefaultRange(t *testing.T) {
-	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
-
-	// A task inside the default window must not shrink it: the window is also
-	// what lets stale events (for tasks that lost their dates) be found.
-	timeMin, timeMax := eventLookupWindow(now, []core.Task{taskDueAt(now)})
-
-	if want := now.Add(-eventLookupPast); !timeMin.Equal(want) {
-		t.Errorf("timeMin = %v, want default %v", timeMin, want)
-	}
-	if want := now.Add(eventLookupFuture); !timeMax.Equal(want) {
-		t.Errorf("timeMax = %v, want default %v", timeMax, want)
-	}
-}
-
-func TestEventLookupWindowAccountsForEventDuration(t *testing.T) {
-	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
-
-	// A long event starting just inside the far edge still ends past it.
-	start := now.Add(eventLookupFuture - time.Hour)
-	task := taskDueAt(start)
-	task.UDAs = map[string]string{"dur": "48h"}
-
-	_, timeMax := eventLookupWindow(now, []core.Task{task})
-
-	if end := start.Add(48 * time.Hour); !timeMax.After(end) {
-		t.Errorf("timeMax = %v, want strictly after event end %v", timeMax, end)
-	}
 }
 
 func TestTaskEventTime(t *testing.T) {

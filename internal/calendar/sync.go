@@ -80,13 +80,8 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 
 	slog.Info("Retrieved tasks", "count", len(tasks))
 
-	// Get existing events from calendar. The lookup window is widened to cover
-	// every task being synced, so events already created for tasks far in the
-	// past or future are found instead of being created a second time.
-	timeMin, timeMax := eventLookupWindow(time.Now(), tasks)
-	slog.Info("Event lookup window", "time_min", timeMin, "time_max", timeMax)
-
-	existingEvents, err := s.getCalendarEvents(ctx, calendarID, timeMin, timeMax)
+	// Get existing events from calendar
+	existingEvents, err := s.getCalendarEvents(ctx, calendarID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get calendar events: %w", err)
 	}
@@ -252,52 +247,23 @@ func (s *SyncClient) findCalendarByName(ctx context.Context, name string) (strin
 	return "", fmt.Errorf("calendar '%s' not found", name)
 }
 
-// Bounds of the window used when listing existing calendar events. The window
-// always covers this much time around now, and is extended further to include
-// every task being synced (see eventLookupWindow).
-const (
-	eventLookupPast   = 30 * 24 * time.Hour
-	eventLookupFuture = 365 * 24 * time.Hour
-	// Margin added on both ends so an event sitting exactly on a boundary is
-	// still returned: the API treats timeMin/timeMax as exclusive bounds on the
-	// event's end/start.
-	eventLookupMargin = 24 * time.Hour
-)
-
-// eventLookupWindow returns the time range to search for existing events.
+// getCalendarEvents retrieves events from the calendar that were created by
+// this tool, identified by the Taskwarrior UUID stored in their description.
 //
-// A fixed window around "now" is not enough: a task due outside it gets an
-// event created that the next sync cannot see, so the event is created again
-// on every run. Widening the window to span all synced tasks makes the lookup
-// cover everything this sync could possibly create.
-func eventLookupWindow(now time.Time, tasks []core.Task) (time.Time, time.Time) {
-	timeMin := now.Add(-eventLookupPast)
-	timeMax := now.Add(eventLookupFuture)
-
-	for _, task := range tasks {
-		eventTime, ok := taskEventTime(task)
-		if !ok {
-			continue
-		}
-		if start := eventTime.Add(-eventLookupMargin); start.Before(timeMin) {
-			timeMin = start
-		}
-		if end := eventTime.Add(eventDuration(task) + eventLookupMargin); end.After(timeMax) {
-			timeMax = end
-		}
-	}
-
-	return timeMin, timeMax
-}
-
-// getCalendarEvents retrieves events from the calendar that were created by this tool
-func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string, timeMin, timeMax time.Time) ([]*calendar.Event, error) {
+// The listing deliberately has no time bounds. An event is matched to its task
+// by UUID, not by date, so filtering the listing by date can only hide events
+// that already exist — and an existing event that the sync cannot see gets
+// created a second time. The previous now-30d..now+365d window did exactly
+// that to any task due outside it, on every run.
+//
+// singleEvents is left off (the default) so recurring events already on the
+// calendar are returned as their single master entry rather than expanded into
+// instances: wui never creates recurring events, and expanding them without an
+// upper time bound is unbounded work. That also rules out orderBy, which the
+// API only accepts together with singleEvents; the order does not matter here.
+func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) ([]*calendar.Event, error) {
 	call := s.calendarService.Events.List(calendarID).
 		Context(ctx).
-		TimeMin(timeMin.Format(time.RFC3339)).
-		TimeMax(timeMax.Format(time.RFC3339)).
-		SingleEvents(true).
-		OrderBy("startTime").
 		MaxResults(2500).
 		// nextPageToken must be part of the field mask, otherwise the response
 		// carries no cursor and pagination silently stops after the first page.
