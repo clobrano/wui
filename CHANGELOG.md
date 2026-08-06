@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `wui sync` no longer re-creates calendar events that already exist. The lookup
+  of existing events was capped at a fixed now-30d..now+365d window and to a
+  single API page, so events for tasks outside that window (or past the first
+  250 events) were invisible to the next run and got duplicated every time.
+
 ### Added
 - Initial release of wui (Warrior UI)
 - Modern TUI built with bubbletea framework

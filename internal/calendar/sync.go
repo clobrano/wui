@@ -80,8 +80,13 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 
 	slog.Info("Retrieved tasks", "count", len(tasks))
 
-	// Get existing events from calendar
-	existingEvents, err := s.getCalendarEvents(ctx, calendarID)
+	// Get existing events from calendar. The lookup window is widened to cover
+	// every task being synced, so events already created for tasks far in the
+	// past or future are found instead of being created a second time.
+	timeMin, timeMax := eventLookupWindow(time.Now(), tasks)
+	slog.Info("Event lookup window", "time_min", timeMin, "time_max", timeMax)
+
+	existingEvents, err := s.getCalendarEvents(ctx, calendarID, timeMin, timeMax)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get calendar events: %w", err)
 	}
@@ -110,9 +115,7 @@ func (s *SyncClient) Sync(ctx context.Context) (*SyncResult, error) {
 	warnings := 0
 	for _, task := range tasks {
 		// Check if task has no due date and no scheduled date
-		hasNoDates := (task.Due == nil || task.Due.IsZero()) && (task.Scheduled == nil || task.Scheduled.IsZero())
-
-		if hasNoDates {
+		if _, hasDates := taskEventTime(task); !hasDates {
 			// If task has an existing event, delete it
 			if existingEvent, exists := eventMap[task.UUID]; exists {
 				slog.Info("Deleting event for task without dates", "uuid", task.UUID, "description", task.Description)
@@ -249,30 +252,69 @@ func (s *SyncClient) findCalendarByName(ctx context.Context, name string) (strin
 	return "", fmt.Errorf("calendar '%s' not found", name)
 }
 
-// getCalendarEvents retrieves events from the calendar that were created by this tool
-func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string) ([]*calendar.Event, error) {
-	// Get events from the past 30 days to the next 365 days
-	timeMin := time.Now().AddDate(0, 0, -30).Format(time.RFC3339)
-	timeMax := time.Now().AddDate(1, 0, 0).Format(time.RFC3339)
+// Bounds of the window used when listing existing calendar events. The window
+// always covers this much time around now, and is extended further to include
+// every task being synced (see eventLookupWindow).
+const (
+	eventLookupPast   = 30 * 24 * time.Hour
+	eventLookupFuture = 365 * 24 * time.Hour
+	// Margin added on both ends so an event sitting exactly on a boundary is
+	// still returned: the API treats timeMin/timeMax as exclusive bounds on the
+	// event's end/start.
+	eventLookupMargin = 24 * time.Hour
+)
 
-	events, err := s.calendarService.Events.List(calendarID).
+// eventLookupWindow returns the time range to search for existing events.
+//
+// A fixed window around "now" is not enough: a task due outside it gets an
+// event created that the next sync cannot see, so the event is created again
+// on every run. Widening the window to span all synced tasks makes the lookup
+// cover everything this sync could possibly create.
+func eventLookupWindow(now time.Time, tasks []core.Task) (time.Time, time.Time) {
+	timeMin := now.Add(-eventLookupPast)
+	timeMax := now.Add(eventLookupFuture)
+
+	for _, task := range tasks {
+		eventTime, ok := taskEventTime(task)
+		if !ok {
+			continue
+		}
+		if start := eventTime.Add(-eventLookupMargin); start.Before(timeMin) {
+			timeMin = start
+		}
+		if end := eventTime.Add(eventDuration(task) + eventLookupMargin); end.After(timeMax) {
+			timeMax = end
+		}
+	}
+
+	return timeMin, timeMax
+}
+
+// getCalendarEvents retrieves events from the calendar that were created by this tool
+func (s *SyncClient) getCalendarEvents(ctx context.Context, calendarID string, timeMin, timeMax time.Time) ([]*calendar.Event, error) {
+	call := s.calendarService.Events.List(calendarID).
 		Context(ctx).
-		TimeMin(timeMin).
-		TimeMax(timeMax).
+		TimeMin(timeMin.Format(time.RFC3339)).
+		TimeMax(timeMax.Format(time.RFC3339)).
 		SingleEvents(true).
 		OrderBy("startTime").
-		Fields("items(id,summary,description,start,end,colorId,reminders)").
-		Do()
-	if err != nil {
-		return nil, fmt.Errorf("failed to list events: %w", err)
-	}
+		MaxResults(2500).
+		// nextPageToken must be part of the field mask, otherwise the response
+		// carries no cursor and pagination silently stops after the first page.
+		Fields("nextPageToken", "items(id,summary,description,start,end,colorId,reminders)")
 
 	// Filter events created by wui (check for UUID in description)
 	var wuiEvents []*calendar.Event
-	for _, event := range events.Items {
-		if extractUUIDFromEvent(event) != "" {
-			wuiEvents = append(wuiEvents, event)
+	err := call.Pages(ctx, func(page *calendar.Events) error {
+		for _, event := range page.Items {
+			if extractUUIDFromEvent(event) != "" {
+				wuiEvents = append(wuiEvents, event)
+			}
 		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list events: %w", err)
 	}
 
 	return wuiEvents, nil
@@ -336,12 +378,7 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 
 	// Set event time based on due date or scheduled date
 	// Note: Tasks without dates are filtered before reaching this function
-	var eventTime time.Time
-	if task.Due != nil && !task.Due.IsZero() {
-		eventTime = *task.Due
-	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
-		eventTime = *task.Scheduled
-	}
+	eventTime, _ := taskEventTime(task)
 
 	// Check if user explicitly wants an all-day event via 'allDay' UDA
 	allDayUDA := task.GetUDA("allDay")
@@ -430,6 +467,19 @@ func (s *SyncClient) taskToEvent(task core.Task) *calendar.Event {
 	return event
 }
 
+// taskEventTime returns the time a task's calendar event starts: the due date
+// when set, otherwise the scheduled date. The second return value is false when
+// the task has neither, meaning it gets no calendar event at all.
+func taskEventTime(task core.Task) (time.Time, bool) {
+	if task.Due != nil && !task.Due.IsZero() {
+		return *task.Due, true
+	}
+	if task.Scheduled != nil && !task.Scheduled.IsZero() {
+		return *task.Scheduled, true
+	}
+	return time.Time{}, false
+}
+
 // defaultEventDuration is used for timed events that have no valid 'dur' UDA.
 const defaultEventDuration = 15 * time.Minute
 
@@ -498,12 +548,7 @@ func (s *SyncClient) shouldUpdateEvent(task core.Task, event *calendar.Event) bo
 
 	// Check if the date or time changed
 	// Note: Tasks without dates are filtered before reaching this function
-	var taskTime time.Time
-	if task.Due != nil && !task.Due.IsZero() {
-		taskTime = *task.Due
-	} else if task.Scheduled != nil && !task.Scheduled.IsZero() {
-		taskTime = *task.Scheduled
-	}
+	taskTime, _ := taskEventTime(task)
 
 	slog.Debug("Checking date/time",
 		"uuid", task.UUID,

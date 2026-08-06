@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/clobrano/wui/internal/core"
-	"google.golang.org/api/calendar/v3"
 )
 
 func timedTask(dur string) core.Task {
@@ -20,6 +19,106 @@ func timedTask(dur string) core.Task {
 		task.UDAs = map[string]string{"dur": dur}
 	}
 	return task
+}
+
+func taskDueAt(due time.Time) core.Task {
+	return core.Task{
+		UUID:        "test-uuid",
+		Description: "Task",
+		Status:      "pending",
+		Due:         &due,
+	}
+}
+
+// The lookup window decides which existing events a sync can see. Any task it
+// would create an event for must fall inside it, otherwise the next run cannot
+// find that event and creates a duplicate.
+func TestEventLookupWindowCoversAllSyncedTasks(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
+
+	longPast := now.Add(-400 * 24 * time.Hour)
+	farFuture := now.Add(900 * 24 * time.Hour)
+	scheduledOnly := now.Add(-200 * 24 * time.Hour)
+
+	tasks := []core.Task{
+		taskDueAt(longPast),
+		taskDueAt(farFuture),
+		{UUID: "scheduled-only", Description: "Scheduled", Status: "pending", Scheduled: &scheduledOnly},
+		{UUID: "no-dates", Description: "No dates", Status: "pending"},
+	}
+
+	timeMin, timeMax := eventLookupWindow(now, tasks)
+
+	if !timeMin.Before(longPast) {
+		t.Errorf("timeMin = %v, want strictly before oldest task time %v", timeMin, longPast)
+	}
+	if !timeMax.After(farFuture) {
+		t.Errorf("timeMax = %v, want strictly after newest task time %v", timeMax, farFuture)
+	}
+	if !timeMin.Before(scheduledOnly) {
+		t.Errorf("timeMin = %v, want strictly before scheduled-only task time %v", timeMin, scheduledOnly)
+	}
+}
+
+func TestEventLookupWindowKeepsDefaultRange(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
+
+	// A task inside the default window must not shrink it: the window is also
+	// what lets stale events (for tasks that lost their dates) be found.
+	timeMin, timeMax := eventLookupWindow(now, []core.Task{taskDueAt(now)})
+
+	if want := now.Add(-eventLookupPast); !timeMin.Equal(want) {
+		t.Errorf("timeMin = %v, want default %v", timeMin, want)
+	}
+	if want := now.Add(eventLookupFuture); !timeMax.Equal(want) {
+		t.Errorf("timeMax = %v, want default %v", timeMax, want)
+	}
+}
+
+func TestEventLookupWindowAccountsForEventDuration(t *testing.T) {
+	now := time.Date(2026, 6, 1, 12, 0, 0, 0, time.Local)
+
+	// A long event starting just inside the far edge still ends past it.
+	start := now.Add(eventLookupFuture - time.Hour)
+	task := taskDueAt(start)
+	task.UDAs = map[string]string{"dur": "48h"}
+
+	_, timeMax := eventLookupWindow(now, []core.Task{task})
+
+	if end := start.Add(48 * time.Hour); !timeMax.After(end) {
+		t.Errorf("timeMax = %v, want strictly after event end %v", timeMax, end)
+	}
+}
+
+func TestTaskEventTime(t *testing.T) {
+	due := time.Date(2026, 7, 8, 14, 0, 0, 0, time.Local)
+	scheduled := time.Date(2026, 7, 8, 9, 0, 0, 0, time.Local)
+	zero := time.Time{}
+
+	tests := []struct {
+		name   string
+		task   core.Task
+		want   time.Time
+		wantOk bool
+	}{
+		{"due wins over scheduled", core.Task{Due: &due, Scheduled: &scheduled}, due, true},
+		{"scheduled used when no due", core.Task{Scheduled: &scheduled}, scheduled, true},
+		{"zero due falls back to scheduled", core.Task{Due: &zero, Scheduled: &scheduled}, scheduled, true},
+		{"no dates", core.Task{}, time.Time{}, false},
+		{"zero dates only", core.Task{Due: &zero, Scheduled: &zero}, time.Time{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := taskEventTime(tt.task)
+			if ok != tt.wantOk {
+				t.Fatalf("taskEventTime() ok = %v, want %v", ok, tt.wantOk)
+			}
+			if !got.Equal(tt.want) {
+				t.Errorf("taskEventTime() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
 
 func TestEventDuration(t *testing.T) {
