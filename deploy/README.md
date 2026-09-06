@@ -22,7 +22,7 @@ for remote access.
 make image
 
 # Or directly:
-podman build -t ghcr.io/clobrano/wui:latest .
+podman build -t quay.io/clobrano/wui:latest .
 ```
 
 Override the engine, repo, or tag:
@@ -34,12 +34,12 @@ make image CONTAINER_ENGINE=docker IMAGE_REPO=localhost/wui IMAGE_TAG=dev
 ## Run once (foreground, for testing)
 
 ```bash
-make image-run
+make run
 # equivalent to:
 podman run --rm -p 127.0.0.1:7007:7007 \
     -v "$HOME/.task:/home/wui/.task:z" \
     -v "$HOME/.taskrc:/home/wui/.taskrc:ro,z" \
-    ghcr.io/clobrano/wui:latest
+    quay.io/clobrano/wui:latest
 
 curl http://localhost:7007/api/v1/version
 ```
@@ -75,7 +75,7 @@ journalctl --user -u wui -f
 Update to a newer image:
 
 ```bash
-podman pull ghcr.io/clobrano/wui:latest
+podman pull quay.io/clobrano/wui:latest
 systemctl --user restart wui
 # or enable automatic updates (the unit sets AutoUpdate=registry):
 systemctl --user enable --now podman-auto-update.timer

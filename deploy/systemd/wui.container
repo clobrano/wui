@@ -17,7 +17,7 @@ After=network-online.target
 Wants=network-online.target
 
 [Container]
-Image=ghcr.io/clobrano/wui:latest
+Image=quay.io/clobrano/wui:latest
 ContainerName=wui
 
 # Keep the image current via `podman auto-update` (podman-auto-update.timer).

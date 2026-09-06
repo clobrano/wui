@@ -1,4 +1,4 @@
-.PHONY: build test install clean help image image-push image-run
+.PHONY: build test install clean help image image-push run
 
 WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
 
@@ -10,7 +10,7 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Container image variables
 CONTAINER_ENGINE ?= podman
-IMAGE_REPO ?= ghcr.io/clobrano/wui
+IMAGE_REPO ?= quay.io/clobrano/wui
 IMAGE_TAG ?= $(VERSION)
 IMAGE ?= $(IMAGE_REPO):$(IMAGE_TAG)
 LDFLAGS=-ldflags "-X github.com/clobrano/wui/internal/version.Version=$(VERSION) \
@@ -82,8 +82,8 @@ image-push: image
 	@echo "Pushing $(IMAGE)..."
 	@$(CONTAINER_ENGINE) push $(IMAGE)
 
-## image-run: Run the image locally on 127.0.0.1:7007 (mounts your Taskwarrior data)
-image-run:
+## run: Run the container image locally on 127.0.0.1:7007 (mounts your Taskwarrior data)
+run:
 	@$(CONTAINER_ENGINE) run --rm \
 		-p 127.0.0.1:7007:7007 \
 		-v "$(HOME)/.task:/home/wui/.task:z" \

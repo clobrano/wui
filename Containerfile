@@ -2,7 +2,7 @@
 # `wui serve` REST API server backed by Taskwarrior.
 #
 # Build (with Make): make image
-# Build (directly):  podman build -t ghcr.io/clobrano/wui:latest .
+# Build (directly):  podman build -t quay.io/clobrano/wui:latest .
 #
 # Runtime notes:
 #   * The server listens on 0.0.0.0:7007 inside the container.
