@@ -12,7 +12,7 @@ via Podman.
 
 The server exposes the Taskwarrior backend over HTTP on port **7007**
 (`/api/v1`). It has **no authentication**, so the unit binds it to loopback
-only — use a reverse proxy or [Tailscale](../README.md#remote-access-with-tailscale)
+only — use a reverse proxy or [Tailscale](../README.md#secure-access-with-tailscale)
 for remote access.
 
 ## Build the image
@@ -43,6 +43,27 @@ podman run --rm -p 127.0.0.1:7007:7007 \
 
 curl http://localhost:7007/api/v1/version
 ```
+
+`make run` publishes on `127.0.0.1:7007` by default, so it is reachable only
+from the host. Note that binding the *server* to `0.0.0.0` inside the
+container (the image default) does not expose it to your network on its own —
+what matters is the host address Podman publishes to. Override `HOST_ADDR`
+(and `HOST_PORT`) to change that:
+
+```bash
+# Reach it over Tailscale — publish on the Tailscale IP only:
+make run HOST_ADDR=$(tailscale ip -4)
+
+# Or expose on all host interfaces (LAN + internet — no auth, avoid this):
+make run HOST_ADDR=0.0.0.0
+```
+
+Publishing on the Tailscale IP keeps the API off the LAN and public internet
+while making it reachable from your other Tailscale devices. Point the client
+(e.g. [wui-android](../README.md#using-from-the-wui-android-flutter-app-android-linux-web))
+at `http://<tailscale-ip>:7007/api/v1`. See
+[Secure access with Tailscale](../README.md#secure-access-with-tailscale) for
+the full walkthrough.
 
 ## Run as a systemd user service (Podman Quadlet)
 

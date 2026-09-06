@@ -28,7 +28,9 @@ AutoUpdate=registry
 UserNS=keep-id:uid=1000,gid=1000
 
 # Bind to loopback only. The API has no authentication — do not expose it
-# directly to the network. Use a reverse proxy or Tailscale for remote access.
+# directly to the network. For remote access over Tailscale, publish on the
+# Tailscale IP instead (reachable only over the WireGuard mesh), e.g.:
+#   PublishPort=100.x.y.z:7007:7007
 PublishPort=127.0.0.1:7007:7007
 
 # Persist Taskwarrior data and wui config on the host. Point these at your real
