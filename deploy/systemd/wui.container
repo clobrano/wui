@@ -1,0 +1,49 @@
+# wui.container — Podman Quadlet unit for running `wui serve` as a rootless
+# systemd *user* service.
+#
+# Install:
+#   mkdir -p ~/.config/containers/systemd
+#   cp deploy/systemd/wui.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user start wui
+#
+# Quadlet (shipped with podman 4.4+) turns this file into a generated
+# systemd service named `wui.service`. See `man quadlet`.
+
+[Unit]
+Description=wui — Taskwarrior REST API server
+Documentation=https://github.com/clobrano/wui
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=ghcr.io/clobrano/wui:latest
+ContainerName=wui
+
+# Keep the image current via `podman auto-update` (podman-auto-update.timer).
+AutoUpdate=registry
+
+# Map the host user to the container's uid/gid 1000 so bind-mounted files in
+# the host's home directory are owned correctly inside the container.
+UserNS=keep-id:uid=1000,gid=1000
+
+# Bind to loopback only. The API has no authentication — do not expose it
+# directly to the network. Use a reverse proxy or Tailscale for remote access.
+PublishPort=127.0.0.1:7007:7007
+
+# Persist Taskwarrior data and wui config on the host. Point these at your real
+# Taskwarrior data to drive existing tasks; ':z' relabels for SELinux hosts.
+Volume=%h/.task:/home/wui/.task:z
+Volume=%h/.taskrc:/home/wui/.taskrc:ro,z
+Volume=%h/.config/wui:/home/wui/.config/wui:z
+
+# Override to change the listen address or pass extra flags, e.g.:
+#   Exec=serve --addr 0.0.0.0:7007 --log-level info
+Exec=serve --addr 0.0.0.0:7007
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
