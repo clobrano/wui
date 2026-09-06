@@ -27,11 +27,14 @@ AutoUpdate=registry
 # the host's home directory are owned correctly inside the container.
 UserNS=keep-id:uid=1000,gid=1000
 
-# Bind to loopback only. The API has no authentication — do not expose it
-# directly to the network. For remote access over Tailscale, publish on the
-# Tailscale IP instead (reachable only over the WireGuard mesh), e.g.:
-#   PublishPort=100.x.y.z:7007:7007
-PublishPort=127.0.0.1:7007:7007
+# Publish the web GUI (port 7008) to loopback only. The GUI has no
+# authentication — do not expose it directly to the network. For remote access
+# over Tailscale, publish on the Tailscale IP instead (reachable only over the
+# WireGuard mesh), e.g.:
+#   PublishPort=100.x.y.z:7008:7008
+# The REST API (7007) runs as an internal child process and is not published;
+# the GUI proxies /api/v1/ to it.
+PublishPort=127.0.0.1:7008:7008
 
 # Persist Taskwarrior data and wui config on the host. Point these at your real
 # Taskwarrior data to drive existing tasks; ':z' relabels for SELinux hosts.
@@ -39,9 +42,10 @@ Volume=%h/.task:/home/wui/.task:z
 Volume=%h/.taskrc:/home/wui/.taskrc:ro,z
 Volume=%h/.config/wui:/home/wui/.config/wui:z
 
-# Override to change the listen address or pass extra flags, e.g.:
-#   Exec=serve --addr 0.0.0.0:7007 --log-level info
-Exec=serve --addr 0.0.0.0:7007
+# Run the web GUI. Override to pass extra flags or run the raw API instead, e.g.:
+#   Exec=gui --port 7008 --log-level info
+#   Exec=serve --addr 0.0.0.0:7007   # (also change PublishPort to 7007)
+Exec=gui --port 7008
 
 [Service]
 Restart=on-failure

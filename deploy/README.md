@@ -1,8 +1,8 @@
 # Running wui in a container
 
 This directory contains everything needed to build a container image of the
-`wui serve` REST API server and run it as a rootless **systemd user service**
-via Podman.
+`wui gui` web interface and run it as a rootless **systemd user service** via
+Podman.
 
 - [`../Containerfile`](../Containerfile) — multi-stage build (Go builder →
   Alpine runtime with Taskwarrior installed).
@@ -10,10 +10,17 @@ via Podman.
   Taskwarrior data dir and taskrc so the image runs out of the box.
 - [`systemd/wui.container`](systemd/wui.container) — Podman Quadlet unit.
 
-The server exposes the Taskwarrior backend over HTTP on port **7007**
-(`/api/v1`). It has **no authentication**, so the unit binds it to loopback
-only — use a reverse proxy or [Tailscale](../README.md#secure-access-with-tailscale)
-for remote access.
+The container runs `wui gui`, which serves the **web UI on port 7008** and
+starts the REST API as an internal child process on 7007. The GUI proxies
+`/api/v1/` to that API, so **only 7008 needs to be published** — open
+`http://<host>:7008` in a browser. It has **no authentication**, so the unit
+binds it to loopback only; use [Tailscale](../README.md#secure-access-with-tailscale)
+or a reverse proxy for remote access.
+
+> To run the raw REST API instead (e.g. for the
+> [wui-android](../README.md#using-from-the-wui-android-flutter-app-android-linux-web)
+> client), override the command to `serve --addr 0.0.0.0:7007` and publish
+> 7007 — see the notes at the end.
 
 ## Build the image
 
@@ -36,19 +43,20 @@ make image CONTAINER_ENGINE=docker IMAGE_REPO=localhost/wui IMAGE_TAG=dev
 ```bash
 make run
 # equivalent to:
-podman run --rm -p 127.0.0.1:7007:7007 \
+podman run --rm -p 127.0.0.1:7008:7008 \
     -v "$HOME/.task:/home/wui/.task:z" \
     -v "$HOME/.taskrc:/home/wui/.taskrc:ro,z" \
     quay.io/clobrano/wui:latest
 
-curl http://localhost:7007/api/v1/version
+# then open http://localhost:7008 in a browser, or:
+curl http://localhost:7008/api/v1/version   # proxied to the internal API
 ```
 
-`make run` publishes on `127.0.0.1:7007` by default, so it is reachable only
-from the host. Note that binding the *server* to `0.0.0.0` inside the
-container (the image default) does not expose it to your network on its own —
-what matters is the host address Podman publishes to. Override `HOST_ADDR`
-(and `HOST_PORT`) to change that:
+`make run` publishes on `127.0.0.1:7008` by default, so it is reachable only
+from the host. Note that binding the GUI to `0.0.0.0` *inside* the container
+(the image default) does not expose it to your network on its own — what
+matters is the host address Podman publishes to. Override `HOST_ADDR` (and
+`HOST_PORT`) to change that:
 
 ```bash
 # Reach it over Tailscale — publish on the Tailscale IP only:
@@ -58,10 +66,9 @@ make run HOST_ADDR=$(tailscale ip -4)
 make run HOST_ADDR=0.0.0.0
 ```
 
-Publishing on the Tailscale IP keeps the API off the LAN and public internet
-while making it reachable from your other Tailscale devices. Point the client
-(e.g. [wui-android](../README.md#using-from-the-wui-android-flutter-app-android-linux-web))
-at `http://<tailscale-ip>:7007/api/v1`. See
+Publishing on the Tailscale IP keeps the GUI off the LAN and public internet
+while making it reachable from your other Tailscale devices — just open
+`http://<tailscale-ip>:7008` there. See
 [Secure access with Tailscale](../README.md#secure-access-with-tailscale) for
 the full walkthrough.
 
@@ -111,5 +118,6 @@ systemctl --user enable --now podman-auto-update.timer
 - **Existing Taskwarrior data.** Point the `%h/.task` and `%h/.taskrc` volumes
   at your real files to drive your existing tasks. If `~/.taskrc` does not
   exist when the container starts, the entrypoint writes a minimal one.
-- **Changing flags.** Edit the `Exec=` line in the unit (e.g. add
-  `--log-level info`) or override `PublishPort` to change the exposed port.
+- **Changing flags / API-only mode.** Edit the `Exec=` line in the unit (e.g.
+  add `--log-level info`). To serve the raw REST API instead of the web GUI,
+  set `Exec=serve --addr 0.0.0.0:7007` and change `PublishPort` to `7007`.

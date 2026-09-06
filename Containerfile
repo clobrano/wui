@@ -1,11 +1,15 @@
-# Containerfile for wui — builds a container image that runs the
-# `wui serve` REST API server backed by Taskwarrior.
+# Containerfile for wui — builds a container image that runs the `wui gui`
+# web interface (backed by Taskwarrior).
 #
 # Build (with Make): make image
 # Build (directly):  podman build -t quay.io/clobrano/wui:latest .
 #
 # Runtime notes:
-#   * The server listens on 0.0.0.0:7007 inside the container.
+#   * `wui gui` serves the web UI on 0.0.0.0:7008 inside the container and
+#     starts the REST API as an internal child process on localhost:7007. The
+#     GUI proxies /api/v1/ to it, so only 7008 needs to be published; browsers
+#     (local or remote over Tailscale) talk only to the GUI port.
+#   * To run the raw REST API instead, override the command with: serve
 #   * Taskwarrior data lives under $TASKDATA (default /home/wui/.task) and the
 #     taskrc under /home/wui/.taskrc — bind-mount your own to use existing data.
 #   * Runs as an unprivileged user (uid/gid 1000), suitable for rootless podman.
@@ -56,7 +60,7 @@ ENV HOME=/home/wui \
 # Data and config live on volumes so they survive container recreation.
 VOLUME ["/home/wui/.task", "/home/wui/.config/wui"]
 
-EXPOSE 7007
+EXPOSE 7008
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-CMD ["serve", "--addr", "0.0.0.0:7007"]
+CMD ["gui", "--port", "7008"]
