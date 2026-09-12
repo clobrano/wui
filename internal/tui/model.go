@@ -205,6 +205,9 @@ type Model struct {
 
 	// Shortcut override warnings (custom commands overriding internal shortcuts)
 	shortcutWarnings []string
+
+	// Per-section column configurations, parallel to sections.Items.
+	sectionColumns []config.Columns
 }
 
 // NewModel creates a new TUI model
@@ -229,6 +232,10 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 	allSections = append(allSections, searchSection)
 
+	// Keep effective columns parallel to sections. Search and special views use
+	// the global columns because they have no separate tab configuration.
+	sectionColumns := []config.Columns{cfg.TUI.Columns}
+
 	// Add user-configured or default sections
 	if cfg.TUI != nil && len(cfg.TUI.Tabs) > 0 {
 		// Convert config.Tab to core.Tab
@@ -244,15 +251,16 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 				Sort:    t.Sort,
 				Reverse: t.Reverse,
 			})
+			sectionColumns = append(sectionColumns, t.EffectiveColumns(cfg.TUI.Columns))
 		}
 		allSections = append(allSections, core.TabsToSections(coreTabs)...)
 	} else {
-		allSections = append(allSections, core.DefaultSections()...)
+		defaultSections := core.DefaultSections()
+		allSections = append(allSections, defaultSections...)
+		for range defaultSections {
+			sectionColumns = append(sectionColumns, cfg.TUI.Columns)
+		}
 	}
-
-	taskList := components.NewTaskList(80, 24, cfg.TUI.Columns, cfg.TUI.NarrowViewFields, styles.ToTaskListStyles())
-	taskList.SetScrollBuffer(cfg.TUI.ScrollBuffer)
-	taskList.SetRelativeDates(cfg.TUI.RelativeDates)
 
 	// Determine initial section: Search tab if --search flag provided, otherwise "Next" tab
 	initialSectionIndex := 1 // Default to "Next" tab (index 1)
@@ -265,6 +273,14 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	} else if len(allSections) <= 1 {
 		initialSectionIndex = 0 // Fallback to first section if only Search exists
 	}
+
+	initialColumns := cfg.TUI.Columns
+	if initialSectionIndex < len(sectionColumns) {
+		initialColumns = sectionColumns[initialSectionIndex]
+	}
+	taskList := components.NewTaskList(80, 24, initialColumns, cfg.TUI.NarrowViewFields, styles.ToTaskListStyles())
+	taskList.SetScrollBuffer(cfg.TUI.ScrollBuffer)
+	taskList.SetRelativeDates(cfg.TUI.RelativeDates)
 
 	// Create help component with keybindings and custom commands from config
 	var helpComponent components.Help
@@ -328,6 +344,7 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 		help:             helpComponent,                                                                                    // Initial size, will be updated
 		confirmAction:    "",
 		shortcutWarnings: shortcutWarnings,
+		sectionColumns:   sectionColumns,
 	}
 
 	// Set custom empty message for Search tab if starting there
@@ -336,6 +353,32 @@ func NewModel(service core.TaskService, cfg *config.Config) Model {
 	}
 
 	return m
+}
+
+// columnsForSection returns a section's configured columns, falling back to
+// the global TUI columns when the section has none.
+func (m Model) columnsForSection(section core.Section) config.Columns {
+	if m.config == nil || m.config.TUI == nil {
+		return nil
+	}
+
+	// SectionChangedMsg is normally emitted after ActiveIndex changes. The name
+	// check also keeps direct messages and tests working without that transition.
+	index := m.sections.ActiveIndex
+	if index < 0 || index >= len(m.sectionColumns) ||
+		index >= len(m.sections.Items) || m.sections.Items[index].Name != section.Name {
+		index = -1
+		for i, item := range m.sections.Items {
+			if item.Name == section.Name {
+				index = i
+				break
+			}
+		}
+	}
+	if index >= 0 && index < len(m.sectionColumns) {
+		return m.sectionColumns[index]
+	}
+	return m.config.TUI.Columns
 }
 
 // Init initializes the model and returns the initial command
@@ -369,8 +412,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case components.SectionChangedMsg:
-		// Section changed - load tasks with new filter
+		// Section changed - apply its columns immediately, then load its tasks.
+		wasInGroupView := m.inGroupView
 		m.currentSection = &msg.Section
+		m.taskList.SetColumns(m.columnsForSection(msg.Section))
 		m.errorMessage = ""
 		m.statusMessage = ""
 		m.isLoading = true
@@ -379,11 +424,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.selectedGroup = nil
 		m.groups = []core.TaskGroup{}
 
-		// Determine if we should show groups
-		if m.sections.IsProjectsView() || m.sections.IsTagsView() {
-			m.inGroupView = true
-		} else {
-			m.inGroupView = false
+		// Determine if we should show groups. Reset the task list display mode
+		// too, so an asynchronous load cannot leave stale group rows visible.
+		m.inGroupView = m.sections.IsProjectsView() || m.sections.IsTagsView()
+		if m.inGroupView {
+			m.taskList.SetGroups(nil)
+		} else if wasInGroupView {
+			m.taskList.SetTasksWithSort(nil, "", false)
 		}
 
 		// Set custom empty message for Search tab
@@ -1386,6 +1433,8 @@ func (m Model) handleNormalKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.sections.ActiveIndex = 0
 					searchSection := m.sections.Items[0]
 					m.currentSection = &searchSection
+					m.taskList.SetTasksWithSort(nil, "", false)
+					m.taskList.SetColumns(m.columnsForSection(searchSection))
 					m.searchTabFilter = searchFilter
 					m.activeFilter = searchFilter
 					m.inGroupView = false

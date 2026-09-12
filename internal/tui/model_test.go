@@ -1,11 +1,13 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/clobrano/wui/internal/config"
 	"github.com/clobrano/wui/internal/core"
+	"github.com/clobrano/wui/internal/tui/components"
 )
 
 func TestNewModel(t *testing.T) {
@@ -28,6 +30,94 @@ func TestNewModel(t *testing.T) {
 	}
 	if model.viewMode != ViewModeList {
 		t.Errorf("Expected initial view mode to be List, got %v", model.viewMode)
+	}
+}
+
+func TestNewModelUsesTabColumnsAndGlobalFallback(t *testing.T) {
+	service := &core.MockTaskService{}
+	cfg := config.DefaultConfig()
+	cfg.TUI.Columns = config.Columns{
+		{Name: "id", Label: "ID"},
+		{Name: "project", Label: "PROJECT"},
+		{Name: "description", Label: "DESCRIPTION"},
+	}
+	cfg.TUI.Tabs = []config.Tab{
+		{Name: "Inbox", Filter: "status:pending", Columns: config.Columns{
+			{Name: "id", Label: "ID"},
+			{Name: "description", Label: "DESCRIPTION"},
+		}},
+		{Name: "Fallback", Filter: "status:waiting"},
+	}
+
+	model := NewModel(service, cfg)
+	model.width = 100
+	model.height = 10
+	model.taskList.SetSize(100, 10)
+	model.tasks = []core.Task{{ID: 1, Description: "Inbox task"}}
+	model.taskList.SetTasks(model.tasks)
+	view := model.taskList.View()
+	if !strings.Contains(view, "DESCRIPTION") || strings.Contains(view, "PROJECT") {
+		t.Errorf("Expected Inbox columns only, got view:\n%s", view)
+	}
+
+	updated, _ := model.Update(components.SectionChangedMsg{Section: model.sections.Items[2]})
+	fallbackModel := updated.(Model)
+	view = fallbackModel.taskList.View()
+	if !strings.Contains(view, "PROJECT") {
+		t.Errorf("Expected global fallback columns, got view:\n%s", view)
+	}
+}
+
+func TestSwitchingTabsRebuildsTaskColumns(t *testing.T) {
+	service := &core.MockTaskService{}
+	cfg := config.DefaultConfig()
+	cfg.TUI.Columns = config.Columns{{Name: "id", Label: "ID"}}
+	cfg.TUI.Tabs = []config.Tab{
+		{Name: "First", Columns: config.Columns{{Name: "id", Label: "ID"}}},
+		{Name: "Second", Columns: config.Columns{{Name: "description", Label: "DESCRIPTION"}}},
+	}
+
+	model := NewModel(service, cfg)
+	model.width = 100
+	model.height = 10
+	model.taskList.SetSize(100, 10)
+	model.taskList.SetTasks([]core.Task{{ID: 1, Description: "Task"}})
+
+	updated, _ := model.Update(components.SectionChangedMsg{Section: model.sections.Items[2]})
+	model = updated.(Model)
+	view := model.taskList.View()
+	if !strings.Contains(view, "DESCRIPTION") {
+		t.Errorf("Expected second tab header after switching, got view:\n%s", view)
+	}
+	if strings.Contains(view, "ID") {
+		t.Errorf("Expected first tab header to be replaced, got view:\n%s", view)
+	}
+}
+
+func TestSwitchingFromGroupedViewClearsStaleGroups(t *testing.T) {
+	service := &core.MockTaskService{}
+	cfg := config.DefaultConfig()
+	cfg.TUI.Tabs = []config.Tab{
+		{Name: "Projects", Filter: "status:pending"},
+		{Name: "Inbox", Filter: "status:pending"},
+	}
+
+	model := NewModel(service, cfg)
+	model.width = 100
+	model.height = 10
+	model.taskList.SetSize(100, 10)
+	model.sections.ActiveIndex = 2 // Inbox
+	model.inGroupView = true
+	model.taskList.SetGroups([]core.TaskGroup{{Name: "Old project", Count: 1}})
+
+	updated, _ := model.Update(components.SectionChangedMsg{Section: model.sections.Items[2]})
+	model = updated.(Model)
+	view := model.taskList.View()
+	if strings.Contains(view, "Old project") || strings.Contains(view, "No groups found") {
+		t.Errorf("Expected stale groups to be cleared, got view:\n%s", view)
+	}
+	if !strings.Contains(view, "No tasks found") {
+		t.Errorf("Expected task mode after leaving grouped view, got view:\n%s", view)
 	}
 }
 

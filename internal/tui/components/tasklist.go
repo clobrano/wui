@@ -65,27 +65,6 @@ type TaskList struct {
 
 // NewTaskList creates a new task list component
 func NewTaskList(width, height int, columns config.Columns, narrowViewFields config.Columns, styles TaskListStyles) TaskList {
-	// Default columns if none provided
-	if len(columns) == 0 {
-		columns = config.DefaultColumns()
-	}
-
-	// Limit to maximum 8 columns
-	if len(columns) > 8 {
-		columns = columns[:8]
-	}
-
-	// Build column names, labels, and lengths maps
-	normalizedColumns := make([]string, len(columns))
-	columnLabels := make(map[string]string)
-	columnLengths := make(map[string]int)
-	for i, col := range columns {
-		normalizedName := strings.ToLower(col.Name)
-		normalizedColumns[i] = normalizedName
-		columnLabels[normalizedName] = col.Label
-		columnLengths[normalizedName] = col.Length
-	}
-
 	// Default narrow view fields if none provided
 	if len(narrowViewFields) == 0 {
 		narrowViewFields = config.DefaultNarrowViewFields()
@@ -107,7 +86,7 @@ func NewTaskList(width, height int, columns config.Columns, narrowViewFields con
 		narrowViewLengths[normalizedName] = field.Length
 	}
 
-	return TaskList{
+	taskList := TaskList{
 		tasks:             []core.Task{},
 		groups:            []core.TaskGroup{},
 		displayMode:       DisplayModeTasks,
@@ -115,9 +94,6 @@ func NewTaskList(width, height int, columns config.Columns, narrowViewFields con
 		selectedUUIDs:     make(map[string]bool),
 		width:             width,
 		height:            height,
-		displayColumns:    normalizedColumns,
-		columnLabels:      columnLabels,
-		columnLengths:     columnLengths,
 		narrowViewFields:  normalizedNarrowViewFields,
 		narrowViewLabels:  narrowViewLabels,
 		narrowViewLengths: narrowViewLengths,
@@ -125,6 +101,34 @@ func NewTaskList(width, height int, columns config.Columns, narrowViewFields con
 		scrollBuffer:      1, // Default: keep 1 task visible above/below cursor
 		styles:            styles,
 	}
+	taskList.SetColumns(columns)
+	return taskList
+}
+
+// SetColumns replaces the visible task columns and recalculates row layout.
+func (t *TaskList) SetColumns(columns config.Columns) {
+	// Keep the same defaulting and normalization as the initial configuration.
+	if len(columns) == 0 {
+		columns = config.DefaultColumns()
+	}
+	if len(columns) > 8 {
+		columns = columns[:8]
+	}
+
+	t.displayColumns = make([]string, len(columns))
+	t.columnLabels = make(map[string]string)
+	t.columnLengths = make(map[string]int)
+	for i, col := range columns {
+		normalizedName := strings.ToLower(col.Name)
+		t.displayColumns[i] = normalizedName
+		t.columnLabels[normalizedName] = col.Label
+		t.columnLengths[normalizedName] = col.Length
+	}
+
+	if t.displayMode == DisplayModeTasks {
+		t.rebuildRowHeights()
+	}
+	t.updateScroll()
 }
 
 // SetTasks updates the task list and switches to task display mode
