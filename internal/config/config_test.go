@@ -140,6 +140,76 @@ invalid yaml content {{{
 	}
 }
 
+func TestLoadConfig_TabColumns(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `tui:
+  columns:
+    - id
+    - project
+    - description
+  tabs:
+    - name: "Inbox"
+      filter: "status:pending"
+      columns:
+        - id
+        - description
+    - name: "Fallback"
+      filter: "status:waiting"
+    - name: "Empty"
+      filter: "status:pending"
+      columns: []
+`
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+	if len(cfg.TUI.Tabs) != 3 {
+		t.Fatalf("Expected 3 tabs, got %d", len(cfg.TUI.Tabs))
+	}
+	if len(cfg.TUI.Tabs[0].Columns) != 2 || cfg.TUI.Tabs[0].Columns[1].Name != "description" {
+		t.Errorf("Expected Inbox columns [id description], got %#v", cfg.TUI.Tabs[0].Columns)
+	}
+	if len(cfg.TUI.Tabs[1].Columns) != 0 {
+		t.Errorf("Expected omitted columns to remain empty, got %#v", cfg.TUI.Tabs[1].Columns)
+	}
+	if len(cfg.TUI.Tabs[2].Columns) != 0 {
+		t.Errorf("Expected explicit empty columns to remain empty, got %#v", cfg.TUI.Tabs[2].Columns)
+	}
+}
+
+func TestLoadConfig_InvalidTabColumnsUseGlobalParsing(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, "config.yaml")
+
+	yamlContent := `tui:
+  columns:
+    - not_a_column
+  tabs:
+    - name: "Invalid"
+      columns:
+        - not_a_column
+`
+	if err := os.WriteFile(configPath, []byte(yamlContent), 0644); err != nil {
+		t.Fatalf("Failed to create test config: %v", err)
+	}
+
+	cfg, err := LoadConfig(configPath)
+	if err != nil {
+		t.Fatalf("Expected invalid names to behave like global columns, got %v", err)
+	}
+	global := cfg.TUI.Columns[0]
+	tab := cfg.TUI.Tabs[0].Columns[0]
+	if global != tab {
+		t.Errorf("Expected global and tab parsing to match, got global %#v and tab %#v", global, tab)
+	}
+}
+
 func TestSaveConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")

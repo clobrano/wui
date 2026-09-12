@@ -87,6 +87,24 @@ func TestSetTasks(t *testing.T) {
 	}
 }
 
+func TestSetColumnsRebuildsTaskLayout(t *testing.T) {
+	tl := NewTaskList(80, 10, testColumns("id", "project", "description"), config.Columns{}, defaultTaskListStyles())
+	tl.SetTasks([]core.Task{{ID: 1, Description: "A task"}})
+
+	tl.SetColumns(testColumns("id", "description"))
+
+	if len(tl.displayColumns) != 2 || tl.displayColumns[1] != "description" {
+		t.Errorf("Expected columns to be replaced, got %v", tl.displayColumns)
+	}
+	if len(tl.rowHeights) != 1 || tl.rowHeightsWidth != tl.width {
+		t.Errorf("Expected row layout to be rebuilt, got heights=%v width=%d", tl.rowHeights, tl.rowHeightsWidth)
+	}
+	view := tl.View()
+	if !strings.Contains(view, "DESCRIPTION") || strings.Contains(view, "PROJECT") {
+		t.Errorf("Expected updated header, got view:\n%s", view)
+	}
+}
+
 func TestSetTasksResetsCursor(t *testing.T) {
 	tl := NewTaskList(80, 24, testColumns("id", "project", "description", "due", "priority"), config.Columns{}, defaultTaskListStyles())
 	tasks := []core.Task{

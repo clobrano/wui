@@ -51,8 +51,9 @@ func TestTUIConfigStruct(t *testing.T) {
 
 func TestTabStruct(t *testing.T) {
 	tab := Tab{
-		Name:   "Important Tasks",
-		Filter: "priority:H status:pending",
+		Name:    "Important Tasks",
+		Filter:  "priority:H status:pending",
+		Columns: Columns{{Name: "id", Label: "ID"}},
 	}
 
 	if tab.Name != "Important Tasks" {
@@ -60,6 +61,21 @@ func TestTabStruct(t *testing.T) {
 	}
 	if tab.Filter != "priority:H status:pending" {
 		t.Errorf("Expected filter 'priority:H status:pending', got %s", tab.Filter)
+	}
+	if len(tab.Columns) != 1 || tab.Columns[0].Name != "id" {
+		t.Errorf("Expected tab columns to contain id, got %#v", tab.Columns)
+	}
+}
+
+func TestTabEffectiveColumns(t *testing.T) {
+	global := Columns{{Name: "id", Label: "ID"}}
+	tab := Tab{Columns: Columns{{Name: "description", Label: "DESCRIPTION"}}}
+
+	if got := tab.EffectiveColumns(global); len(got) != 1 || got[0].Name != "description" {
+		t.Errorf("Expected tab columns, got %#v", got)
+	}
+	if got := (Tab{}).EffectiveColumns(global); len(got) != 1 || got[0].Name != "id" {
+		t.Errorf("Expected global fallback, got %#v", got)
 	}
 }
 

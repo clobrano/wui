@@ -159,7 +159,8 @@ wui reads from `~/.config/wui/config.yaml` (created automatically on first run).
 
 ### Tabs
 
-Tabs are the heart of wui. Each tab defines a Taskwarrior filter and optional sort order. You can add, remove, and reorder tabs freely.
+Tabs are the heart of wui. Each tab defines a Taskwarrior filter, optional sort order, and optional
+visible columns. You can add, remove, and reorder tabs freely.
 
 ```yaml
 tui:
@@ -214,7 +215,8 @@ Add `reverse: true` to invert the order. Completed tasks always sort to the bott
 
 ### Columns
 
-Choose up to 6 columns for the task list (case-insensitive):
+Choose the global default columns for the task list (case-insensitive). A tab can override them with its
+own `columns`; omitted or empty tab columns use this global list:
 
 ```yaml
 tui:
@@ -223,10 +225,26 @@ tui:
     - project
     - priority
     - due
+    - tags
     - description
+  tabs:
+    - name: "Inbox"
+      filter: "status:pending +in"
+      columns:
+        - id
+        - description
+    - name: "Next"
+      filter: "status:pending -WAITING"
+      columns:
+        - id
+        - project
+        - due
+        - description
 ```
 
-Available columns: `id`, `project`, `priority`, `due`, `tags`, `description`.
+Available columns include `id`, `uuid`, `project`, `priority`, `status`, `tags`, `description`, date
+fields (`due`, `scheduled`, `wait`, `start`, `entry`, `modified`, `end`), `urgency`, `annotation`, and
+`dependency`. Custom labels and lengths are also supported.
 
 ### Sidebar
 
