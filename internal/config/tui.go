@@ -6,9 +6,9 @@ import "gopkg.in/yaml.v3"
 type TUIConfig struct {
 	SidebarWidth                    int                      `yaml:"sidebar_width"`
 	ScrollBuffer                    int                      `yaml:"scroll_buffer"`
-	InputMode                       string                   `yaml:"input_mode"` // "floating" or "bottom" - controls how input prompts are displayed
-	RelativeDates                   bool                     `yaml:"relative_dates,omitempty"`                      // Show dates as relative (e.g., "2 weeks ago") instead of absolute (YYYY-MM-DD)
-	ForceSmallScreen                bool                     `yaml:"force_small_screen,omitempty"`                  // Force small screen mode regardless of terminal width
+	InputMode                       string                   `yaml:"input_mode"`                   // "floating" or "bottom" - controls how input prompts are displayed
+	RelativeDates                   bool                     `yaml:"relative_dates,omitempty"`     // Show dates as relative (e.g., "2 weeks ago") instead of absolute (YYYY-MM-DD)
+	ForceSmallScreen                bool                     `yaml:"force_small_screen,omitempty"` // Force small screen mode regardless of terminal width
 	SilenceShortcutOverrideWarnings bool                     `yaml:"silence_shortcut_override_warnings,omitempty"`
 	ValidateTodosOnComplete         *bool                    `yaml:"validate_todos_on_complete,omitempty"`   // Prevent completing tasks with TODO: annotations (default: true)
 	ValidateBlockedOnComplete       *bool                    `yaml:"validate_blocked_on_complete,omitempty"` // Prevent completing tasks blocked by other tasks (default: true)
@@ -29,10 +29,11 @@ type CustomCommand struct {
 
 // Tab represents a section/tab in the UI
 type Tab struct {
-	Name    string `yaml:"name"`
-	Filter  string `yaml:"filter"`
-	Sort    string `yaml:"sort,omitempty"`    // Sorting method: "alphabetic", "due", "scheduled", "created", "modified" (default: none)
-	Reverse bool   `yaml:"reverse,omitempty"` // Reverse sort order
+	Name    string  `yaml:"name"`
+	Filter  string  `yaml:"filter"`
+	Sort    string  `yaml:"sort,omitempty"`    // Sorting method: "alphabetic", "due", "scheduled", "created", "modified" (default: none)
+	Reverse bool    `yaml:"reverse,omitempty"` // Reverse sort order
+	Columns Columns `yaml:"columns,omitempty"` // Optional per-tab columns; falls back to TUI columns when empty
 }
 
 // Column represents a table column configuration
@@ -44,6 +45,15 @@ type Column struct {
 
 // Columns is a wrapper type that supports both old ([]string) and new ([]Column) formats
 type Columns []Column
+
+// EffectiveColumns returns this tab's columns, or the global columns when the tab
+// does not define any.
+func (t Tab) EffectiveColumns(global Columns) Columns {
+	if len(t.Columns) == 0 {
+		return global
+	}
+	return t.Columns
+}
 
 // GetDefaultLabels returns default labels for all known taskwarrior properties
 func GetDefaultLabels() map[string]string {
