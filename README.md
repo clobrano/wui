@@ -528,7 +528,21 @@ The server shuts down cleanly on `Ctrl+C`.
 
 ### Running as a daemon (Linux / systemd)
 
-`wui serve` can run in the background as a **systemd user service**. It runs as your user, so it uses your `~/.taskrc`, Taskwarrior data and `~/.config/wui` — no root needed.
+There are two ways to keep wui running in the background as a **systemd user service**. Pick one per machine: both read and write the same Taskwarrior data, so don't run them side by side.
+
+| | Native (`make service-install`) | Container ([`deploy/`](deploy/README.md)) |
+|---|---|---|
+| Runs | `wui serve` (REST API, `localhost:7007`) | `wui gui` (web UI, `127.0.0.1:7008`; API kept internal) |
+| Host needs | Go and Taskwarrior | Podman 4.4+ |
+| Updates | `git pull && make service-install` | `podman auto-update` from the registry |
+| Unit | `wui-serve.service` | `wui.service` (Quadlet) |
+| Best for | A box that already has Taskwarrior; API clients like wui-android | Keeping the host clean; serving the web UI |
+
+The container can run the REST API instead by changing its `Exec=` line to `serve` (see [`deploy/README.md`](deploy/README.md#notes)); the native unit always runs `serve`.
+
+#### Native
+
+`wui serve` runs straight from the binary as your user, so it uses your `~/.taskrc`, Taskwarrior data and `~/.config/wui` — no root needed.
 
 ```bash
 make service-install                      # build, install, enable and start at boot (localhost:7007)
@@ -543,9 +557,13 @@ make service-uninstall                    # stop, disable and remove the unit
 
 By default `service-install` also runs `loginctl enable-linger $USER`, so your user's services start at boot and keep running with nobody logged in (it may ask for sudo/polkit). On a desktop where you only want it while logged in, use `make service-install WUI_LINGER=0`. `service-uninstall` leaves linger on, since other user services may rely on it; turn it off with `loginctl disable-linger $USER`.
 
-Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`contrib/systemd/wui-serve.service.in`](contrib/systemd/wui-serve.service.in).
+Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`deploy/systemd/wui-serve.service.in`](deploy/systemd/wui-serve.service.in).
 
 Setting `WUI_LOG_FILE=-` makes wui log to stderr instead of `/tmp/wui.log`; the service does this so its logs go to the journal.
+
+#### Container
+
+See [`deploy/README.md`](deploy/README.md) for building the image and installing the Podman Quadlet unit.
 
 ### Endpoints
 

@@ -120,7 +120,7 @@ WUI_SERVE_FLAGS ?=
 WUI_LINGER      ?= 1
 SYSTEMD_USER_DIR ?= $(HOME)/.config/systemd/user
 SERVICE_NAME     = wui-serve.service
-SERVICE_TEMPLATE = contrib/systemd/$(SERVICE_NAME).in
+SERVICE_TEMPLATE = deploy/systemd/$(SERVICE_NAME).in
 
 ## service-install: Install wui and enable+start it as a systemd user service, started at boot (WUI_ADDR, WUI_LOG_LEVEL, WUI_SERVE_FLAGS, WUI_LINGER)
 service-install: install

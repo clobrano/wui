@@ -17,6 +17,11 @@ starts the REST API as an internal child process on 7007. The GUI proxies
 binds it to loopback only; use [Tailscale](../README.md#secure-access-with-tailscale)
 or a reverse proxy for remote access.
 
+> Prefer running the `wui` binary directly on the host, without a container?
+> Use `make service-install` instead — see
+> [Running as a daemon](../README.md#running-as-a-daemon-linux--systemd).
+> Use one or the other, not both: they share the same Taskwarrior data.
+
 > To run the raw REST API instead (e.g. for the
 > [wui-android](../README.md#using-from-the-wui-android-flutter-app-android-linux-web)
 > client), override the command to `serve --addr 0.0.0.0:7007` and publish
@@ -90,8 +95,8 @@ systemctl --user daemon-reload
 systemctl --user start wui
 systemctl --user status wui
 
-# 4. (Optional) keep it running after logout, without an active session:
-loginctl enable-linger "$USER"
+# 4. (Optional) start it at boot and keep it running after logout:
+make service-linger      # same as: loginctl enable-linger "$USER"
 ```
 
 Logs:
