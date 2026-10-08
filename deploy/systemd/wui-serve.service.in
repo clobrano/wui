@@ -1,6 +1,6 @@
 # systemd *user* unit for the wui REST API server.
 #
-# Generated from contrib/systemd/wui-serve.service.in by `make service-install`.
+# Generated from deploy/systemd/wui-serve.service.in by `make service-install`.
 # It runs as your user so it can reach ~/.taskrc, your Taskwarrior data and
 # ~/.config/wui. Placeholders (@...@) are substituted by the Makefile.
 
