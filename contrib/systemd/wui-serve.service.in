@@ -1,0 +1,28 @@
+# systemd *user* unit for the wui REST API server.
+#
+# Generated from contrib/systemd/wui-serve.service.in by `make service-install`.
+# It runs as your user so it can reach ~/.taskrc, your Taskwarrior data and
+# ~/.config/wui. Placeholders (@...@) are substituted by the Makefile.
+
+[Unit]
+Description=wui REST API server (Taskwarrior backend)
+Documentation=https://github.com/clobrano/wui#api-server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=@WUI_BIN@ serve --addr @WUI_ADDR@ --log-level @WUI_LOG_LEVEL@ @WUI_SERVE_FLAGS@
+Restart=on-failure
+RestartSec=5
+# User units start with a minimal PATH: make task, yt-dlp, etc. findable.
+Environment=PATH=%h/.local/bin:%h/go/bin:/usr/local/bin:/usr/bin:/bin
+# Send logs to stderr so they land in the journal (journalctl --user -u wui-serve).
+Environment=WUI_LOG_FILE=-
+
+# Light hardening that does not get in the way of a per-user service.
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

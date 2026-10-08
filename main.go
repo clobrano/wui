@@ -324,10 +324,15 @@ func initLogging(cfg *config.Config) {
 		logFile = "/tmp/wui.log"
 	}
 
-	f, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		// Fallback to discarding logs if file can't be opened
-		f = nil
+	// "-" means log to stderr (e.g. under systemd, so logs reach the journal)
+	var f *os.File
+	if logFile != "-" {
+		var err error
+		f, err = os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		if err != nil {
+			// Fallback to stderr if file can't be opened
+			f = nil
+		}
 	}
 
 	// Create handler based on format

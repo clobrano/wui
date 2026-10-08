@@ -526,6 +526,27 @@ wui serve --addr :7007
 
 The server shuts down cleanly on `Ctrl+C`.
 
+### Running as a daemon (Linux / systemd)
+
+`wui serve` can run in the background as a **systemd user service**. It runs as your user, so it uses your `~/.taskrc`, Taskwarrior data and `~/.config/wui` — no root needed.
+
+```bash
+make service-install                      # build, install, enable and start (localhost:7007)
+make service-install WUI_ADDR=:7007       # listen on all interfaces
+make service-install WUI_SERVE_FLAGS="--tls-cert /path/cert.pem --tls-key /path/key.pem"
+
+make service-status                       # systemctl --user status wui-serve
+make service-logs                         # journalctl --user -u wui-serve -f
+make service-restart                      # e.g. after editing config.yaml
+make service-uninstall                    # stop, disable and remove the unit
+
+make service-linger                       # optional: start at boot, keep running after logout
+```
+
+Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`contrib/systemd/wui-serve.service.in`](contrib/systemd/wui-serve.service.in).
+
+Setting `WUI_LOG_FILE=-` makes wui log to stderr instead of `/tmp/wui.log`; the service does this so its logs go to the journal.
+
 ### Endpoints
 
 All paths are under `/api/v1`. Requests and responses use JSON.
