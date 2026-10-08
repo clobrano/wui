@@ -116,11 +116,13 @@ WUI_BIN         ?= $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/$(BINA
 WUI_ADDR        ?= localhost:7007
 WUI_LOG_LEVEL   ?= info
 WUI_SERVE_FLAGS ?=
+# 1 = start the service at boot, without a login session (loginctl enable-linger)
+WUI_LINGER      ?= 1
 SYSTEMD_USER_DIR ?= $(HOME)/.config/systemd/user
 SERVICE_NAME     = wui-serve.service
 SERVICE_TEMPLATE = contrib/systemd/$(SERVICE_NAME).in
 
-## service-install: Install wui and enable+start it as a systemd user service (WUI_ADDR, WUI_LOG_LEVEL, WUI_SERVE_FLAGS)
+## service-install: Install wui and enable+start it as a systemd user service, started at boot (WUI_ADDR, WUI_LOG_LEVEL, WUI_SERVE_FLAGS, WUI_LINGER)
 service-install: install
 	@command -v systemctl >/dev/null || { echo "systemctl not found: systemd is required"; exit 1; }
 	@test -x "$(WUI_BIN)" || { echo "wui binary not found at $(WUI_BIN); set WUI_BIN=/path/to/wui"; exit 1; }
@@ -134,7 +136,12 @@ service-install: install
 	systemctl --user daemon-reload
 	systemctl --user enable $(SERVICE_NAME)
 	systemctl --user restart $(SERVICE_NAME)
-	@echo "wui serve is running on $(WUI_ADDR). To keep it running while logged out: make service-linger"
+ifeq ($(WUI_LINGER),1)
+	loginctl enable-linger "$$(id -un)"
+	@echo "wui serve is running on $(WUI_ADDR) and will start at boot"
+else
+	@echo "wui serve is running on $(WUI_ADDR) (starts at login only; run 'make service-linger' to start it at boot)"
+endif
 
 ## service-uninstall: Stop, disable and remove the wui systemd user service
 service-uninstall:
@@ -154,6 +161,6 @@ service-status:
 service-logs:
 	journalctl --user -u $(SERVICE_NAME) -f
 
-## service-linger: Let user services run at boot / without an active login session
+## service-linger: Let user services run at boot / without an active login session (done by service-install unless WUI_LINGER=0)
 service-linger:
-	loginctl enable-linger $(USER)
+	loginctl enable-linger "$$(id -un)"
