@@ -1,4 +1,4 @@
-.PHONY: build test install clean help image image-push run
+.PHONY: build test install clean help image image-push run service-install service-uninstall service-status service-logs service-restart service-linger
 
 WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
 
@@ -107,3 +107,53 @@ serve:
 
 ## rebuild-and-serve
 rebuild-and-serve: build install serve
+
+# ---------------------------------------------------------------------------
+# wui serve as a systemd --user daemon (Linux)
+# ---------------------------------------------------------------------------
+# Defaults to where `make install` (go install) puts the binary
+WUI_BIN         ?= $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/$(BINARY_NAME)
+WUI_ADDR        ?= localhost:7007
+WUI_LOG_LEVEL   ?= info
+WUI_SERVE_FLAGS ?=
+SYSTEMD_USER_DIR ?= $(HOME)/.config/systemd/user
+SERVICE_NAME     = wui-serve.service
+SERVICE_TEMPLATE = contrib/systemd/$(SERVICE_NAME).in
+
+## service-install: Install wui and enable+start it as a systemd user service (WUI_ADDR, WUI_LOG_LEVEL, WUI_SERVE_FLAGS)
+service-install: install
+	@command -v systemctl >/dev/null || { echo "systemctl not found: systemd is required"; exit 1; }
+	@test -x "$(WUI_BIN)" || { echo "wui binary not found at $(WUI_BIN); set WUI_BIN=/path/to/wui"; exit 1; }
+	@mkdir -p $(SYSTEMD_USER_DIR)
+	@sed -e 's|@WUI_BIN@|$(WUI_BIN)|g' \
+	     -e 's|@WUI_ADDR@|$(WUI_ADDR)|g' \
+	     -e 's|@WUI_LOG_LEVEL@|$(WUI_LOG_LEVEL)|g' \
+	     -e 's|@WUI_SERVE_FLAGS@|$(WUI_SERVE_FLAGS)|g' \
+	     $(SERVICE_TEMPLATE) > $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)
+	@echo "Installed $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)"
+	systemctl --user daemon-reload
+	systemctl --user enable $(SERVICE_NAME)
+	systemctl --user restart $(SERVICE_NAME)
+	@echo "wui serve is running on $(WUI_ADDR). To keep it running while logged out: make service-linger"
+
+## service-uninstall: Stop, disable and remove the wui systemd user service
+service-uninstall:
+	-systemctl --user disable --now $(SERVICE_NAME)
+	rm -f $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)
+	systemctl --user daemon-reload
+
+## service-restart: Restart the wui systemd user service
+service-restart:
+	systemctl --user restart $(SERVICE_NAME)
+
+## service-status: Show the status of the wui systemd user service
+service-status:
+	-systemctl --user status --no-pager $(SERVICE_NAME)
+
+## service-logs: Follow the wui systemd user service logs
+service-logs:
+	journalctl --user -u $(SERVICE_NAME) -f
+
+## service-linger: Let user services run at boot / without an active login session
+service-linger:
+	loginctl enable-linger $(USER)
