@@ -531,7 +531,7 @@ The server shuts down cleanly on `Ctrl+C`.
 `wui serve` can run in the background as a **systemd user service**. It runs as your user, so it uses your `~/.taskrc`, Taskwarrior data and `~/.config/wui` — no root needed.
 
 ```bash
-make service-install                      # build, install, enable and start (localhost:7007)
+make service-install                      # build, install, enable and start at boot (localhost:7007)
 make service-install WUI_ADDR=:7007       # listen on all interfaces
 make service-install WUI_SERVE_FLAGS="--tls-cert /path/cert.pem --tls-key /path/key.pem"
 
@@ -539,9 +539,9 @@ make service-status                       # systemctl --user status wui-serve
 make service-logs                         # journalctl --user -u wui-serve -f
 make service-restart                      # e.g. after editing config.yaml
 make service-uninstall                    # stop, disable and remove the unit
-
-make service-linger                       # optional: start at boot, keep running after logout
 ```
+
+By default `service-install` also runs `loginctl enable-linger $USER`, so your user's services start at boot and keep running with nobody logged in (it may ask for sudo/polkit). On a desktop where you only want it while logged in, use `make service-install WUI_LINGER=0`. `service-uninstall` leaves linger on, since other user services may rely on it; turn it off with `loginctl disable-linger $USER`.
 
 Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`contrib/systemd/wui-serve.service.in`](contrib/systemd/wui-serve.service.in).
 
