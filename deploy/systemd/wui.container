@@ -1,0 +1,55 @@
+# wui.container — Podman Quadlet unit for running `wui serve` as a rootless
+# systemd *user* service.
+#
+# Install:
+#   mkdir -p ~/.config/containers/systemd
+#   cp deploy/systemd/wui.container ~/.config/containers/systemd/
+#   systemctl --user daemon-reload
+#   systemctl --user start wui
+#
+# Quadlet (shipped with podman 4.4+) turns this file into a generated
+# systemd service named `wui.service`. See `man quadlet`.
+
+[Unit]
+Description=wui — Taskwarrior REST API server
+Documentation=https://github.com/clobrano/wui
+After=network-online.target
+Wants=network-online.target
+
+[Container]
+Image=quay.io/clobrano/wui:latest
+ContainerName=wui
+
+# Keep the image current via `podman auto-update` (podman-auto-update.timer).
+AutoUpdate=registry
+
+# Map the host user to the container's uid/gid 1000 so bind-mounted files in
+# the host's home directory are owned correctly inside the container.
+UserNS=keep-id:uid=1000,gid=1000
+
+# Publish the web GUI (port 7008) to loopback only. The GUI has no
+# authentication — do not expose it directly to the network. For remote access
+# over Tailscale, publish on the Tailscale IP instead (reachable only over the
+# WireGuard mesh), e.g.:
+#   PublishPort=100.x.y.z:7008:7008
+# The REST API (7007) runs as an internal child process and is not published;
+# the GUI proxies /api/v1/ to it.
+PublishPort=127.0.0.1:7008:7008
+
+# Persist Taskwarrior data and wui config on the host. Point these at your real
+# Taskwarrior data to drive existing tasks; ':z' relabels for SELinux hosts.
+Volume=%h/.task:/home/wui/.task:z
+Volume=%h/.taskrc:/home/wui/.taskrc:ro,z
+Volume=%h/.config/wui:/home/wui/.config/wui:z
+
+# Run the web GUI. Override to pass extra flags or run the raw API instead, e.g.:
+#   Exec=gui --port 7008 --log-level info
+#   Exec=serve --addr 0.0.0.0:7007   # (also change PublishPort to 7007)
+Exec=gui --port 7008
+
+[Service]
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

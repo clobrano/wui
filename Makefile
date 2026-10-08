@@ -1,4 +1,4 @@
-.PHONY: build test install clean help
+.PHONY: build test install clean help image image-push run
 
 WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
 
@@ -7,6 +7,18 @@ BINARY_NAME=wui
 VERSION?=dev
 COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+# Container image variables
+CONTAINER_ENGINE ?= podman
+IMAGE_REPO ?= quay.io/clobrano/wui
+IMAGE_TAG ?= $(VERSION)
+IMAGE ?= $(IMAGE_REPO):$(IMAGE_TAG)
+
+# Host address:port to publish the container's web GUI on. Defaults to loopback
+# (the GUI has no auth). To reach it over Tailscale, publish on the Tailscale
+# IP, e.g.: make run HOST_ADDR=$(tailscale ip -4)
+HOST_ADDR ?= 127.0.0.1
+HOST_PORT ?= 7008
 LDFLAGS=-ldflags "-X github.com/clobrano/wui/internal/version.Version=$(VERSION) \
                    -X github.com/clobrano/wui/internal/version.Commit=$(COMMIT) \
                    -X github.com/clobrano/wui/internal/version.BuildDate=$(BUILD_DATE)"
@@ -59,6 +71,30 @@ lint:
 mod-tidy:
 	@echo "Tidying modules..."
 	@go mod tidy
+
+## image: Build the container image ($(IMAGE))
+image:
+	@echo "Building container image $(IMAGE)..."
+	@$(CONTAINER_ENGINE) build \
+		--build-arg VERSION=$(VERSION) \
+		--build-arg COMMIT=$(COMMIT) \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		-t $(IMAGE) \
+		-f Containerfile .
+	@echo "Image built: $(IMAGE)"
+
+## image-push: Push the container image to the registry
+image-push: image
+	@echo "Pushing $(IMAGE)..."
+	@$(CONTAINER_ENGINE) push $(IMAGE)
+
+## run: Run the container image, publishing the web GUI on $(HOST_ADDR):$(HOST_PORT) (mounts your Taskwarrior data)
+run:
+	@$(CONTAINER_ENGINE) run --rm \
+		-p $(HOST_ADDR):$(HOST_PORT):7008 \
+		-v "$(HOME)/.task:/home/wui/.task:z" \
+		-v "$(HOME)/.taskrc:/home/wui/.taskrc:ro,z" \
+		$(IMAGE)
 
 ## help: Display this help message
 help:
