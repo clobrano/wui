@@ -109,28 +109,30 @@ serve:
 rebuild-and-serve: build install serve
 
 # ---------------------------------------------------------------------------
-# wui serve as a systemd --user daemon (Linux)
+# wui as a systemd --user daemon (Linux)
 # ---------------------------------------------------------------------------
 # Defaults to where `make install` (go install) puts the binary
 WUI_BIN         ?= $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/$(BINARY_NAME)
-WUI_ADDR        ?= localhost:7007
+# Web GUI port. `wui gui` listens on all interfaces (reachable from the LAN)
+# and starts the REST API itself on localhost:7007.
+WUI_PORT        ?= 7008
+# What the service runs. For the REST API only, e.g.: WUI_ARGS="serve --addr :7007"
+WUI_ARGS        ?= gui --port $(WUI_PORT) --no-browser
 WUI_LOG_LEVEL   ?= info
-WUI_SERVE_FLAGS ?=
 # 1 = start the service at boot, without a login session (loginctl enable-linger)
 WUI_LINGER      ?= 1
 SYSTEMD_USER_DIR ?= $(HOME)/.config/systemd/user
 SERVICE_NAME     = wui-serve.service
 SERVICE_TEMPLATE = deploy/systemd/$(SERVICE_NAME).in
 
-## service-install: Install wui and enable+start it as a systemd user service, started at boot (WUI_ADDR, WUI_LOG_LEVEL, WUI_SERVE_FLAGS, WUI_LINGER)
+## service-install: Install wui and enable+start it as a systemd user service, started at boot (WUI_PORT, WUI_ARGS, WUI_LOG_LEVEL, WUI_LINGER)
 service-install: install
 	@command -v systemctl >/dev/null || { echo "systemctl not found: systemd is required"; exit 1; }
 	@test -x "$(WUI_BIN)" || { echo "wui binary not found at $(WUI_BIN); set WUI_BIN=/path/to/wui"; exit 1; }
 	@mkdir -p $(SYSTEMD_USER_DIR)
 	@sed -e 's|@WUI_BIN@|$(WUI_BIN)|g' \
-	     -e 's|@WUI_ADDR@|$(WUI_ADDR)|g' \
+	     -e 's|@WUI_ARGS@|$(WUI_ARGS)|g' \
 	     -e 's|@WUI_LOG_LEVEL@|$(WUI_LOG_LEVEL)|g' \
-	     -e 's|@WUI_SERVE_FLAGS@|$(WUI_SERVE_FLAGS)|g' \
 	     $(SERVICE_TEMPLATE) > $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)
 	@echo "Installed $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)"
 	systemctl --user daemon-reload
@@ -138,9 +140,9 @@ service-install: install
 	systemctl --user restart $(SERVICE_NAME)
 ifeq ($(WUI_LINGER),1)
 	loginctl enable-linger "$$(id -un)"
-	@echo "wui serve is running on $(WUI_ADDR) and will start at boot"
+	@echo "wui is running ($(WUI_ARGS)) and will start at boot"
 else
-	@echo "wui serve is running on $(WUI_ADDR) (starts at login only; run 'make service-linger' to start it at boot)"
+	@echo "wui is running ($(WUI_ARGS)); starts at login only, run 'make service-linger' to start it at boot"
 endif
 
 ## service-uninstall: Stop, disable and remove the wui systemd user service
