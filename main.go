@@ -67,8 +67,9 @@ var serveTLSCert string
 var serveTLSKey string
 
 var (
-	guiPort    int
-	guiAPIPort int
+	guiPort      int
+	guiAPIPort   int
+	guiNoBrowser bool
 )
 
 var guiCmd = &cobra.Command{
@@ -87,7 +88,8 @@ Ports:
 Examples:
   wui gui                     # GUI on :7008, API on :7007
   wui gui --port 8080         # GUI on :8080
-  wui gui --api-port 9000     # Connect to API on :9000`,
+  wui gui --api-port 9000     # Connect to API on :9000
+  wui gui --no-browser        # Don't open a browser (e.g. as a service)`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if err := runGUI(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -187,6 +189,7 @@ func init() {
 	// GUI command flags
 	guiCmd.Flags().IntVar(&guiPort, "port", 7008, "port for the GUI HTTP server")
 	guiCmd.Flags().IntVar(&guiAPIPort, "api-port", 0, "port of the wui serve API (0 = use config or default 7007)")
+	guiCmd.Flags().BoolVar(&guiNoBrowser, "no-browser", false, "do not open the GUI in a browser on startup")
 
 	// Serve command flags
 	serveCmd.Flags().StringVar(&serveAddr, "addr", "localhost:7007", "address to listen on (host:port)")
@@ -612,7 +615,9 @@ func runGUI() error {
 
 	// Task 1.6: open the browser.
 	fmt.Fprintf(os.Stderr, "wui GUI listening on %s\n", guiURL)
-	openBrowser(guiURL)
+	if !guiNoBrowser {
+		openBrowser(guiURL)
+	}
 
 	select {
 	case err := <-errCh:
