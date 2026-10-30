@@ -157,6 +157,11 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	// Static assets
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
+	// PWA: the service worker must be served from the root so its scope
+	// covers every page, and the manifest needs its own content type.
+	mux.HandleFunc("GET /sw.js", serveStaticFile("static/sw.js", "text/javascript; charset=utf-8"))
+	mux.HandleFunc("GET /manifest.webmanifest", serveStaticFile("static/manifest.webmanifest", "application/manifest+json"))
+
 	// GUI pages
 	mux.HandleFunc("GET /", s.handleTaskList)
 	mux.HandleFunc("GET /tasks", s.handleTaskList)
@@ -173,6 +178,22 @@ func (s *Server) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/gui/filter-history", s.handleFilterHistoryAdd)
 	mux.HandleFunc("DELETE /api/gui/filter-history", s.handleFilterHistoryDelete)
 	mux.HandleFunc("POST /api/gui/filter-history/clear", s.handleFilterHistoryClear)
+}
+
+// serveStaticFile serves a single embedded file with the given content type.
+// Responses are not cached by the browser so service worker updates are picked
+// up on the next visit.
+func serveStaticFile(name, contentType string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, err := staticFS.ReadFile(name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Write(data)
+	}
 }
 
 // urlify converts URLs in text into <a> tags.

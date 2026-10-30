@@ -99,6 +99,13 @@ systemctl --user status wui
 make service-linger      # same as: loginctl enable-linger "$USER"
 ```
 
+`make container-install` does all of the above (and `make container-uninstall`
+undoes it). Add `WUI_TAILSCALE=1` to also serve the GUI over HTTPS on your
+tailnet with `tailscale serve`, which Tailscale's host-side daemon proxies to
+`127.0.0.1:7008`. HTTPS is what lets you install the GUI as an app on your
+phone and other devices; see
+[Installing the web GUI as an app](../README.md#installing-the-web-gui-as-an-app-pwa).
+
 Logs:
 
 ```bash
