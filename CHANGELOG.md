@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Web GUI can be installed as a Progressive Web App (manifest, icons, service worker with offline fallback)
+- `make container-install` / `container-uninstall` for the Podman Quadlet unit
+- `WUI_TAILSCALE=1` for `service-install` and `container-install`, and `make tailscale-serve`, to serve the web GUI over HTTPS on a tailnet
 - Initial release of wui (Warrior UI)
 - Modern TUI built with bubbletea framework
 - Multiple view sections (Next, Waiting, Projects, Tags, All)

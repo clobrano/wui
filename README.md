@@ -548,6 +548,7 @@ wui runs straight from the binary as your user, so it uses your `~/.taskrc`, Tas
 make service-install                      # build, install, enable and start at boot (web GUI on :7008)
 make service-install WUI_PORT=8080        # web GUI on another port
 make service-install WUI_ARGS="serve --addr :7007"   # REST API only, e.g. for wui-android
+make service-install WUI_TAILSCALE=1      # also serve the GUI over HTTPS on your tailnet (see below)
 make service-linger                       # only needed if you installed with WUI_LINGER=0
 
 make service-status                       # systemctl --user status wui-serve
@@ -566,19 +567,34 @@ Setting `WUI_LOG_FILE=-` makes wui log to stderr instead of `/tmp/wui.log`; the 
 
 #### Container
 
-See [`deploy/README.md`](deploy/README.md) for building the image and installing the Podman Quadlet unit.
+```bash
+make container-install                    # install the Podman Quadlet unit, start it, start at boot
+make container-install WUI_TAILSCALE=1    # also serve the GUI over HTTPS on your tailnet (see below)
+make container-uninstall                  # stop it and remove the unit
+```
+
+See [`deploy/README.md`](deploy/README.md) for building the image and the details of the Quadlet unit.
 
 ### Installing the web GUI as an app (PWA)
 
 The web GUI is a Progressive Web App: Chrome, Edge and Android offer **Install app** (or **Add to Home screen**) in the browser menu, and Safari on iOS has **Share → Add to Home Screen**. Once installed, wui opens in its own window with its own icon, and shows the last loaded page, or an offline notice, while the server can't be reached. Task data is always fetched live.
 
-Browsers only allow installing from a secure origin: `http://localhost:7008` works, but `http://<server>:7008` from another machine does not. To install on other devices, put the GUI behind HTTPS, for example with [Tailscale Serve](https://tailscale.com/kb/1312/serve):
+Browsers only allow installing from a secure origin: `http://localhost:7008` works, but `http://<server>:7008` from another machine does not. To install on other devices, put the GUI behind HTTPS. The deploys can do this with [Tailscale Serve](https://tailscale.com/kb/1312/serve), which works on the free plan:
 
-```bash
-tailscale serve --bg 7008      # https://<machine>.<tailnet>.ts.net -> localhost:7008
-```
+1. In the Tailscale admin console, [DNS page](https://login.tailscale.com/admin/dns): make sure **MagicDNS** is on, then click **Enable HTTPS** under **HTTPS Certificates**. This is needed once per tailnet.
+2. Install with `WUI_TAILSCALE=1`:
 
-or any reverse proxy with a certificate (Caddy, nginx, …).
+   ```bash
+   make service-install WUI_TAILSCALE=1      # native
+   make container-install WUI_TAILSCALE=1    # container
+   ```
+
+   Or, for a wui that is already running: `make tailscale-serve` (add `TAILSCALE_PORT=…` if the GUI isn't on 7008).
+3. Open the printed `https://<machine>.<tailnet>.ts.net` address on a device connected to your tailnet, and install the app from the browser menu.
+
+Tailscale gets and renews the certificate itself and remembers this setting across reboots. Changing it needs root, so the targets run `sudo tailscale serve …`; if you made your user a Tailscale operator (`sudo tailscale set --operator=$USER`), pass `TAILSCALE_SUDO=`. Use `make tailscale-serve-status` to check it and `make tailscale-serve-off` to stop it. Note that the machine and tailnet names (not the GUI itself) end up in public certificate transparency logs.
+
+Any other reverse proxy with a certificate (Caddy, nginx, …) works too.
 
 ### Endpoints
 
