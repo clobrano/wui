@@ -568,6 +568,18 @@ Setting `WUI_LOG_FILE=-` makes wui log to stderr instead of `/tmp/wui.log`; the 
 
 See [`deploy/README.md`](deploy/README.md) for building the image and installing the Podman Quadlet unit.
 
+### Installing the web GUI as an app (PWA)
+
+The web GUI is a Progressive Web App: Chrome, Edge and Android offer **Install app** (or **Add to Home screen**) in the browser menu, and Safari on iOS has **Share → Add to Home Screen**. Once installed, wui opens in its own window with its own icon, and shows the last loaded page, or an offline notice, while the server can't be reached. Task data is always fetched live.
+
+Browsers only allow installing from a secure origin: `http://localhost:7008` works, but `http://<server>:7008` from another machine does not. To install on other devices, put the GUI behind HTTPS, for example with [Tailscale Serve](https://tailscale.com/kb/1312/serve):
+
+```bash
+tailscale serve --bg 7008      # https://<machine>.<tailnet>.ts.net -> localhost:7008
+```
+
+or any reverse proxy with a certificate (Caddy, nginx, …).
+
 ### Endpoints
 
 All paths are under `/api/v1`. Requests and responses use JSON.
