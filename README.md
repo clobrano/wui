@@ -464,6 +464,7 @@ wui                              Launch the TUI
 wui version                      Print version info
 wui sync                         Sync tasks to Google Calendar
 wui serve                        Start the REST API server
+wui gui                          Start the web GUI (and the REST API if it isn't running)
 
 Flags (all commands):
   --config string                Config file path (default: ~/.config/wui/config.yaml)
@@ -479,6 +480,12 @@ wui serve flags:
   --addr string                  Address to listen on (default: localhost:7007)
   --tls-cert string              Path to TLS certificate file (enables HTTPS)
   --tls-key string               Path to TLS private key file (enables HTTPS)
+
+wui gui flags:
+  --host string                  Address to listen on (default: all interfaces)
+  --port int                     Port to listen on (default: 7008)
+  --api-port int                 Port of the wui serve API (default: config or 7007)
+  --no-browser                   Don't open the GUI in a browser on startup
 ```
 
 ### Logging
@@ -532,7 +539,7 @@ There are two ways to keep wui running in the background as a **systemd user ser
 
 | | Native (`make service-install`) | Container ([`deploy/`](deploy/README.md)) |
 |---|---|---|
-| Runs | `wui gui` (web UI on `:7008`, all interfaces; API on `localhost:7007`) | `wui gui` (web UI, `127.0.0.1:7008`; API kept internal) |
+| Runs | `wui gui` (web UI on `:7008`, all interfaces, or `127.0.0.1` with `WUI_TAILSCALE=1`; API on `localhost:7007`) | `wui gui` (web UI, `127.0.0.1:7008`; API kept internal) |
 | Host needs | Go and Taskwarrior | Podman 4.4+ |
 | Updates | `git pull && make service-install` | `podman auto-update` from the registry |
 | Unit | `wui-serve.service` | `wui.service` (Quadlet) |
@@ -548,7 +555,8 @@ wui runs straight from the binary as your user, so it uses your `~/.taskrc`, Tas
 make service-install                      # build, install, enable and start at boot (web GUI on :7008)
 make service-install WUI_PORT=8080        # web GUI on another port
 make service-install WUI_ARGS="serve --addr :7007"   # REST API only, e.g. for wui-android
-make service-install WUI_TAILSCALE=1      # also serve the GUI over HTTPS on your tailnet (see below)
+make service-install WUI_TAILSCALE=1      # GUI on 127.0.0.1 only, served over HTTPS on your tailnet (see below)
+make service-install WUI_HOST=127.0.0.1   # GUI reachable from this machine only
 make service-linger                       # only needed if you installed with WUI_LINGER=0
 
 make service-status                       # systemctl --user status wui-serve
@@ -557,11 +565,11 @@ make service-restart                      # e.g. after editing config.yaml
 make service-uninstall                    # stop, disable and remove the unit
 ```
 
-The web GUI has **no authentication** and is reachable by anyone on your network. If the server has a firewall, open the port (e.g. `sudo firewall-cmd --add-port=7008/tcp --permanent && sudo firewall-cmd --reload`, or `sudo ufw allow 7008/tcp`). For access from outside your network, use [Tailscale](#secure-access-with-tailscale) rather than opening it to the internet.
+The web GUI has **no authentication** and, by default, is reachable by anyone on your network. If the server has a firewall, open the port (e.g. `sudo firewall-cmd --add-port=7008/tcp --permanent && sudo firewall-cmd --reload`, or `sudo ufw allow 7008/tcp`). For access from outside your network, use [Tailscale](#secure-access-with-tailscale) rather than opening it to the internet. With `WUI_TAILSCALE=1` the GUI listens on `127.0.0.1` only and other devices reach it through `https://<machine>.<tailnet>.ts.net`, so there is no port to open; set `WUI_HOST=` to keep it on all interfaces as well.
 
 By default `service-install` also runs `loginctl enable-linger $USER`, so your user's services start at boot and keep running with nobody logged in (it may ask for sudo/polkit). On a desktop where you only want it while logged in, use `make service-install WUI_LINGER=0`. `service-uninstall` leaves linger on, since other user services may rely on it; turn it off with `loginctl disable-linger $USER`.
 
-Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`deploy/systemd/wui-serve.service.in`](deploy/systemd/wui-serve.service.in).
+Re-run `make service-install` to upgrade the binary or change options. Other variables: `WUI_HOST` (GUI listen address; default all interfaces, or `127.0.0.1` with `WUI_TAILSCALE=1`), `WUI_LOG_LEVEL` (default `info`) and `WUI_BIN` (default: where `go install` puts `wui`). The unit template is in [`deploy/systemd/wui-serve.service.in`](deploy/systemd/wui-serve.service.in).
 
 Setting `WUI_LOG_FILE=-` makes wui log to stderr instead of `/tmp/wui.log`; the service does this so its logs go to the journal. `wui gui --no-browser` skips opening a browser on startup; the service uses it.
 

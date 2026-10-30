@@ -113,16 +113,19 @@ rebuild-and-serve: build install serve
 # ---------------------------------------------------------------------------
 # Defaults to where `make install` (go install) puts the binary
 WUI_BIN         ?= $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/$(BINARY_NAME)
-# Web GUI port. `wui gui` listens on all interfaces (reachable from the LAN)
-# and starts the REST API itself on localhost:7007.
+# Web GUI port. `wui gui` starts the REST API itself on localhost:7007.
 WUI_PORT        ?= 7008
+# 1 = also serve the web GUI over HTTPS on your tailnet (see tailscale-serve)
+WUI_TAILSCALE   ?= 0
+# Web GUI listen address. Empty = all interfaces (reachable from the LAN); with
+# WUI_TAILSCALE=1 it defaults to 127.0.0.1, so the GUI is only reachable
+# through Tailscale's HTTPS proxy.
+WUI_HOST        ?= $(if $(filter 1,$(WUI_TAILSCALE)),127.0.0.1)
 # What the service runs. For the REST API only, e.g.: WUI_ARGS="serve --addr :7007"
-WUI_ARGS        ?= gui --port $(WUI_PORT) --no-browser
+WUI_ARGS        ?= gui $(if $(WUI_HOST),--host $(WUI_HOST) )--port $(WUI_PORT) --no-browser
 WUI_LOG_LEVEL   ?= info
 # 1 = start the service at boot, without a login session (loginctl enable-linger)
 WUI_LINGER      ?= 1
-# 1 = also serve the web GUI over HTTPS on your tailnet (see tailscale-serve)
-WUI_TAILSCALE   ?= 0
 SYSTEMD_USER_DIR ?= $(HOME)/.config/systemd/user
 SERVICE_NAME     = wui-serve.service
 SERVICE_TEMPLATE = deploy/systemd/$(SERVICE_NAME).in

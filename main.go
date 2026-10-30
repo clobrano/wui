@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"runtime"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -67,6 +68,7 @@ var serveTLSCert string
 var serveTLSKey string
 
 var (
+	guiHost      string
 	guiPort      int
 	guiAPIPort   int
 	guiNoBrowser bool
@@ -81,13 +83,15 @@ The GUI launches a local HTTP server and opens your default browser. It requires
 wui serve (the REST API) to be reachable; if it is not already running, wui gui
 starts it automatically as a child process.
 
-Ports:
+Addresses:
+  --host      GUI listen address    (default: all interfaces)
   --port      GUI HTTP server port  (default 7008)
   --api-port  wui serve API port    (default 7007)
 
 Examples:
   wui gui                     # GUI on :7008, API on :7007
   wui gui --port 8080         # GUI on :8080
+  wui gui --host 127.0.0.1    # GUI reachable from this machine only
   wui gui --api-port 9000     # Connect to API on :9000
   wui gui --no-browser        # Don't open a browser (e.g. as a service)`,
 	Run: func(cmd *cobra.Command, args []string) {
@@ -187,6 +191,7 @@ func init() {
 	rootCmd.AddCommand(guiCmd)
 
 	// GUI command flags
+	guiCmd.Flags().StringVar(&guiHost, "host", "", "address for the GUI HTTP server to listen on (empty = all interfaces)")
 	guiCmd.Flags().IntVar(&guiPort, "port", 7008, "port for the GUI HTTP server")
 	guiCmd.Flags().IntVar(&guiAPIPort, "api-port", 0, "port of the wui serve API (0 = use config or default 7007)")
 	guiCmd.Flags().BoolVar(&guiNoBrowser, "no-browser", false, "do not open the GUI in a browser on startup")
@@ -478,9 +483,19 @@ func resolveAPIPort(flag int, cfg *config.Config) int {
 	return 7007
 }
 
-// portInUse returns true when something is already listening on localhost:<port>.
-func portInUse(port int) bool {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("localhost:%d", port), time.Second)
+// dialHost returns the host to connect to for a server listening on listenHost:
+// localhost for the wildcard addresses, listenHost otherwise.
+func dialHost(listenHost string) string {
+	switch listenHost {
+	case "", "0.0.0.0", "::":
+		return "localhost"
+	}
+	return listenHost
+}
+
+// portInUse returns true when something is already listening on host:<port>.
+func portInUse(host string, port int) bool {
+	conn, err := net.DialTimeout("tcp", net.JoinHostPort(host, strconv.Itoa(port)), time.Second)
 	if err != nil {
 		return false
 	}
@@ -541,12 +556,14 @@ func runGUI() error {
 	initLogging(cfg)
 
 	apiPort := resolveAPIPort(guiAPIPort, cfg)
-	// Bind on all interfaces so the GUI is reachable over the LAN (e.g. from
-	// other devices on the same WiFi). The browser is still opened via localhost.
-	guiAddr := fmt.Sprintf(":%d", guiPort)
+	// By default bind on all interfaces so the GUI is reachable over the LAN
+	// (e.g. from other devices on the same WiFi); --host narrows that, e.g. to
+	// 127.0.0.1 behind a reverse proxy. The browser is opened via guiDialHost.
+	guiAddr := net.JoinHostPort(guiHost, strconv.Itoa(guiPort))
+	guiDialHost := dialHost(guiHost)
 
 	// Task 1.3: fail fast if the GUI port is already occupied.
-	if portInUse(guiPort) {
+	if portInUse(guiDialHost, guiPort) {
 		return fmt.Errorf("port %d is already in use; choose another with --port", guiPort)
 	}
 
@@ -590,7 +607,7 @@ func runGUI() error {
 	filterHistory := gui.NewFilterHistory(config.ConfigDir())
 	guiServer := gui.NewServer(apiClient, cfg, filterHistory, fmt.Sprintf("http://localhost:%d", apiPort))
 
-	guiURL := fmt.Sprintf("http://localhost:%d", guiPort)
+	guiURL := "http://" + net.JoinHostPort(guiDialHost, strconv.Itoa(guiPort))
 
 	// Task 1.8: graceful shutdown on SIGINT / SIGTERM.
 	stop := make(chan os.Signal, 1)
@@ -607,7 +624,7 @@ func runGUI() error {
 			return fmt.Errorf("GUI server failed to start: %w", err)
 		default:
 		}
-		if portInUse(guiPort) {
+		if portInUse(guiDialHost, guiPort) {
 			break
 		}
 		time.Sleep(50 * time.Millisecond)
