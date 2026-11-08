@@ -416,3 +416,12 @@ function _pollAPI() {
     })
     .catch(() => setTimeout(_pollAPI, 2000));
 }
+
+/* ── Progressive Web App ────────────────────────────────────────────────── */
+// Service workers need a secure context (HTTPS or localhost); elsewhere the
+// GUI still works, it just can't be installed.
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(err => console.warn('wui: service worker registration failed', err));
+  });
+}

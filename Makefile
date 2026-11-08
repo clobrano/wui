@@ -1,4 +1,4 @@
-.PHONY: build test install clean help image image-push run service-install service-uninstall service-status service-logs service-restart service-linger
+.PHONY: build test install clean help image image-push run service-install service-uninstall service-status service-logs service-restart service-linger container-install container-uninstall tailscale-serve tailscale-serve-off tailscale-serve-status
 
 WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
 
@@ -113,11 +113,16 @@ rebuild-and-serve: build install serve
 # ---------------------------------------------------------------------------
 # Defaults to where `make install` (go install) puts the binary
 WUI_BIN         ?= $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)/$(BINARY_NAME)
-# Web GUI port. `wui gui` listens on all interfaces (reachable from the LAN)
-# and starts the REST API itself on localhost:7007.
+# Web GUI port. `wui gui` starts the REST API itself on localhost:7007.
 WUI_PORT        ?= 7008
+# 1 = also serve the web GUI over HTTPS on your tailnet (see tailscale-serve)
+WUI_TAILSCALE   ?= 0
+# Web GUI listen address. Empty = all interfaces (reachable from the LAN); with
+# WUI_TAILSCALE=1 it defaults to 127.0.0.1, so the GUI is only reachable
+# through Tailscale's HTTPS proxy.
+WUI_HOST        ?= $(if $(filter 1,$(WUI_TAILSCALE)),127.0.0.1)
 # What the service runs. For the REST API only, e.g.: WUI_ARGS="serve --addr :7007"
-WUI_ARGS        ?= gui --port $(WUI_PORT) --no-browser
+WUI_ARGS        ?= gui $(if $(WUI_HOST),--host $(WUI_HOST) )--port $(WUI_PORT) --no-browser
 WUI_LOG_LEVEL   ?= info
 # 1 = start the service at boot, without a login session (loginctl enable-linger)
 WUI_LINGER      ?= 1
@@ -144,12 +149,18 @@ ifeq ($(WUI_LINGER),1)
 else
 	@echo "wui is running ($(WUI_ARGS)); starts at login only, run 'make service-linger' to start it at boot"
 endif
+ifeq ($(WUI_TAILSCALE),1)
+	@$(MAKE) --no-print-directory tailscale-serve TAILSCALE_PORT=$(WUI_PORT)
+endif
 
-## service-uninstall: Stop, disable and remove the wui systemd user service
+## service-uninstall: Stop, disable and remove the wui systemd user service (and its Tailscale HTTPS proxy if WUI_TAILSCALE=1)
 service-uninstall:
 	-systemctl --user disable --now $(SERVICE_NAME)
 	rm -f $(SYSTEMD_USER_DIR)/$(SERVICE_NAME)
 	systemctl --user daemon-reload
+ifeq ($(WUI_TAILSCALE),1)
+	-@$(MAKE) --no-print-directory tailscale-serve-off
+endif
 
 ## service-restart: Restart the wui systemd user service
 service-restart:
@@ -166,3 +177,59 @@ service-logs:
 ## service-linger: Let user services run at boot / without an active login session (done by service-install unless WUI_LINGER=0)
 service-linger:
 	loginctl enable-linger "$$(id -un)"
+
+# ---------------------------------------------------------------------------
+# wui container as a systemd --user service (Podman Quadlet)
+# ---------------------------------------------------------------------------
+QUADLET_DIR      ?= $(HOME)/.config/containers/systemd
+QUADLET_UNIT      = deploy/systemd/wui.container
+
+## container-install: Install the Podman Quadlet unit and start the wui container, started at boot (WUI_LINGER, WUI_TAILSCALE)
+container-install:
+	@command -v podman >/dev/null || { echo "podman not found: Podman 4.4+ is required"; exit 1; }
+	@mkdir -p $(HOME)/.task $(HOME)/.config/wui $(QUADLET_DIR)
+	@test -e $(HOME)/.taskrc || touch $(HOME)/.taskrc
+	cp $(QUADLET_UNIT) $(QUADLET_DIR)/wui.container
+	systemctl --user daemon-reload
+	systemctl --user restart wui.service
+ifeq ($(WUI_LINGER),1)
+	loginctl enable-linger "$$(id -un)"
+endif
+ifeq ($(WUI_TAILSCALE),1)
+	@$(MAKE) --no-print-directory tailscale-serve TAILSCALE_PORT=$(HOST_PORT)
+endif
+
+## container-uninstall: Stop the wui container and remove its Quadlet unit (and its Tailscale HTTPS proxy if WUI_TAILSCALE=1)
+container-uninstall:
+	-systemctl --user stop wui.service
+	rm -f $(QUADLET_DIR)/wui.container
+	systemctl --user daemon-reload
+ifeq ($(WUI_TAILSCALE),1)
+	-@$(MAKE) --no-print-directory tailscale-serve-off
+endif
+
+# ---------------------------------------------------------------------------
+# HTTPS over Tailscale (needed to install the web GUI as an app on other devices)
+# ---------------------------------------------------------------------------
+# `tailscale serve` gets and renews a certificate for <machine>.<tailnet>.ts.net
+# and proxies https://<machine>.<tailnet>.ts.net to the local web GUI. Tailscale
+# keeps this setting across reboots, so it only has to be run once. Enable
+# "HTTPS Certificates" at https://login.tailscale.com/admin/dns first.
+TAILSCALE_PORT  ?= $(WUI_PORT)
+# Changing tailscale serve needs root unless you ran `sudo tailscale set --operator=$$USER`;
+# in that case pass TAILSCALE_SUDO=
+TAILSCALE_SUDO  ?= sudo
+
+## tailscale-serve: Serve the web GUI over HTTPS on your tailnet (TAILSCALE_PORT, TAILSCALE_SUDO)
+tailscale-serve:
+	@command -v tailscale >/dev/null || { echo "tailscale not found: install it from https://tailscale.com/download"; exit 1; }
+	$(TAILSCALE_SUDO) tailscale serve --bg --https=443 http://127.0.0.1:$(TAILSCALE_PORT)
+	@tailscale serve status
+
+## tailscale-serve-off: Stop serving the web GUI over HTTPS on your tailnet
+tailscale-serve-off:
+	$(TAILSCALE_SUDO) tailscale serve --https=443 off
+
+## tailscale-serve-status: Show what Tailscale serves over HTTPS
+tailscale-serve-status:
+	tailscale serve status
