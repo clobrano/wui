@@ -1,4 +1,4 @@
-.PHONY: build test install clean help image image-push run service-install service-uninstall service-status service-logs service-restart service-linger container-install container-uninstall tailscale-serve tailscale-serve-off tailscale-serve-status
+.PHONY: build test install clean help demo image image-push run service-install service-uninstall service-status service-logs service-restart service-linger container-install container-uninstall tailscale-serve tailscale-serve-off tailscale-serve-status
 
 WUI_CONFIG ?= $(HOME)/.config/wui/config.yaml
 
@@ -95,6 +95,10 @@ run:
 		-v "$(HOME)/.task:/home/wui/.task:z" \
 		-v "$(HOME)/.taskrc:/home/wui/.taskrc:ro,z" \
 		$(IMAGE)
+
+## demo: Re-record the README demo GIF on sample tasks (needs vhs and Taskwarrior)
+demo: build
+	vhs docs/demo/wui.tape
 
 ## help: Display this help message
 help:
