@@ -6,6 +6,7 @@
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#features-at-a-glance">Features</a> &bull;
   <a href="#configuration">Configuration</a> &bull;
+  <a href="#web-gui">Web GUI</a> &bull;
   <a href="#google-calendar-sync">Calendar Sync</a> &bull;
   <a href="#api-server">API Server</a>
 </p>
@@ -14,7 +15,11 @@
 
 If you already live in the terminal and rely on [Taskwarrior](https://taskwarrior.org) to manage your tasks, **wui** gives you a fast, keyboard-driven interface to do it all without leaving the command line.
 
-Built with Go and [Bubbletea](https://github.com/charmbracelet/bubbletea), wui is designed for speed, simplicity, and respect for the Taskwarrior workflow you already know.
+Built with Go and [Bubbletea](https://github.com/charmbracelet/bubbletea), wui is designed for speed, simplicity, and respect for the Taskwarrior workflow you already know. When you're away from the terminal, the same tasks are a browser tab away with the [web GUI](#web-gui).
+
+<p align="center">
+  <img src="docs/demo/wui.gif" alt="wui demo: browsing tabs and projects, viewing a task, filtering, adding, modifying and completing tasks" width="900">
+</p>
 
 ```
 wui
@@ -24,13 +29,14 @@ That's it. Press `?` for help.
 
 ## Why wui?
 
-- **Instant startup** &mdash; no loading screens, no web servers, no Electron
+- **Instant startup** &mdash; the TUI is a single binary: no loading screens, no Electron
 - **Vim-style navigation** &mdash; `h` `j` `k` `l`, `g` `G`, `Ctrl+d` `Ctrl+u` &mdash; feels like home
 - **Taskwarrior-native filtering** &mdash; use the same filter syntax you already know (`+work due:tomorrow project:Home`)
 - **Grouped views** &mdash; browse tasks organized by project or tag, drill in with `Enter`, back out with `Esc`
 - **Batch operations** &mdash; select multiple tasks with `Space`, then act on all of them at once
 - **Custom commands** &mdash; wire up any key to run a shell command with task data (`xdg-open {{.url}}`, copy to clipboard, git clone, etc.)
 - **Google Calendar sync** &mdash; push tasks to your calendar with `wui sync`
+- **Web GUI** &mdash; run `wui gui` for a browser UI that works on desktop and phone, installable as an app
 - **REST API server** &mdash; run `wui serve` to expose the Taskwarrior backend over HTTP for Flutter, web, or any other client
 - **Fully configurable** &mdash; tabs, columns, keybindings, themes, sort order &mdash; your workflow, your rules
 - **Respects your `.taskrc`** &mdash; reads your existing Taskwarrior contexts and settings
@@ -56,6 +62,7 @@ That's it. Press `?` for help.
 | **Autocomplete** | Tab-completion for projects and tags when creating or modifying tasks |
 | **Task validation** | Configurable guards: warn before completing tasks with TODO annotations or unresolved blockers |
 | **Google Calendar sync** | One-way sync to Google Calendar with priority color-coding |
+| **Web GUI** | Browser UI with the same tabs and filters, mobile gestures, and PWA install &mdash; see [Web GUI](#web-gui) |
 | **CLI integration** | `--search` flag to open with a pre-applied filter (great for scripts and aliases) |
 
 ## Installation
@@ -89,6 +96,9 @@ wui
 
 # Open straight into a search
 wui --search "project:Home +urgent"
+
+# Open the web GUI in your browser (http://localhost:7008)
+wui gui
 
 # Sync tasks to Google Calendar
 wui sync
@@ -519,19 +529,40 @@ wui is inspired by [taskwarrior-tui](https://github.com/kdheepak/taskwarrior-tui
 | Markdown export | Copy tasks to clipboard | &mdash; |
 | Short view | Auto-adapts to narrow terminals | &mdash; |
 
-## API Server
+## Web GUI
 
-`wui serve` starts a lightweight REST/JSON HTTP server backed by the same Taskwarrior client that the TUI uses. This lets any HTTP-capable client — Flutter, a web app, scripts, other terminals — drive the same business logic without running the TUI.
+`wui gui` serves a web interface for the same Taskwarrior data, so you can check and update your tasks from a browser, another computer or your phone.
 
 ```bash
-# Listen on localhost only (default)
-wui serve
-
-# Listen on all interfaces (e.g. to reach from a phone on the same network)
-wui serve --addr :7007
+wui gui                        # http://localhost:7008, opens your browser
+wui gui --port 8080            # another port
+wui gui --host 127.0.0.1       # reachable from this machine only
 ```
 
-The server shuts down cleanly on `Ctrl+C`.
+<p align="center">
+  <img src="docs/demo/gui-desktop.png" alt="wui web GUI: task list" width="66%">
+  &nbsp;
+  <img src="docs/demo/gui-mobile.png" alt="wui web GUI on a phone" width="22%">
+</p>
+<p align="center">
+  <img src="docs/demo/gui-detail.png" alt="wui web GUI: task details with annotations" width="66%">
+</p>
+
+What you get:
+
+- **The same tabs as the TUI** &mdash; Search, your configured tabs, and the grouped **Projects** and **Tags** views, all read from `~/.config/wui/config.yaml`, with the same columns
+- **Taskwarrior filters** &mdash; type any filter (`project:home +errand due.before:eow`); recent filters are kept in a history you can reuse
+- **Task details** &mdash; all fields, clickable links in annotations, and buttons to start/stop, edit, mark done or delete; add and remove annotations in place
+- **New and edit forms** &mdash; a **Form** mode with fields for project (with autocomplete), tags, priority, due/scheduled/wait/until dates, recurrence and dependencies, or a **Raw** mode where you type Taskwarrior arguments directly
+- **Batch actions** &mdash; tick several tasks (long-press on touch screens) to complete or delete them together
+- **Undo** &mdash; every done or delete shows an *Undo* toast
+- **Made for phones** &mdash; compact layout on small screens; swipe a task right to complete it or left to delete it
+- **Light and dark** &mdash; follows your system theme
+- **Installable** &mdash; add it to your home screen or desktop as an app (see [below](#installing-the-web-gui-as-an-app-pwa))
+
+`wui gui` starts the [REST API](#api-server) for you on `localhost:7007` if it isn't already running, and forwards `/api/v1/` to it, so the GUI's port is the only one you need to expose. The GUI has **no authentication**: anyone who can reach the port can read and change your tasks. Keep it on your own network, or use [Tailscale](#secure-access-with-tailscale).
+
+To keep it running in the background, or reach it from your other devices, see the next two sections.
 
 ### Running as a daemon (Linux / systemd)
 
@@ -603,6 +634,20 @@ Browsers only allow installing from a secure origin: `http://localhost:7008` wor
 Tailscale gets and renews the certificate itself and remembers this setting across reboots. Changing it needs root, so the targets run `sudo tailscale serve …`; if you made your user a Tailscale operator (`sudo tailscale set --operator=$USER`), pass `TAILSCALE_SUDO=`. Use `make tailscale-serve-status` to check it and `make tailscale-serve-off` to stop it. Note that the machine and tailnet names (not the GUI itself) end up in public certificate transparency logs.
 
 Any other reverse proxy with a certificate (Caddy, nginx, …) works too.
+
+## API Server
+
+`wui serve` starts a lightweight REST/JSON HTTP server backed by the same Taskwarrior client that the TUI uses. This lets any HTTP-capable client — Flutter, a web app, scripts, other terminals — drive the same business logic without running the TUI.
+
+```bash
+# Listen on localhost only (default)
+wui serve
+
+# Listen on all interfaces (e.g. to reach from a phone on the same network)
+wui serve --addr :7007
+```
+
+The server shuts down cleanly on `Ctrl+C`.
 
 ### Endpoints
 
